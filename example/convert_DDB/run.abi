@@ -1,0 +1,38 @@
+!ng2qpt 1 1 1
+ prtdos 0
+
+ ndivsm 20
+ nqpath 8
+ qpath
+    0.0    0.0    0.0
+    0.0    0.5    0.0
+    0.5    0.5    0.0
+    0.0    0.0    0.0
+    0.5    0.5    0.5
+    0.0    0.5    0.0
+    0.5    0.5    0.0
+    0.5    0.5    0.5
+
+ ifcflag 1
+ ngqpt  4 4 4
+ q1shft 0 0 0
+ nqshft 1
+ asr 0
+ chneut 1
+ dipdip 0
+ dipquad 0
+ quadquad 0
+ prt_ifc 1
+ ifcana 1
+
+lwfflag 1
+lwf_nwann 15
+lwf_ngqpt  4 4 4
+lwf_anchor_qpt  0 0 0
+lwf_anchor_iband  1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
+lwf_disentangle 1
+lwf_mu 200.0   
+lwf_sigma 50.0080
+lwf_anchor_proj  0 
+
+#lwf_projector 1 2 3

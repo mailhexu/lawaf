@@ -2,9 +2,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='wannierbuilder',
+    name='lawaf',
     version='0.1.5',
-    description='Downfold Hamiltonian',
+    description='Package for constructing of Lattice Wannier function and other types of Wannier functions',
     author='Xu He',
     author_email='mailhexu@gmail.com',
     license='GPLv3',

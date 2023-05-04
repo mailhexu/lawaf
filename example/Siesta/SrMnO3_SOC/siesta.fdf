@@ -1,0 +1,71 @@
+SystemName	siesta
+SystemLabel	siesta
+
+CDF.Compress	9
+CDF.Save	True
+MaxSCFIteration	60
+SCF.DM.Tolerance	0.0001
+SCF.EDM.Tolerance	1e-2 eV
+SCF.H.Tolerance	1e-3 eV
+SCF.Mixer.History	16
+SCF.Mixer.Method	Pulay
+SCF.Mixer.Spin	sum
+SCF.Mixer.Weight	0.4
+SaveHS	True
+Spin.OrbitStrength	1.0
+Write.DMHS.Netcdf	True
+WriteOrbMom	True
+SCFMustConverge	True
+
+Spin     	spin-orbit
+XC.functional	GGA
+XC.authors	PBE
+
+MeshCutoff	2721.1386024367243	eV
+PAO.EnergyShift	0.1	eV
+
+NumberOfSpecies	3
+NumberOfAtoms	5
+%block ChemicalSpecieslabel
+    1 38 Sr.1
+    2 25 Mn.2
+    3 8 O.3
+%endblock ChemicalSpecieslabel
+
+%block PAO.BasisSizes
+    Sr.1	DZP
+    Mn.2	DZP
+    O.3	DZP
+%endblock PAO.BasisSizes
+
+
+LatticeConstant	1.0 Ang
+%block LatticeVectors
+    3.804443964000000     -0.000000000000000     0.000000000000000 
+    -0.000000000000000     3.804442236000000     0.000000000000000 
+    0.000000000000000     0.000000000000000     3.804448543000000 
+%endblock LatticeVectors
+
+
+AtomicCoordinatesFormat  Ang
+%block AtomicCoordinatesAndAtomicSpecies
+     0.000000000      0.000000000      0.000000000 1
+     1.902221982      1.902221118      1.902224271 2
+     0.000000000      1.902221118      1.902224271 3
+     1.902221982      0.000000000      1.902224271 3
+     1.902221982      1.902221118      0.000000000 3
+%endblock AtomicCoordinatesAndAtomicSpecies
+
+%block DM.InitSpin
+    2 3.00000000000000
+%endblock DM.InitSpin
+
+DM.UseSaveDM	True
+
+#KPoint grid
+%block kgrid_Monkhorst_Pack
+     5       0       0  0.0
+     0       5       0  0.0
+     0       0       5  0.0
+%endblock kgrid_Monkhorst_Pack
+

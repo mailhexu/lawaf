@@ -1,0 +1,6 @@
+The pseudopotentials can be downloaded in the Pseudodojo database.
+http://www.pseudo-dojo.org/index.html
+Please select the full-relativistic pseudopotentials, with the PBE xc functional, in the psml format. 
+The Max or Psml branch of siesta with psml support is needed to run the 
+
+
