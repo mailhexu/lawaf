@@ -1,4 +1,4 @@
-from wannierbuilder.scdm.lwf import LWF
+from lawaf.scdm.lwf import LWF
 import numpy as np
 from minimulti.utils.supercell import SupercellMaker
 from pyDFTutils.ase_utils import vesta_view

@@ -8,7 +8,7 @@ from scipy.sparse import csr_matrix
 from netCDF4 import Dataset
 from collections import defaultdict
 from scipy.optimize import curve_fit
-from wannierbuilder.utils.supercell import SupercellMaker
+from lawaf.utils.supercell import SupercellMaker
 from scipy.sparse import coo_matrix
 from itertools import groupby
 from ase.dft.kpoints import bandpath

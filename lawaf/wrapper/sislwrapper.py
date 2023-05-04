@@ -1,8 +1,8 @@
 import numpy as np
 from scipy.linalg import eigh
-from wannierbuilder.math.linalg import Lowdin
+from lawaf.math.linalg import Lowdin
 from ase.atoms import Atoms
-from wannierbuilder.utils.symbol import symbol_number
+from lawaf.utils.symbol import symbol_number
 from collections import defaultdict
 
 

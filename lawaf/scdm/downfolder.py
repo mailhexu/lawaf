@@ -5,15 +5,15 @@ import copy
 import json
 from ase.dft.kpoints import monkhorst_pack
 import numpy as np
-from wannierbuilder.scdm.scdmk import (WannierProjectedBuilder,
+from lawaf.scdm.scdmk import (WannierProjectedBuilder,
                                        WannierScdmkBuilder, occupation_func)
 import matplotlib.pyplot as plt
-from wannierbuilder.plot import plot_band
-from wannierbuilder.wrapper.ijR import ijR
-from wannierbuilder.wrapper.wannier90 import wannier_to_model
-from wannierbuilder.wrapper.sislwrapper import SislWrapper,  SislHSWrapper, SislWFSXWrapper
-from wannierbuilder.wrapper.phonopywrapper import PhonopyWrapper
-from wannierbuilder.wrapper.myTB import MyTB
+from lawaf.plot import plot_band
+from lawaf.wrapper.ijR import ijR
+from lawaf.wrapper.wannier90 import wannier_to_model
+from lawaf.wrapper.sislwrapper import SislWrapper,  SislHSWrapper, SislWFSXWrapper
+from lawaf.wrapper.phonopywrapper import PhonopyWrapper
+from lawaf.wrapper.myTB import MyTB
 
 
 @dataclass
@@ -110,7 +110,7 @@ def make_builder(model,
     return wann_builder
 
 
-class BandDownfolder():
+class Lawaf():
     def __init__(self, model):
         """
         Setup the model
@@ -261,7 +261,7 @@ class BandDownfolder():
         return ax
 
 
-class W90Downfolder(BandDownfolder):
+class W90Downfolder(Lawaf):
     def __init__(self, folder, prefix):
         """
         folder   # The folder containing the Wannier function files
@@ -271,7 +271,7 @@ class W90Downfolder(BandDownfolder):
         self.model = m
 
 
-class SislDownfolder(BandDownfolder):
+class SislDownfolder(Lawaf):
     def __init__(self,
                  folder=None,
                  fdf_file=None,
@@ -410,7 +410,7 @@ class SislDownfolder(BandDownfolder):
         return grid
 
 
-class PhononDownfolder(BandDownfolder):
+class PhononDownfolder(Lawaf):
     def __init__(self, model):
         self.model = model
         try:

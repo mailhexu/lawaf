@@ -1,6 +1,6 @@
 import numpy as np
 from ase.dft.kpoints import monkhorst_pack
-from wannierbuilder.utils.kpoints import kmesh_to_R
+from lawaf.utils.kpoints import kmesh_to_R
 from scipy.linalg import eigh
 
 

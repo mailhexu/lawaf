@@ -9,8 +9,8 @@ from ase.io import read
 from ase.atoms import Atoms
 #from TB2J.utils import auto_assign_basis_name
 from functools import lru_cache
-from wannierbuilder.wrapper.w90_parser import parse_ham, parse_xyz, parse_win
-from wannierbuilder.wrapper.utils import auto_assign_basis_name
+from lawaf.wrapper.w90_parser import parse_ham, parse_xyz, parse_win
+from lawaf.wrapper.utils import auto_assign_basis_name
 
 
 class AbstractTB():

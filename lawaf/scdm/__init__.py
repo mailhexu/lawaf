@@ -1,2 +1,2 @@
-from .downfolder import (BandDownfolder, PhonopyDownfolder, SislDownfolder,
+from .downfolder import (Lawaf, PhonopyDownfolder, SislDownfolder,
                          W90Downfolder)

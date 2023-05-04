@@ -7,8 +7,8 @@ from scipy.linalg import qr, svd, norm, eigh
 from scipy.special import erfc
 from netCDF4 import Dataset
 from ase.dft.kpoints import get_monkhorst_pack_size_and_offset
-from wannierbuilder.utils.kpoints import kmesh_to_R, build_Rgrid
-from wannierbuilder.scdm.lwf import LWF
+from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
+from lawaf.scdm.lwf import LWF
 
 
 def scdm(psiT, ncol):
@@ -20,7 +20,7 @@ def scdm(psiT, ncol):
     return cols
 
 
-class WannierBuilder():
+class Lawaf():
     """
     General Wannier function builder
     """
@@ -264,7 +264,7 @@ class WannierBuilder():
         root.close()
 
 
-class WannierProjectedBuilder(WannierBuilder):
+class WannierProjectedBuilder(Lawaf):
     """
     Projected Wannier functions.
     We define a set of projectors, which is a nwann*nbasis matrix.
@@ -324,7 +324,7 @@ class WannierProjectedBuilder(WannierBuilder):
         return U @ VT
 
 
-class WannierScdmkBuilder(WannierBuilder):
+class WannierScdmkBuilder(Lawaf):
     """
     Build Wannier functions using the SCDMk method.
     """

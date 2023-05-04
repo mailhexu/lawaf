@@ -5,7 +5,7 @@ simple IFC wrapper
 from scipy.linalg import eigh
 import numpy as np
 #from minimulti.ioput.ifc_netcdf import read_ifc_from_netcdf, save_ifc_to_netcdf
-from wannierbuilder.plot import plot_band
+from lawaf.plot import plot_band
 import matplotlib.pyplot as plt
 
 

@@ -2,8 +2,8 @@ import numpy as np
 from ase.io import read
 import os
 from collections import OrderedDict
-#import banddownfolder.wrapper.pythtb as pythtb
-from wannierbuilder.utils.symbol import symbol_number
+#import lawaf.wrapper.pythtb as pythtb
+from lawaf.utils.symbol import symbol_number
 
 
 def _red_to_cart(tmp, red):

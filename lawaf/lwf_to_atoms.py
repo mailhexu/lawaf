@@ -1,16 +1,14 @@
-from banddownfolder.scdm.lwf import LWF
+from lawaf.scdm.lwf import LWF
 import numpy as np
 from minimulti.utils.supercell import SupercellMaker
-from pyDFTutils.ase_utils import vesta_view
 from netCDF4 import Dataset
 from ase.io import read, write
 from scipy.sparse import dok_matrix, csr_matrix, save_npz, load_npz
 from ase.units import Bohr
 from ase import Atoms
-from pyDFTutils.ase_utils import vesta_view
 import copy
 import os
-
+from pyDFTutils.ase_utils import vesta_view
 
 def write_atoms_to_netcdf(fname, atoms: Atoms):
     root = Dataset(fname, 'w')

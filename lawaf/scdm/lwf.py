@@ -3,9 +3,9 @@ import copy
 from scipy.linalg import eigh
 from netCDF4 import Dataset
 from ase import Atoms
-from wannierbuilder.scdm.eigen_modifer import HamModifier, force_ASR_kspace
+from lawaf.scdm.eigen_modifer import HamModifier, force_ASR_kspace
 import matplotlib.pyplot as plt
-from wannierbuilder.plot import plot_band
+from lawaf.plot import plot_band
 from dataclasses import dataclass
 
 

@@ -1,3 +1,3 @@
-from wannierbuilder.scdm.downfolder import W90Downfolder, SislDownfolder, PhonopyDownfolder, BandDownfolder
-from wannierbuilder.scdm.lwf import LWF
+from lawaf.scdm.downfolder import W90Downfolder, SislDownfolder, PhonopyDownfolder, Lawaf
+from lawaf.scdm.lwf import LWF
 

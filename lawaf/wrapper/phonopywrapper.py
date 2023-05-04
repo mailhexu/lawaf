@@ -4,13 +4,13 @@ import numpy as np
 from phonopy import load, Phonopy
 from ase import Atoms
 from ase.dft.kpoints import monkhorst_pack
-from wannierbuilder.utils.kpoints import kmesh_to_R, build_Rgrid
+from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
 #from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
-from wannierbuilder.plot import plot_band
-from wannierbuilder.wrapper.ifcwrapper import IFC
+from lawaf.plot import plot_band
+from lawaf.wrapper.ifcwrapper import IFC
 import matplotlib.pyplot as plt
 #from supercellmap import SupercellMaker
-from wannierbuilder.utils.supercell import SupercellMaker
+from lawaf.utils.supercell import SupercellMaker
 
 
 class PhonopyWrapper():

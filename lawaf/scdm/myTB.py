@@ -204,12 +204,12 @@ class MyTB(AbstractTB):
         return nm
 
     @staticmethod
-    def load_banddownfolder(path,
+    def load_lawaf(path,
                             prefix,
                             posfile='POSCAR',
                             nls=True,
                             groupby='spin'):
-        from wannierbuilder.scdm.lwf import LWF
+        from lawaf.scdm.lwf import LWF
         lwf = LWF.load_nc(fname=os.path.join(path, f"{prefix}.nc"))
         nbasis = lwf.nwann
         nspin = 1
