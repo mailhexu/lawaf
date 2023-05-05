@@ -46,24 +46,6 @@ class Lawaf():
 
         self.wfn_anchor = wfn_anchor
 
-        if False:
-            shift = 1.3
-            shift2 = shift-0.01
-            ik = self.find_k((0.5, 0, 0.5))
-            self.evals[ik, 0] -= shift
-            self.evals[ik, 1] -= shift2
-
-            ik = self.find_k((0.5, 0, -0.5))
-            self.evals[ik, 0] -= shift
-            self.evals[ik, 1] -= shift2
-
-            ik = self.find_k((-0.5, 0, -0.5))
-            self.evals[ik, 0] -= shift
-            self.evals[ik, 1] -= shift2
-
-            ik = self.find_k((-0.5, 0, 0.5))
-            self.evals[ik, 0] -= shift
-            self.evals[ik, 1] -= shift2
 
         self.ndim = self.kpts.shape[1]
         self.nkpt, self.nbasis, self.nband = np.shape(wfn)

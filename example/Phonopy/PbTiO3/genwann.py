@@ -1,6 +1,6 @@
 import numpy as np
 from ase.io import write
-from banddownfolder.scdm import PhonopyDownfolder
+from lawaf.scdm import PhonopyDownfolder
 import matplotlib.pyplot as plt
 
 fname = 'phonopy_params.yaml'

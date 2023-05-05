@@ -1,7 +1,7 @@
 import numpy as np
 from ase.dft.kpoints import monkhorst_pack
-from lawaf.utils.kpoints import kmesh_to_R
 from scipy.linalg import eigh
+from lawaf.utils.kpoints import kmesh_to_R
 
 
 def HR_to_k(HR, Rlist, kpts):
