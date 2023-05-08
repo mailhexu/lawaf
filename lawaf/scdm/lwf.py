@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class twobody_terms:
+class TwobodyTerms():
     #nterm: int = 0
     #Rlist: np.ndarray = None
     #coeff_twobody: np.array
@@ -223,8 +223,8 @@ class LWF():
         wannR_imag[:] = np.imag(self.wannR)
         wann_center_xred[:] = np.array(self.wann_centers)
 
-        if twobody_terms is not None:
-            twobody_terms.write_to_netcdf_file(root)
+        if self.twobody_terms is not None:
+            self.twobody_terms.write_to_netcdf_file(root)
 
         root.close()
 

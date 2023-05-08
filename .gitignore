@@ -1,5 +1,14 @@
 Downfolded_hr.nc
 Downfolded_hr.txt 
+Downfold.json
+lwf.nc
+*.vasp
+*.pdf
+*.png
+*.cif
+*.mcif
+*.nc
+
 
 doc/refs/*.pdf
 

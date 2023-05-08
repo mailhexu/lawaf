@@ -4,6 +4,7 @@ import os
 import copy
 import json
 from ase.dft.kpoints import monkhorst_pack
+from lawaf.utils.kpoints import monkhorst_pack
 import numpy as np
 from lawaf.scdm.scdmk import (WannierProjectedBuilder,
                                        WannierScdmkBuilder, occupation_func)
@@ -20,6 +21,7 @@ from lawaf.wrapper.myTB import MyTB
 class WFParams():
     method = 'scdmk'
     kmesh: Tuple[int] = (5, 5, 5)
+    gamma: bool = True
     nwann: int = 0
     weight_func: str = 'unity'
     mu: float = 0.0
@@ -212,7 +214,7 @@ class Lawaf():
                           ax=None,
                           savefig='Downfolded_band.png',
                           cell=np.eye(3),
-                          show=True):
+                          show=True, **kwargs):
         """
         Parameters:
         ========================================
@@ -241,7 +243,7 @@ class Lawaf():
                            erange=erange,
                            efermi=efermi,
                            cell=cell,
-                           ax=ax, **kargs)
+                           ax=ax, **kwargs)
         ax = plot_band(self.ewf,
                        kvectors=kvectors,
                        knames=knames,
@@ -253,7 +255,7 @@ class Lawaf():
                        marker=marker,
                        erange=erange,
                        cell=cell,
-                       ax=ax, **kargs)
+                       ax=ax, **kwargs)
         if savefig is not None:
             plt.savefig(savefig)
         if show:
@@ -312,7 +314,6 @@ class SislDownfolder(Lawaf):
         self.shift_fermi = None
 
         if mode == 'HS':
-        if H is None:
             fdf = sisl.get_sile(os.path.join(folder, fdf_file))
             fdf.read()
             H = fdf.read_hamiltonian()

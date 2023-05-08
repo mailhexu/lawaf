@@ -1,6 +1,6 @@
 import numpy as np
 from ase import Atoms
-from mcif import write_mcif
+from lawaf.plot.mcif import write_mcif
 #from ase.io import write
 #from ase.io.cif import write_cif
 
