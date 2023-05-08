@@ -174,8 +174,8 @@ class Lawaf():
     def downfold(self,
                  post_func=None,
                  output_path='./',
-                 write_hr_nc='Downfolded_hr.nc',
-                 write_hr_txt='Downfolded_hr.txt',
+                 write_hr_nc='LWF.nc',
+                 write_hr_txt='LWF.txt',
                  **params):
         self.params.update(params)
         if 'post_func' in self.params:
