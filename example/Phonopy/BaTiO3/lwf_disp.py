@@ -98,23 +98,31 @@ class MyLWFSC():
         return self.sc_atoms, disp
 
 
-def test_mapping():
-    mylwf = LWF.load_nc(fname='./lwf.nc')
-
-    scmaker = SupercellMaker(sc_matrix=np.diag([2, 2, 2]), center=True)
+def write_lwf_cif(lwf=None, lwf_fname=None, sc_matrix=np.diag([2, 2, 2]), center=True, amp=1.0, prefix="LWF", listlwf=None):
+    if lwf is None:
+        mylwf = LWF.load_nc(fname=lwf_fname)
+    scmaker = SupercellMaker(sc_matrix=sc_matrix, center=center)
     mylwfsc = MyLWFSC(mylwf, scmaker)
-    nwan=scmaker.ncell*3
-    amp = np.zeros((nwan, ))
-    amp[1]=1
+    #nwan=scmaker.ncell*3
+    nlwf=mylwfsc.nlwf
+    nlwf_sc = scmaker.ncell * nlwf
+    amps = np.zeros((nlwf_sc, ))
+    if listlwf is None:
+        listlwf=list(range(nlwf))
+    elif isinstance(listlwf, int):
+        listlwf=[listlwf]
 
-    atoms, disp=mylwfsc.get_distorted_atoms(amp)
-    print(disp)
-    write("disp.vasp", atoms, vasp5=True, sort=False)
-    write_mcif("wf1.cif", atoms, vectors=disp, factor=1)
+    atoms_lwfs=[]
+    disps=[]
+    for i in listlwf:
+        amps[i]=amp
+        atoms, disp=mylwfsc.get_distorted_atoms(amps)
+        atoms_lwfs.append(atoms)
+        disps.append(disp)
+        write_mcif(f"{prefix}_{i:04d}.cif", atoms, vectors=disp, factor=1)
+    return atoms
 
-
-
-test_mapping()
+write_lwf_cif(lwf_fname="lwf.nc")
 
 
 def lwf_to_atoms(mylwf: LWF, scmat, amplist):

@@ -1,14 +1,17 @@
 from lawaf.scdm.lwf import LWF
+from lawaf.plot.mcif import write_mcif
 import numpy as np
 from minimulti.utils.supercell import SupercellMaker
+from pyDFTutils.ase_utils import vesta_view
 from netCDF4 import Dataset
 from ase.io import read, write
 from scipy.sparse import dok_matrix, csr_matrix, save_npz, load_npz
 from ase.units import Bohr
 from ase import Atoms
+from pyDFTutils.ase_utils import vesta_view
 import copy
 import os
-from pyDFTutils.ase_utils import vesta_view
+
 
 def write_atoms_to_netcdf(fname, atoms: Atoms):
     root = Dataset(fname, 'w')
@@ -65,7 +68,7 @@ class MyLWFSC():
                  lwf,
                  scmaker,
                  mapping_file=None,
-                 scatoms_file='scatoms.vasp'):
+                 scatoms_file=None):
         self.lwf = lwf
 
         nR, self.natom3, self.nlwf = self.lwf.wannR.shape
@@ -79,39 +82,48 @@ class MyLWFSC():
             if mapping_file is not None:
                 save_npz(mapping_file, self.mapping_mat)
         self.prim_atoms = self.lwf.atoms
-        if os.path.exists(scatoms_file):
+        if scatoms_file is not None and os.path.exists(scatoms_file):
             self.sc_atoms = read(scatoms_file)
         else:
             self.sc_atoms = scmaker.sc_atoms(self.prim_atoms)
-            write(scatoms_file, self.sc_atoms, vasp5=True)
+            #write(scatoms_file, self.sc_atoms, vasp5=True)
 
     def get_distorted_atoms(self, amp):
         disp = (self.mapping_mat @ amp).reshape((self.natom_sc, 3))
         atoms = copy.deepcopy(self.sc_atoms)
         positions = atoms.get_positions() + disp
         atoms.set_positions(positions)
-        write('datoms.vasp', atoms, vasp5=True, sort=True)
-        write_atoms_to_netcdf('datoms.nc', atoms)
-        return atoms
+        #write('datoms.vasp', atoms, vasp5=True, sort=True)
+        #write_atoms_to_netcdf('datoms.nc', atoms)
+        return self.sc_atoms, disp
 
 
-def test_mapping():
-    mylwf = LWF.load_nc(fname='./lwf.nc')
-
-    scmaker = SupercellMaker(sc_matrix=np.diag([4, 4, 4]))
+def write_lwf_cif(lwf=None, lwf_fname=None,  sc_matrix=np.diag([2, 2, 2]), center=True, amp=1.0, prefix="LWF", listlwf=None):
+    if lwf is None:
+        mylwf = LWF.load_nc(fname=lwf_fname)
+    scmaker = SupercellMaker(sc_matrix=sc_matrix, center=center)
     mylwfsc = MyLWFSC(mylwf, scmaker)
-    amp = np.zeros((128, ))
-    amp[0]=1.4
-    #amp[1]=0.9
-    #amp[::4] = 0.3
-    #amp[2::4]=-0.3
-    #amp[1::4] = 0.3
-    #amp[3::4]=-0.3
+    #nwan=scmaker.ncell*3
+    nlwf=mylwfsc.nlwf
+    nlwf_sc = scmaker.ncell * nlwf
+    if listlwf is None:
+        listlwf=list(range(nlwf))
+    elif isinstance(listlwf, int):
+        listlwf=[listlwf]
 
-    mylwfsc.get_distorted_atoms(amp)
+    atoms_lwfs=[]
+    disps=[]
+    for i in listlwf:
+        amps = np.zeros((nlwf_sc, ))
+        amps[i]=amp
+        atoms, disp=mylwfsc.get_distorted_atoms(amps)
+        atoms_lwfs.append(atoms)
+        disps.append(disp)
+        atoms.set_pbc(True)
+        write_mcif(f"{prefix}_{i:04d}.cif", atoms, vectors=disp, factor=1)
+    return atoms
 
-
-test_mapping()
+#write_lwf_cif(lwf_fname="Downfolded_hr.nc", listlwf=[0,1,2], sc_matrix=np.diag([3,3,3]))
 
 
 def lwf_to_atoms(mylwf: LWF, scmat, amplist):
@@ -124,21 +136,19 @@ def lwf_to_atoms(mylwf: LWF, scmat, amplist):
     nR, natom3, nlwf = mylwf.wannR.shape
     scnatom = len(scatoms)
 
-    #print(mylwf.wannR[mylwf.Rdict[(0,0,0)],:, 0].real)
     displacement = np.zeros_like(positions.flatten())
     for (R, iwann, ampwann) in amplist:
         iwann = int(iwann) - 1
         for Rwann, iRwann in mylwf.Rdict.items():
             for j in range(natom3):
                 sc_j, sc_R = scmaker.sc_jR_to_scjR(j, Rwann, R, natom3)
-                #print(f"{mylwf.wannR[iRwann, iwann, j].real: .2f}")
                 amp = ampwann * mylwf.wannR[iRwann, j, iwann]
-                #print(f"{amp:.2f}")
                 displacement[sc_j] += amp.real
     sc_pos = positions + displacement.reshape((scnatom, 3))
-    #print(displacement.reshape((scnatom, 3))[:6])
     scatoms.set_positions(sc_pos)
     return scatoms
+
+
 
 
 def load_amplist(fname):
