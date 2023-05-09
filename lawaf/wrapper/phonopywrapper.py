@@ -2,6 +2,7 @@ import copy
 from scipy.linalg import eigh
 import numpy as np
 from phonopy import load, Phonopy
+from phonopy.harmonic.dynamical_matrix import DynamicalMatrixGL
 from ase import Atoms
 from ase.dft.kpoints import monkhorst_pack
 from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
@@ -11,6 +12,7 @@ from lawaf.wrapper.ifcwrapper import IFC
 import matplotlib.pyplot as plt
 #from supercellmap import SupercellMaker
 from lawaf.utils.supercell import SupercellMaker
+
 
 
 class PhonopyWrapper():

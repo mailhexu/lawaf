@@ -432,7 +432,12 @@ class WannierScdmkBuilder(Lawaf):
         """
         calculate Amn for one k point using scdmk method.
         """
+        psik=self.get_psi_k(ik)
+        occ=self.occ[ik]
+        projs=self.projs[ik]
+        return self.get_Amn_psik(psik,occ=self.occ[ik], projs=projjs)
 
+    def get_Amn_psik(self, psik, occ, projs):
         if self.use_proj:
             psi = self.get_psi_k(ik)[self.cols, :] * (self.occ[ik] *
                                                       self.projs[ik])[None, :]
@@ -441,6 +446,9 @@ class WannierScdmkBuilder(Lawaf):
         U, _S, VT = svd(psi.T.conj(), full_matrices=False)
         Amn_k = U @ VT
         return Amn_k
+
+
+
 
     def get_Amn_one_k_old(self, ik):
         """
