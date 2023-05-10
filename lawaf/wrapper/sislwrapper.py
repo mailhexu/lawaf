@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.linalg import eigh
-from lawaf.math.linalg import Lowdin
+from lawaf.mathutils.linalg import Lowdin
 from ase.atoms import Atoms
 from lawaf.utils.symbol import symbol_number
 from collections import defaultdict

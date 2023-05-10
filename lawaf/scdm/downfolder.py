@@ -113,12 +113,17 @@ def make_builder(model,
 
 
 class Lawaf():
+    params: WFParams =None
+    builder: Union[WannierProjectedBuilder, WannierScdmkBuilder] =None
+    model: Union[SislHSWrapper, PhonopyWrapper, MyTB] =None
+
     def __init__(self, model):
         """
         Setup the model
         """
         self.model = model
         self.params = {}
+        self.builder: Union[WannierProjectedBuilder, WannierScdmkBuilder] = None
 
     def set_parameters(self,
                        method='scdmk',
@@ -412,12 +417,15 @@ class SislDownfolder(Lawaf):
 
 
 class PhononDownfolder(Lawaf):
-    def __init__(self, model):
+    def __init__(self, model, atoms=None):
         self.model = model
-        try:
-            self.atoms = self.model.atoms
-        except Exception:
-            self.atoms = None
+        if atoms is not None:
+            self.atoms = atoms
+        else:
+            try:
+                self.atoms = self.model.atoms
+            except Exception:
+                self.atoms = None
         self.params = {}
 
 
@@ -436,4 +444,38 @@ class PhonopyDownfolder(PhononDownfolder):
                 "phonopy is needed. Do you have phonopy installed?")
         if phonon is None:
             phonon = phonopy.load(*argv, **kwargs)
-        super().__init__(PhonopyWrapper(phonon, mode=mode))
+        model=PhonopyWrapper(phonon, mode=mode)
+        super().__init__(model, atoms=model.atoms)
+        self.has_nac=self.model.has_nac
+
+
+    def downfold(self,
+                 post_func=None,
+                 output_path='./',
+                 write_hr_nc='LWF.nc',
+                 write_hr_txt='LWF.txt',
+                 **params):
+        self.params.update(params)
+        if 'post_func' in self.params:
+            self.params.pop('post_func')
+        self.builder = make_builder(self.model, **self.params)
+        self.atoms = self.model.atoms
+        if self.has_nac:
+            self.ewf = self.builder.get_wannier_nac(Hshort)
+        else:
+            self.ewf = self.builder.get_wannier()
+        if post_func is not None:
+            post_func(self.ewf)
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        try:
+            self.save_info(output_path=output_path)
+        except:
+            pass
+        if write_hr_txt is not None:
+            self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
+        if write_hr_nc is not None:
+            #self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+            self.ewf.write_nc(os.path.join(
+                output_path, write_hr_nc), atoms=self.atoms)
+        return self.ewf

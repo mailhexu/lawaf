@@ -7,6 +7,7 @@ from lawaf.scdm.eigen_modifer import HamModifier, force_ASR_kspace
 import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
 from dataclasses import dataclass
+from typing import Union
 
 
 @dataclass
@@ -48,11 +49,34 @@ class TwobodyTerms():
         orderj[:] = self.coeff_twobody[3, :]
         val[:] = self.val
 
+@dataclass
+class GenericWF():
+    """Generic Wannier functions class"""
+    nwann: int = 0
+    ndim: int = 3
+    nbasis: int = 0
+    nR: int = 0
+    wannR: np.ndarray = None
+    HwannR: np.ndarray = None
+    Rlist: np.ndarray = None
+    cell: np.ndarray = None
+    wann_centers: Union[np.ndarray, None] = None
+    Rdict: Union[dict, None] = None
+    name: str = "GenericWF"
 
-class LWF():
+
+
+class LWF(GenericWF):
     """
     Localized Wannier function
     """
+    name: str = "LWF"
+    atoms: Atoms = None
+    has_nac: bool = False
+    born_effective_charges: np.ndarray = None
+    dielectric_tensor: np.ndarray = None
+    factor: float = 1.0
+    Zwann: np.ndarray = None
 
     def __init__(self,
                  wannR,
@@ -61,6 +85,10 @@ class LWF():
                  cell,
                  wann_centers,
                  atoms=None,
+                 born=None,
+                 has_nac=False,
+                 dielectric=None, 
+                 factor=1.0,
                  fortran_order=False,
                  twobody_terms=None):
         self.atoms = atoms
@@ -75,6 +103,25 @@ class LWF():
         for i, R in enumerate(Rlist):
             self.Rdict[tuple(R)] = i
         self.twobody_terms = twobody_terms
+        self.has_nac = has_nac
+        self.born_effective_charges = born
+        self.dielectric_tensor = dielectric
+        self.factor = factor
+        if atoms is not None:
+            self.natom=len(self.atoms)
+        self.atoms=atoms
+
+    def get_wannier_born(self):
+        if self.has_nac:
+            self.Zwann=np.zeros((self.nwann, 3))
+            for i in range(self.nwann):
+                W_R_tau_i = self.wannR[:, :, i].reshape(self.nR, self.natom, 3)
+                # TODO: check the order of born effective charges (de or ed?)
+                # R: Rvector. d & e: directions of dispalcement and efield
+                self.Zwann[i, :] = np.einsum("Rad,ade->e", W_R_tau_i, self.born_effective_charges)
+        else:
+            self.Zwann = None
+
 
     def find_iR_at_zero(self):
         iR = np.argmin(np.linalg.norm(self.Rlist, axis=1))
@@ -232,6 +279,12 @@ class LWF():
         m3 = np.kron(masses, [1, 1, 1])
         # print(self.wannR.conj()*self.wannR)
         return np.einsum('rij,i->j', (self.wannR.conj() * self.wannR), m3)
+
+    def born_to_lwf(self, born):
+        wborn=np.zeors((self.nwann,3))
+        for i in range(self.nwann):
+            for j in range(self.natom):
+                wborn[i]
 
     def write_lwf_nc(self, fname, prefix='wann_', atoms=None):
         root = Dataset(fname, 'w')

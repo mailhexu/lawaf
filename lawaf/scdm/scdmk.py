@@ -2,6 +2,7 @@
 Wannier Module: For building Wannier functions and Hamiltonians.
 """
 
+import copy
 import numpy as np
 from scipy.linalg import qr, svd, norm, eigh
 from scipy.special import erfc
@@ -9,22 +10,45 @@ from netCDF4 import Dataset
 from ase.dft.kpoints import get_monkhorst_pack_size_and_offset
 from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
 from lawaf.scdm.lwf import LWF
+from typing import Callable, Optional, Tuple, Union
+from dataclasses import dataclass
 
 
 def scdm(psiT, ncol):
     """
     select columns for a psiT.
     """
-    _Q, _R, piv = qr(psiT, mode='full', pivoting=True)
+    _Q, _R, piv = qr(psiT, mode="full", pivoting=True)
     cols = piv[:ncol]
     return cols
 
 
-class Lawaf():
+@dataclass
+class BasicLaWaf:
+    evals: np.ndarray = None
+    wfn: np.ndarray = None
+    positions: np.ndarray = None
+    kpts: np.ndarray = None
+    nwann: int = None
+    weight_func: Callable = None
+    exclude_bands: Optional[Tuple[int]] = None
+    wfn_anchor: Optional[np.ndarray] = None
+    ndim: int = 3
+    nkpt: int = None
+    nbaisis: int = None
+    nband: int = None
+    is_orthogonal: bool = False
+    S: np.ndarray = None
+    has_phase: bool = True
+    build_Rgrid: Optional[np.ndarray] = None
+
+
+
+
+class Lawaf(BasicLaWaf):
     """
     General Wannier function builder
     """
-
     def __init__(
         self,
         evals,
@@ -33,20 +57,17 @@ class Lawaf():
         kpts,
         nwann,
         weight_func,
+        atoms=None,
         kweights=None,
         Sk=None,
         has_phase=True,
         Rgrid=None,
         exclude_bands=None,
-        wfn_anchor=None
+        wfn_anchor=None,
     ):
         self.evals = np.array(evals)
-
         self.kpts = np.array(kpts, dtype=float)
-
         self.wfn_anchor = wfn_anchor
-
-
         self.ndim = self.kpts.shape[1]
         self.nkpt, self.nbasis, self.nband = np.shape(wfn)
 
@@ -58,21 +79,19 @@ class Lawaf():
         # exclude bands
         if exclude_bands is None:
             exclude_bands = []
-        self.ibands = tuple(
-            [i for i in range(self.nband) if i not in exclude_bands])
+        self.ibands = tuple([i for i in range(self.nband) if i not in exclude_bands])
         self.nband = len(self.ibands)
         self.nwann = nwann
         self.positions = positions
         # kpts
         self.nkpt = self.kpts.shape[0]
-        self.kmesh, self.k_offset = get_monkhorst_pack_size_and_offset(
-            self.kpts)
+        self.kmesh, self.k_offset = get_monkhorst_pack_size_and_offset(self.kpts)
         if not kweights:
             self.kweights = np.ones(self.nkpt, dtype=float) / self.nkpt
         else:
             self.kweights = kweights
         self.weight_func = weight_func
-
+        self.atoms = atoms
         # Rgrid
         self.Rgrid = Rgrid
         self._prepare_Rlist()
@@ -90,15 +109,11 @@ class Lawaf():
 
         self.Amn = np.zeros((self.nkpt, self.nband, self.nwann), dtype=complex)
 
-        self.wannk = np.zeros((self.nkpt, self.nbasis, self.nwann),
-                              dtype=complex)
-        self.Hwann_k = np.zeros((self.nkpt, self.nwann, self.nwann),
-                                dtype=complex)
+        self.wannk = np.zeros((self.nkpt, self.nbasis, self.nwann), dtype=complex)
+        self.Hwann_k = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
 
-        self.HwannR = np.zeros((self.nR, self.nwann, self.nwann),
-                               dtype=complex)
-        self.wannR = np.zeros((self.nR, self.nbasis, self.nwann),
-                              dtype=complex)
+        self.HwannR = np.zeros((self.nR, self.nwann, self.nwann), dtype=complex)
+        self.wannR = np.zeros((self.nR, self.nbasis, self.nwann), dtype=complex)
 
     def get_wannier(self):
         """
@@ -108,6 +123,18 @@ class Lawaf():
         self.get_Amn()
         self.get_wannk_and_Hk()
         lwf = self.k_to_R()
+        lwf.atoms = copy.deepcopy(self.atoms)
+        return lwf
+
+    def get_wannier_nac(self, Hshort):
+        """
+        Calculate Wannier functions but using non-analytic correction.
+        """
+        self.prepare()
+        self.get_Amn()
+        self.get_wannk_and_Hk_nac(Hshort)
+        lwf = self.k_to_R()
+        lwf.atoms = copy.deepcopy(self.atoms)
         return lwf
 
     def prepare(self):
@@ -132,7 +159,7 @@ class Lawaf():
         return self.evals[ikpt, self.ibands]
 
     def _remove_phase_k(self, wfnk, k):
-        #phase = np.exp(-2j * np.pi * np.einsum('j, kj->k', k, self.positions))
+        # phase = np.exp(-2j * np.pi * np.einsum('j, kj->k', k, self.positions))
         # return wfnk[:, :] * phase[:, None]
         psi = np.zeros_like(wfnk)
         for ibasis in range(self.nbasis):
@@ -165,16 +192,14 @@ class Lawaf():
         """
         Calcualte Amn matrix for one k point
         """
-        raise NotImplementedError(
-            "The get_Amn_one_k method is should be overrided.")
+        raise NotImplementedError("The get_Amn_one_k method is should be overrided.")
 
     def get_Amn(self):
         """
         Calculate all Amn matrix for all k.
         """
         for ik in range(self.nkpt):
-            self.Amn[ik, :, :] = np.array(self.get_Amn_one_k(ik),
-                                          dtype=complex)
+            self.Amn[ik, :, :] = np.array(self.get_Amn_one_k(ik), dtype=complex)
         return self.Amn
 
     def get_wannk_and_Hk(self, shift=0.0):
@@ -183,19 +208,36 @@ class Lawaf():
         """
         for ik in range(self.nkpt):
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
-            h = self.Amn[ik, :, :].T.conj() @ np.diag(
-                self.get_eval_k(ik)+shift) @ self.Amn[ik, :, :]
+            h = (
+                self.Amn[ik, :, :].T.conj()
+                @ np.diag(self.get_eval_k(ik) + shift)
+                @ self.Amn[ik, :, :]
+            )
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
+
+
+    def get_wannk_and_Hk_nac(self, Ham):
+        """
+        calculate Wannier function and H in k-space 
+        but onlythe short range part of the Hk. Ham is the 
+        short range part of the Hamiltonian in the original basis.
+        """
+        for ik in range(self.nkpt):
+            self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
+            psik=self.get_psi_k(ik)
+            psiA=psik@self.Amn[ik, :, :]
+            self.Hwann_k[ik] = psiA.T.conj() @ Ham[ik] @ psiA
+        return self.Hwann_k
+
 
     def get_wannier_centers(self):
         self.wann_centers = np.zeros((self.nwann, 3), dtype=float)
         for iR, R in enumerate(self.Rlist):
             c = self.wannR[iR, :, :]
-            self.wann_centers += (c.conj() *
-                                  c).T.real @ self.positions + R[None, :]
+            self.wann_centers += (c.conj() * c).T.real @ self.positions + R[None, :]
             # self.wann_centers+=np.einsum('ij, ij, jk', c.conj())#(c.conj()*c).T.real@self.positions  + R[None, :]
-        #print(f"Wannier Centers: {self.wann_centers}")
+        # print(f"Wannier Centers: {self.wann_centers}")
 
     def _assure_normalized(self):
         """
@@ -203,9 +245,8 @@ class Lawaf():
         # TODO: should we use overlap matrix for non-orthogonal basis?
         """
         for iwann in range(self.nwann):
-            norm = np.trace(
-                self.wannR[:, :, iwann].conj().T @ self.wannR[:, :, iwann])
-            #print(f"Norm {iwann}: {norm}")
+            norm = np.trace(self.wannR[:, :, iwann].conj().T @ self.wannR[:, :, iwann])
+            # print(f"Norm {iwann}: {norm}")
 
     def k_to_R(self):
         """
@@ -214,36 +255,34 @@ class Lawaf():
         for iR, R in enumerate(self.Rlist):
             for ik, k in enumerate(self.kpts):
                 phase = np.exp(-2j * np.pi * np.dot(R, k))
-                self.HwannR[iR] += self.Hwann_k[
-                    ik, :, :] * phase * self.kweights[ik]
-                self.wannR[iR] += self.wannk[
-                    ik, :, :] * phase * self.kweights[ik]
+                self.HwannR[iR] += self.Hwann_k[ik, :, :] * phase * self.kweights[ik]
+                self.wannR[iR] += self.wannk[ik, :, :] * phase * self.kweights[ik]
         self._assure_normalized()
         self.get_wannier_centers()
-        return LWF(self.wannR,
-                   self.HwannR,
-                   self.Rlist,
-                   cell=np.eye(3),
-                   wann_centers=self.wann_centers)
+        return LWF(
+            self.wannR,
+            self.HwannR,
+            self.Rlist,
+            cell=np.eye(3),
+            wann_centers=self.wann_centers,
+            atoms=copy.deepcopy(self.atoms),
+        )
 
     def save_Amnk_nc(self, fname):
         """
         Save Amn matrices into a netcdf file.
         """
-        root = Dataset(fname, 'w')
-        ndim = root.createDimension('ndim', self.ndim)
-        nwann = root.createDimension('nwann', self.nwann)
-        nkpt = root.createDimension('nkpt', self.nkpt)
-        nband = root.createDimension('nband', self.nband)
-        kpoints = root.createVariable('kpoints',
-                                      float,
-                                      dimensions=(ndim, nkpt))
-        Amnk = root.createVariable('Amnk',
-                                   float,
-                                   dimensions=(nkpt, nband, nwann))
+        root = Dataset(fname, "w")
+        ndim = root.createDimension("ndim", self.ndim)
+        nwann = root.createDimension("nwann", self.nwann)
+        nkpt = root.createDimension("nkpt", self.nkpt)
+        nband = root.createDimension("nband", self.nband)
+        kpoints = root.createVariable("kpoints", float, dimensions=(ndim, nkpt))
+        Amnk = root.createVariable("Amnk", float, dimensions=(nkpt, nband, nwann))
         kpoints[:] = self.kpts
         Amnk[:] = self.Amn
         root.close()
+
 
 
 class WannierProjectedBuilder(Lawaf):
@@ -266,11 +305,11 @@ class WannierProjectedBuilder(Lawaf):
                     self.projectors.append(self.get_psi_k(ik)[:, iband])
             else:
                 for iband in ibands:
-                    #print("adding anchor")
+                    # print("adding anchor")
                     self.projectors.append(self.wfn_anchor[tuple(k)][:, iband])
-        assert len(
-            self.projectors
-        ) == self.nwann, "The number of projectors != number of wannier functions"
+        assert (
+            len(self.projectors) == self.nwann
+        ), "The number of projectors != number of wannier functions"
 
     def set_projectors_with_basis(self, ibasis):
         self.projectors = []
@@ -278,18 +317,18 @@ class WannierProjectedBuilder(Lawaf):
             b = np.zeros(self.nbasis, dtype=complex)
             b[i] = 1.0
             self.projectors.append(b)
-        assert len(
-            self.projectors
-        ) == self.nwann, "The number of projectors != number of wannier functions"
+        assert (
+            len(self.projectors) == self.nwann
+        ), "The number of projectors != number of wannier functions"
 
     def set_projectors(self, projectors):
         """
         set the initial guess for Wannier functions.
         projectors: a list of wavefunctions. shape: [nwann, nbasis]
         """
-        assert len(
-            projectors
-        ) == self.nwann, "The number of projectors != number of wannier functions"
+        assert (
+            len(projectors) == self.nwann
+        ), "The number of projectors != number of wannier functions"
         self.projectors = projectors
 
     def get_Amn_one_k(self, ik):
@@ -300,8 +339,9 @@ class WannierProjectedBuilder(Lawaf):
         A = np.zeros((self.nband, self.nwann), dtype=complex)
         for iband in range(self.nband):
             for iproj, psi_a in enumerate(self.projectors):
-                A[iband, iproj] = np.vdot(self.get_psi_k(ik)[:, iband],
-                                          psi_a) * self.occ[ik, iband]
+                A[iband, iproj] = (
+                    np.vdot(self.get_psi_k(ik)[:, iband], psi_a) * self.occ[ik, iband]
+                )
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
 
@@ -311,34 +351,37 @@ class WannierScdmkBuilder(Lawaf):
     Build Wannier functions using the SCDMk method.
     """
 
-    def __init__(self,
-                 evals,
-                 wfn,
-                 positions,
-                 kpts,
-                 nwann,
-                 weight_func,
-                 kweights=None,
-                 Sk=None,
-                 has_phase=True,
-                 Rgrid=None,
-                 exclude_bands=[],
-                 sort_cols=True,
-                 wfn_anchor=None,
-                 use_proj=True):
-
-        super().__init__(evals=evals,
-                         wfn=wfn,
-                         positions=positions,
-                         kpts=kpts,
-                         kweights=kweights,
-                         nwann=nwann,
-                         Sk=Sk,
-                         weight_func=weight_func,
-                         has_phase=has_phase,
-                         Rgrid=Rgrid,
-                         wfn_anchor=wfn_anchor,
-                         exclude_bands=exclude_bands)
+    def __init__(
+        self,
+        evals,
+        wfn,
+        positions,
+        kpts,
+        nwann,
+        weight_func,
+        kweights=None,
+        Sk=None,
+        has_phase=True,
+        Rgrid=None,
+        exclude_bands=[],
+        sort_cols=True,
+        wfn_anchor=None,
+        use_proj=True,
+    ):
+        super().__init__(
+            evals=evals,
+            wfn=wfn,
+            positions=positions,
+            kpts=kpts,
+            kweights=kweights,
+            nwann=nwann,
+            Sk=Sk,
+            weight_func=weight_func,
+            has_phase=has_phase,
+            Rgrid=Rgrid,
+            wfn_anchor=wfn_anchor,
+            exclude_bands=exclude_bands,
+        )
         # anchors
         self.psi_anchors = []
         self.cols = []
@@ -351,9 +394,9 @@ class WannierScdmkBuilder(Lawaf):
         Munually set selected Columns.
         """
         if cols is not None:
-            assert len(
-                cols
-            ) == self.nwann, "Number of columns should be equal to number of Wannier functions"
+            assert (
+                len(cols) == self.nwann
+            ), "Number of columns should be equal to number of Wannier functions"
             self.cols = cols
             if self.sort_cols:
                 self.cols = np.sort(self.cols)
@@ -393,11 +436,11 @@ class WannierScdmkBuilder(Lawaf):
                 self.add_anchors(self.get_psi_k(ik), ibands)
             else:
                 self.add_anchors(self.wfn_anchor[k], ibands)
-        self.cols = self.cols[:self.nwann]
+        self.cols = self.cols[: self.nwann]
         print(f"Using the anchor points, these cols are selected: {self.cols}")
-        assert len(
-            self.cols
-        ) == self.nwann, "After adding all anchors, the number of selected columns != nwann"
+        assert (
+            len(self.cols) == self.nwann
+        ), "After adding all anchors, the number of selected columns != nwann"
 
     def auto_set_anchors(self, kpt=(0.0, 0.0, 0.0)):
         """
@@ -432,33 +475,16 @@ class WannierScdmkBuilder(Lawaf):
         """
         calculate Amn for one k point using scdmk method.
         """
-        psik=self.get_psi_k(ik)
-        occ=self.occ[ik]
-        projs=self.projs[ik]
-        return self.get_Amn_psik(psik,occ=self.occ[ik], projs=projjs)
+        psik = self.get_psi_k(ik)
+        occ = self.occ[ik]
+        projs = self.projs[ik]
+        return self.get_Amn_psik(psik, occ=occ, projs=projs)
 
     def get_Amn_psik(self, psik, occ, projs):
         if self.use_proj:
-            psi = self.get_psi_k(ik)[self.cols, :] * (self.occ[ik] *
-                                                      self.projs[ik])[None, :]
+            psi = psik[self.cols, :] * (occ * projs)[None, :]
         else:
-            psi = self.get_psi_k(ik)[self.cols, :] * self.occ[ik][None, :]
-        U, _S, VT = svd(psi.T.conj(), full_matrices=False)
-        Amn_k = U @ VT
-        return Amn_k
-
-
-
-
-    def get_Amn_one_k_old(self, ik):
-        """
-        calculate Amn for one k point using scdmk method.
-        """
-        if self.use_proj:
-            psi = self.get_psi_k(ik)[self.cols, :] * (self.occ[ik] *
-                                                      self.projs[ik])[None, :]
-        else:
-            psi = self.get_psi_k(ik)[self.cols, :] * self.occ[ik][None, :]
+            psi = psik[self.cols, :] * occ[None, :]
         U, _S, VT = svd(psi.T.conj(), full_matrices=False)
         Amn_k = U @ VT
         return Amn_k
@@ -478,24 +504,31 @@ def occupation_func(ftype=None, mu=0.0, sigma=1.0):
 
         def func(x):
             return np.ones_like(x, dtype=float)
-    elif ftype == 'Fermi':
+
+    elif ftype == "Fermi":
 
         def func(x):
             return 0.5 * erfc((x - mu) / sigma)
-    elif ftype == 'Gauss':
+
+    elif ftype == "Gauss":
 
         def func(x):
-            return np.exp(-1.0 * (x - mu)**2 / sigma**2)
-    elif ftype == 'window':
+            return np.exp(-1.0 * (x - mu) ** 2 / sigma**2)
+
+    elif ftype == "window":
 
         def func(x):
             return 0.5 * erfc((x - mu) / 0.01) - 0.5 * erfc((x - sigma) / 0.01)
-    elif ftype == 'linear':
+
+    elif ftype == "linear":
+
         def func(x):
             return x
+
     else:
         raise NotImplementedError("function type %s not implemented." % ftype)
     return func
+
 
 
 def Amnk_to_Hk(Amn, psi, Hk0, kpts):
@@ -525,6 +558,7 @@ def Hk_to_Hreal(Hk, kpts, kweights, Rpts):
 def test():
     a = np.arange(-5, 5, 0.01)
     import matplotlib.pyplot as plt
+
     plt.plot(a, 0.5 * erfc((a - 0.0) / 0.5))
     plt.show()
 
