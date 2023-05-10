@@ -205,16 +205,31 @@ class PhonopyWrapper:
         # self.phonon.symmetrize_force_constants_by_space_group()
         pass
 
-    def solve(self, k):
+    def solve(self, k, splitH=False):
         # Hk = self.phonon.get_dynamical_matrix_at_q(k)
-        Hk = self.phonon.dynamical_matrix.get_dynamical_matrix(k)
-        Hk_short = self.phonon.dynamical_matrix.get_short_range_dynamical_matrix(k)
-        Hk_long = self.phonon.dynamical_matrix.get_long_range_dynamical_matrix(k)
-        Hk *= np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
+        if self.has_nac:
+            if self.phonon._dynamical_matrix is None:
+                msg = "Dynamical matrix has not yet built."
+                raise RuntimeError(msg)
+            self.phonon._dynamical_matrix.run(k)
+            #return self.phonon._dynamical_matrix.get_dynamical_matrix()
+            #self.phonon.dynamical_matrix._compute_dynamical_matrix(k, [0, 0, 0])
+            Hk, Hshort, Hlong = self.phonon.dynamical_matrix.get_dynamical_matrix(k)
+        else:
+            Hk = self.phonon.get_dynamical_matrix_at_q(k)
+        phase=np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
+
+        Hk *= phase 
+        if splitH:
+            Hshort *= phase
+            Hlong *= phase
         if self.mode == "ifc":
             Hk *= self.Mmat
         evals, evecs = eigh(Hk)
-        return evals, evecs
+        if splitH:
+            return evals, evecs, Hk, Hshort, Hlong
+        else:
+            return evals, evecs
 
     def assure_ASR(self, HR, Rlist):
         igamma = np.argmin(np.linalg.norm(Rlist, axis=1))
