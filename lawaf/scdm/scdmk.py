@@ -41,6 +41,10 @@ class BasicLaWaf:
     S: np.ndarray = None
     has_phase: bool = True
     build_Rgrid: Optional[np.ndarray] = None
+    has_nac: bool = False
+    Hks: Optional[np.ndarray] = None
+    Hshorts: Optional[np.ndarray] = None
+    Hlongs: Optional[np.ndarray] = None
 
 
 
@@ -126,14 +130,21 @@ class Lawaf(BasicLaWaf):
         lwf.atoms = copy.deepcopy(self.atoms)
         return lwf
 
-    def get_wannier_nac(self, Hshort):
+    def set_nac_Hk(self, Hks, Hshorts, Hlongs):
+        self.has_nac=True
+        self.Hks = Hks
+        self.Hshorts=Hshorts
+        self.Hlongs=Hlongs
+
+    def get_wannier_nac(self, Hshort, born, dielectric, factor):
         """
         Calculate Wannier functions but using non-analytic correction.
         """
         self.prepare()
         self.get_Amn()
-        self.get_wannk_and_Hk_nac(Hshort)
+        self.get_wannk_and_Hk_nac()
         lwf = self.k_to_R()
+        lwf.set_born_from_full(born, dielectric, factor)
         lwf.atoms = copy.deepcopy(self.atoms)
         return lwf
 
@@ -217,17 +228,19 @@ class Lawaf(BasicLaWaf):
         return self.wannk, self.Hwann_k
 
 
-    def get_wannk_and_Hk_nac(self, Ham):
+    def get_wannk_and_Hk_nac(self):
         """
         calculate Wannier function and H in k-space 
         but onlythe short range part of the Hk. Ham is the 
         short range part of the Hamiltonian in the original basis.
         """
+        print("Using short range part of DM to build Hamiltonian")
         for ik in range(self.nkpt):
+            Ham=self.Hshorts[ik]
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
             psik=self.get_psi_k(ik)
             psiA=psik@self.Amn[ik, :, :]
-            self.Hwann_k[ik] = psiA.T.conj() @ Ham[ik] @ psiA
+            self.Hwann_k[ik] = psiA.T.conj() @ Ham @ psiA
         return self.Hwann_k
 
 
@@ -561,6 +574,3 @@ def test():
 
     plt.plot(a, 0.5 * erfc((a - 0.0) / 0.5))
     plt.show()
-
-
-# print(kmesh_to_R([2,2,2]))

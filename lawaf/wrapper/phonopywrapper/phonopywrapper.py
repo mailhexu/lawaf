@@ -80,7 +80,7 @@ class MyDynamicalMatrixGL(DynamicalMatrixGL):
             return (
                 self._short_range_dynamical_matrix,
                 self._long_range_dynamical_matrix,
-                DM
+                DM,
             )
         else:
             return DM
@@ -160,17 +160,18 @@ def my_get_dynamical_matrix(
 class PhonopyWrapper:
     phonon: Phonopy = None
 
-    def __init__(self, phonon=None, phonon_fname="phonopy_params.yaml", mode="ifc"):
+    def __init__(
+        self, phonon=None, phonon_fname="phonopy_params.yaml", mode="ifc", has_nac=False
+    ):
         if phonon is not None:
             self.phonon = phonon
         else:
             self.phonon = load(phonon_fname)
-        try:
-            self.get_nac_params()
+        if has_nac:
             self.has_nac = True
-            replace_phonon_dynamics_with_myGL(self.phonon)
             self.get_nac_params()
-        except:
+            replace_phonon_dynamics_with_myGL(self.phonon)
+        else:
             self.has_nac = False
 
         if self.has_nac:
@@ -205,28 +206,33 @@ class PhonopyWrapper:
         # self.phonon.symmetrize_force_constants_by_space_group()
         pass
 
-    def solve(self, k, splitH=False):
+    def solve(self, k):
         # Hk = self.phonon.get_dynamical_matrix_at_q(k)
         if self.has_nac:
             if self.phonon._dynamical_matrix is None:
                 msg = "Dynamical matrix has not yet built."
                 raise RuntimeError(msg)
-            self.phonon._dynamical_matrix.run(k)
-            #return self.phonon._dynamical_matrix.get_dynamical_matrix()
-            #self.phonon.dynamical_matrix._compute_dynamical_matrix(k, [0, 0, 0])
-            Hk, Hshort, Hlong = self.phonon.dynamical_matrix.get_dynamical_matrix(k)
-        else:
+            # replace_phonon_dynamics_with_myGL(self.phonon)
+            # self.phonon._dynamical_matrix.run(k)
+            # return self.phonon._dynamical_matrix.get_dynamical_matrix()
+            # self.phonon.dynamical_matrix._compute_dynamical_matrix(k, [0, 0, 0])
+            # Hk, Hshort, Hlong = self.phonon.dynamical_matrix.get_dynamical_matrix(split_short_long=True)
             Hk = self.phonon.get_dynamical_matrix_at_q(k)
-        phase=np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
+            # Hk=self.phonon.dynamical_matrix.dynamical_matrix
+            Hshort = self.phonon.dynamical_matrix.short_range_dynamical_matrix
+            Hlong = self.phonon.dynamical_matrix.long_range_dynamical_matrix
+        phase = np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
 
-        Hk *= phase 
-        if splitH:
+        Hk *= phase
+        if self.has_nac:
             Hshort *= phase
             Hlong *= phase
         if self.mode == "ifc":
             Hk *= self.Mmat
+            Hshort *= self.Mmat
+            Hlong *= self.Mmat
         evals, evecs = eigh(Hk)
-        if splitH:
+        if self.has_nac:
             return evals, evecs, Hk, Hshort, Hlong
         else:
             return evals, evecs
@@ -271,11 +277,36 @@ class PhonopyWrapper:
     def solve_all(self, kpts):
         evals = []
         evecs = []
-        for ik, k in enumerate(kpts):
-            evalue, evec = self.solve(k)
-            evals.append(evalue)
-            evecs.append(evec)
-        return np.array(evals, dtype=float), np.array(evecs, dtype=complex, order="C")
+        Hks = []
+        Hshorts = []
+        Hlongs = []
+        if not self.has_nac:
+            for ik, k in enumerate(kpts):
+                evalue, evec = self.solve(k)
+                evals.append(evalue)
+                evecs.append(evec)
+        else:
+            for ik, k in enumerate(kpts):
+                evalue, evec, Hk, Hshort, Hlong = self.solve(
+                    k, split_short_long=self.has_nac
+                )
+                evals.append(evalue)
+                evecs.append(evec)
+                Hks.append(Hk)
+                Hshorts.append(Hshort)
+                Hlongs.append(Hlong)
+        if split_short_long:
+            return (
+                np.array(evals, dtype=float),
+                np.array(evecs, dtype=complex, order="C"),
+                np.array(Hks, dtype=complex, order="C"),
+                np.array(Hshorts, dtype=complex, order="C"),
+                np.array(Hlongs, dtype=complex, order="C"),
+            )
+        else:
+            return np.array(evals, dtype=float), np.array(
+                evecs, dtype=complex, order="C"
+            )
 
     @property
     def positions(self):
@@ -366,7 +397,7 @@ def replace_phonon_dynamics_with_myGL(phonon):
         phonon._dynamical_matrix_decimals,
         symprec=phonon._symprec,
         log_level=phonon._log_level,
-        use_openmp=phonon.use_openmp(),
+        use_openmp=False,  # phonon.use_openmp(),
     )
 
 

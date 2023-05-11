@@ -1,4 +1,4 @@
-from banddownfolder import W90Downfolder
+from lawaf import W90Downfolder
 import numpy as np
 
 def main():
@@ -9,7 +9,7 @@ def main():
     # Downfold the band structure.
     model.downfold(
         method='scdmk',
-        kmesh=(3, 3, 3),
+        kmesh=(4, 4, 4),
         nwann=2,
         weight_func='Gauss',
         mu=10.0,

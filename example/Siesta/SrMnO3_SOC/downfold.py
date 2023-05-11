@@ -1,4 +1,4 @@
-from banddownfolder.scdm.downfolder import SislDownfolder
+from lawaf.scdm.downfolder import SislDownfolder
 import numpy as np
 
 

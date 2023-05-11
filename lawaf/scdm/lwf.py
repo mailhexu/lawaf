@@ -11,10 +11,10 @@ from typing import Union
 
 
 @dataclass
-class TwobodyTerms():
-    #nterm: int = 0
-    #Rlist: np.ndarray = None
-    #coeff_twobody: np.array
+class TwobodyTerms:
+    # nterm: int = 0
+    # Rlist: np.ndarray = None
+    # coeff_twobody: np.array
 
     def __init__(self):
         self.nterm: int = 0
@@ -24,24 +24,16 @@ class TwobodyTerms():
     def write_to_netcdf_file(self, ncfile: Dataset):
         Dataset.redef()
         nterm = Dataset.createDimension("nterm", self.nterm)
-        iR = Dataset.createVariable("wann_twobody_iR",
-                                    int,
-                                    dimensions=("nterm", ))
-        i = Dataset.createVariable("wann_twobody_i",
-                                   int,
-                                   dimensions=("nterm", ))
-        j = Dataset.createVariable("wann_twobody_j",
-                                   int,
-                                   dimensions=("nterm", ))
-        orderi = Dataset.createVariable("wann_twobody_orderi",
-                                        int,
-                                        dimensions=("nterm", ))
-        orderj = Dataset.createVariable("wann_twobody_orderj",
-                                        int,
-                                        dimensions=("nterm", ))
-        val = Dataset.createVariable("wann_twobody_val",
-                                     int,
-                                     dimensions=("nterm", ))
+        iR = Dataset.createVariable("wann_twobody_iR", int, dimensions=("nterm",))
+        i = Dataset.createVariable("wann_twobody_i", int, dimensions=("nterm",))
+        j = Dataset.createVariable("wann_twobody_j", int, dimensions=("nterm",))
+        orderi = Dataset.createVariable(
+            "wann_twobody_orderi", int, dimensions=("nterm",)
+        )
+        orderj = Dataset.createVariable(
+            "wann_twobody_orderj", int, dimensions=("nterm",)
+        )
+        val = Dataset.createVariable("wann_twobody_val", int, dimensions=("nterm",))
         iR[:] = self.iR
         i[:] = self.coeff_twobody[0, :]
         j[:] = self.coeff_twobody[1, :]
@@ -49,9 +41,11 @@ class TwobodyTerms():
         orderj[:] = self.coeff_twobody[3, :]
         val[:] = self.val
 
+
 @dataclass
-class GenericWF():
+class GenericWF:
     """Generic Wannier functions class"""
+
     nwann: int = 0
     ndim: int = 3
     nbasis: int = 0
@@ -65,11 +59,11 @@ class GenericWF():
     name: str = "GenericWF"
 
 
-
 class LWF(GenericWF):
     """
     Localized Wannier function
     """
+
     name: str = "LWF"
     atoms: Atoms = None
     has_nac: bool = False
@@ -78,19 +72,21 @@ class LWF(GenericWF):
     factor: float = 1.0
     Zwann: np.ndarray = None
 
-    def __init__(self,
-                 wannR,
-                 HwannR,
-                 Rlist,
-                 cell,
-                 wann_centers,
-                 atoms=None,
-                 born=None,
-                 has_nac=False,
-                 dielectric=None, 
-                 factor=1.0,
-                 fortran_order=False,
-                 twobody_terms=None):
+    def __init__(
+        self,
+        wannR,
+        HwannR,
+        Rlist,
+        cell,
+        wann_centers,
+        atoms=None,
+        born=None,
+        has_nac=False,
+        dielectric=None,
+        factor=1.0,
+        fortran_order=False,
+        twobody_terms=None,
+    ):
         self.atoms = atoms
         self.wannR = wannR
         self.HwannR = HwannR
@@ -108,20 +104,22 @@ class LWF(GenericWF):
         self.dielectric_tensor = dielectric
         self.factor = factor
         if atoms is not None:
-            self.natom=len(self.atoms)
-        self.atoms=atoms
+            self.natom = len(self.atoms)
+        self.atoms = atoms
+
+    def set_born_from_full(self, born, dielectric, factor):
+        self.has_nac = True
+        self.Zwann = np.zeros((self.nwann, 3))
+        for i in range(self.nwann):
+            W_R_tau_i = self.wannR[:, :, i].reshape(self.nR, self.natom, 3)
+            # TODO: check the order of born effective charges (de or ed?)
+            # R: Rvector. d & e: directions of dispalcement and efield
+            self.Zwann[i, :] = np.einsum(
+                "Rad,ade->e", W_R_tau_i, self.born_effective_charges
+            )
 
     def get_wannier_born(self):
-        if self.has_nac:
-            self.Zwann=np.zeros((self.nwann, 3))
-            for i in range(self.nwann):
-                W_R_tau_i = self.wannR[:, :, i].reshape(self.nR, self.natom, 3)
-                # TODO: check the order of born effective charges (de or ed?)
-                # R: Rvector. d & e: directions of dispalcement and efield
-                self.Zwann[i, :] = np.einsum("Rad,ade->e", W_R_tau_i, self.born_effective_charges)
-        else:
-            self.Zwann = None
-
+        return self.Zwann
 
     def find_iR_at_zero(self):
         iR = np.argmin(np.linalg.norm(self.Rlist, axis=1))
@@ -145,7 +143,6 @@ class LWF(GenericWF):
             for i, val in zip(ids, vals):
                 print(f"{i}: {val}")
 
-        print(self.get_wann_largest_basis())
 
     @property
     def site_energies(self):
@@ -184,74 +181,77 @@ class LWF(GenericWF):
         for iwann in range(self.nwann):
             a = np.abs(self.wannR[:, :, iwann])
             ind = np.unravel_index(np.argmax(a, axis=None), a.shape)
-            ret.append({'R': self.Rlist[ind[0]], 'orb': ind[1]})
+            ret.append({"R": self.Rlist[ind[0]], "orb": ind[1]})
         return ret
 
     def write_nc(self, fname, prefix="wann_", atoms=None):
-        root = Dataset(fname, 'w')
-        ndim = root.createDimension('ndim', self.ndim)
-        nR = root.createDimension('nR', self.nR)
-        three = root.createDimension('three', 3)
-        nwann = root.createDimension(prefix + 'nwann', self.nwann)
-        nbasis = root.createDimension(prefix + 'nbasis', self.nbasis)
+        root = Dataset(fname, "w")
+        ndim = root.createDimension("ndim", self.ndim)
+        nR = root.createDimension("nR", self.nR)
+        three = root.createDimension("three", 3)
+        nwann = root.createDimension(prefix + "nwann", self.nwann)
+        nbasis = root.createDimension(prefix + "nbasis", self.nbasis)
 
         if atoms is not None:
-            natom = root.createDimension(prefix + 'natom', len(atoms))
+            natom = root.createDimension(prefix + "natom", len(atoms))
 
-        Rlist = root.createVariable(prefix + 'Rlist',
-                                    int,
-                                    dimensions=('nR', 'ndim'))
-        HamR_real = root.createVariable(prefix + 'HamR_real',
-                                        float,
-                                        dimensions=('nR', prefix + 'nwann',
-                                                    prefix + 'nwann'),
-                                        zlib=True)
-        HamR_imag = root.createVariable(prefix + 'HamR_imag',
-                                        float,
-                                        dimensions=('nR', prefix + 'nwann',
-                                                    prefix + 'nwann'),
-                                        zlib=True)
+        Rlist = root.createVariable(prefix + "Rlist", int, dimensions=("nR", "ndim"))
+        HamR_real = root.createVariable(
+            prefix + "HamR_real",
+            float,
+            dimensions=("nR", prefix + "nwann", prefix + "nwann"),
+            zlib=True,
+        )
+        HamR_imag = root.createVariable(
+            prefix + "HamR_imag",
+            float,
+            dimensions=("nR", prefix + "nwann", prefix + "nwann"),
+            zlib=True,
+        )
 
-        wannR_real = root.createVariable(prefix + 'wannier_function_real',
-                                         float,
-                                         dimensions=('nR', prefix + 'nbasis',
-                                                     prefix + 'nwann'),
-                                         zlib=True)
-        wannR_imag = root.createVariable(prefix + 'wannier_function_imag',
-                                         float,
-                                         dimensions=('nR', prefix + 'nbasis',
-                                                     prefix + 'nwann'),
-                                         zlib=True)
-        wann_center_xred = root.createVariable(prefix + 'wannier_center_xred',
-                                               float,
-                                               dimensions=(prefix + 'nwann',
-                                                           'three'),
-                                               zlib=True)
+        wannR_real = root.createVariable(
+            prefix + "wannier_function_real",
+            float,
+            dimensions=("nR", prefix + "nbasis", prefix + "nwann"),
+            zlib=True,
+        )
+        wannR_imag = root.createVariable(
+            prefix + "wannier_function_imag",
+            float,
+            dimensions=("nR", prefix + "nbasis", prefix + "nwann"),
+            zlib=True,
+        )
+        wann_center_xred = root.createVariable(
+            prefix + "wannier_center_xred",
+            float,
+            dimensions=(prefix + "nwann", "three"),
+            zlib=True,
+        )
 
         if atoms is not None:
-            cell = root.createVariable(prefix + "cell",
-                                       float,
-                                       dimensions=('three', 'three'),
-                                       zlib=True)
-            numbers = root.createVariable(prefix + "atomic_numbers",
-                                          int,
-                                          dimensions=(prefix + 'natom'),
-                                          zlib=True)
-            masses = root.createVariable(prefix + "atomic_masses",
-                                         float,
-                                         dimensions=(prefix + 'natom'),
-                                         zlib=True)
+            cell = root.createVariable(
+                prefix + "cell", float, dimensions=("three", "three"), zlib=True
+            )
+            numbers = root.createVariable(
+                prefix + "atomic_numbers", int, dimensions=(prefix + "natom"), zlib=True
+            )
+            masses = root.createVariable(
+                prefix + "atomic_masses",
+                float,
+                dimensions=(prefix + "natom"),
+                zlib=True,
+            )
 
-            xred = root.createVariable(prefix + "atomic_xred",
-                                       float,
-                                       dimensions=(prefix + "natom", "three"))
+            xred = root.createVariable(
+                prefix + "atomic_xred", float, dimensions=(prefix + "natom", "three")
+            )
 
-            xcart = root.createVariable(prefix + "atomic_xcart",
-                                        float,
-                                        dimensions=(prefix + "natom", "three"))
-            lwf_masses = root.createVariable(prefix + 'lwf_masses',
-                                             float,
-                                             dimensions=(prefix + 'nwann'))
+            xcart = root.createVariable(
+                prefix + "atomic_xcart", float, dimensions=(prefix + "natom", "three")
+            )
+            lwf_masses = root.createVariable(
+                prefix + "lwf_masses", float, dimensions=(prefix + "nwann")
+            )
 
             cell[:] = atoms.get_cell().array
             numbers[:] = atoms.get_atomic_numbers()
@@ -278,84 +278,84 @@ class LWF(GenericWF):
     def masses_to_lwf_masses(self, masses):
         m3 = np.kron(masses, [1, 1, 1])
         # print(self.wannR.conj()*self.wannR)
-        return np.einsum('rij,i->j', (self.wannR.conj() * self.wannR), m3)
+        return np.einsum("rij,i->j", (self.wannR.conj() * self.wannR), m3)
 
     def born_to_lwf(self, born):
-        wborn=np.zeors((self.nwann,3))
+        wborn = np.zeors((self.nwann, 3))
         for i in range(self.nwann):
             for j in range(self.natom):
                 wborn[i]
 
-    def write_lwf_nc(self, fname, prefix='wann_', atoms=None):
-        root = Dataset(fname, 'w')
-        ndim = root.createDimension('ndim', self.ndim)
-        nR = root.createDimension('nR', self.nR)
-        three = root.createDimension('three', 3)
-        nwann = root.createDimension(prefix + 'nwann', self.nwann)
-        nbasis = root.createDimension(prefix + 'nbasis', self.nbasis)
+    def write_lwf_nc(self, fname, prefix="wann_", atoms=None):
+        root = Dataset(fname, "w")
+        ndim = root.createDimension("ndim", self.ndim)
+        nR = root.createDimension("nR", self.nR)
+        three = root.createDimension("three", 3)
+        nwann = root.createDimension(prefix + "nwann", self.nwann)
+        nbasis = root.createDimension(prefix + "nbasis", self.nbasis)
 
         if self.atoms is not None:
             atoms = self.atoms
         if atoms is not None:
-            natom = root.createDimension(prefix + 'natom', len(atoms))
+            natom = root.createDimension(prefix + "natom", len(atoms))
 
-        Rlist = root.createVariable(prefix + 'Rlist',
-                                    float,
-                                    dimensions=('nR', 'ndim'))
-        ifc_real = root.createVariable(prefix + 'HamR_real',
-                                       float,
-                                       dimensions=('nR', prefix + 'nwann',
-                                                   prefix + 'nwann'),
-                                       zlib=True)
-        ifc_imag = root.createVariable(prefix + 'HamR_imag',
-                                       float,
-                                       dimensions=('nR', prefix + 'nwann',
-                                                   prefix + 'nwann'),
-                                       zlib=True)
+        Rlist = root.createVariable(prefix + "Rlist", float, dimensions=("nR", "ndim"))
+        ifc_real = root.createVariable(
+            prefix + "HamR_real",
+            float,
+            dimensions=("nR", prefix + "nwann", prefix + "nwann"),
+            zlib=True,
+        )
+        ifc_imag = root.createVariable(
+            prefix + "HamR_imag",
+            float,
+            dimensions=("nR", prefix + "nwann", prefix + "nwann"),
+            zlib=True,
+        )
 
-        wannR_real = root.createVariable(prefix + 'wannier_function_real',
-                                         float,
-                                         dimensions=('nR', prefix + 'nbasis',
-                                                     prefix + 'nwann'),
-                                         zlib=True)
-        wannR_imag = root.createVariable(prefix + 'wannier_function_imag',
-                                         float,
-                                         dimensions=('nR', prefix + 'nbasis',
-                                                     prefix + 'nwann'),
-                                         zlib=True)
+        wannR_real = root.createVariable(
+            prefix + "wannier_function_real",
+            float,
+            dimensions=("nR", prefix + "nbasis", prefix + "nwann"),
+            zlib=True,
+        )
+        wannR_imag = root.createVariable(
+            prefix + "wannier_function_imag",
+            float,
+            dimensions=("nR", prefix + "nbasis", prefix + "nwann"),
+            zlib=True,
+        )
 
-        wann_centers = root.createVariable(prefix + 'centers',
-                                           float,
-                                           dimensions=(prefix + 'nwann',
-                                                       'three'),
-                                           zlib=True)
+        wann_centers = root.createVariable(
+            prefix + "centers", float, dimensions=(prefix + "nwann", "three"), zlib=True
+        )
 
         # root.createVariable(prefix+'xred', float64, dimensions=(nR, nwann, nwann))
         # root.createVariable(prefix+'cell', float64, dimensions=(nR, nwann, nwann))
         if atoms is not None:
-            cell = root.createVariable(prefix + "cell",
-                                       float,
-                                       dimensions=('three', 'three'),
-                                       zlib=True)
-            numbers = root.createVariable(prefix + "atomic_numbers",
-                                          int,
-                                          dimensions=(prefix + 'natom'),
-                                          zlib=True)
-            masses = root.createVariable(prefix + "atomic_masses",
-                                         float,
-                                         dimensions=(prefix + 'natom'),
-                                         zlib=True)
+            cell = root.createVariable(
+                prefix + "cell", float, dimensions=("three", "three"), zlib=True
+            )
+            numbers = root.createVariable(
+                prefix + "atomic_numbers", int, dimensions=(prefix + "natom"), zlib=True
+            )
+            masses = root.createVariable(
+                prefix + "atomic_masses",
+                float,
+                dimensions=(prefix + "natom"),
+                zlib=True,
+            )
 
-            xred = root.createVariable(prefix + "atomic_xred",
-                                       float,
-                                       dimensions=(prefix + "natom", "three"))
+            xred = root.createVariable(
+                prefix + "atomic_xred", float, dimensions=(prefix + "natom", "three")
+            )
 
-            xcart = root.createVariable(prefix + "atomic_xcart",
-                                        float,
-                                        dimensions=(prefix + "natom", "three"))
-            lwf_masses = root.createVariable(prefix + 'lwf_masses',
-                                             float,
-                                             dimensions=(prefix + 'nwann'))
+            xcart = root.createVariable(
+                prefix + "atomic_xcart", float, dimensions=(prefix + "natom", "three")
+            )
+            lwf_masses = root.createVariable(
+                prefix + "lwf_masses", float, dimensions=(prefix + "nwann")
+            )
 
             cell[:] = atoms.get_cell().array
             numbers[:] = atoms.get_atomic_numbers()
@@ -377,32 +377,32 @@ class LWF(GenericWF):
         root.close()
 
     @staticmethod
-    def load_nc(fname, prefix='wann_', order='C'):
-        root = Dataset(fname, 'r')
-        ndim = root.dimensions['ndim'].size
-        nR = root.dimensions['nR'].size
-        nwann = root.dimensions[prefix + 'nwann'].size
-        nbasis = root.dimensions[prefix + 'nbasis'].size
+    def load_nc(fname, prefix="wann_", order="C"):
+        root = Dataset(fname, "r")
+        ndim = root.dimensions["ndim"].size
+        nR = root.dimensions["nR"].size
+        nwann = root.dimensions[prefix + "nwann"].size
+        nbasis = root.dimensions[prefix + "nbasis"].size
         try:
-            natom = root.dimensions[prefix + 'natom'].size
+            natom = root.dimensions[prefix + "natom"].size
             has_atom = True
         except:
             has_atom = False
             atoms = None
 
-        Rlist = root.variables[prefix + 'Rlist'][:]
+        Rlist = root.variables[prefix + "Rlist"][:]
         Rlist = np.array(Rlist, dtype=int)
         try:
-            ham_real = root.variables[prefix + 'HamR_real'][:]
-            ham_imag = root.variables[prefix + 'HamR_imag'][:]
+            ham_real = root.variables[prefix + "HamR_real"][:]
+            ham_imag = root.variables[prefix + "HamR_imag"][:]
         except KeyError:
-            ham_real = root.variables[prefix + 'ifc_real'][:]
-            ham_imag = root.variables[prefix + 'ifc_imag'][:]
+            ham_real = root.variables[prefix + "ifc_real"][:]
+            ham_imag = root.variables[prefix + "ifc_imag"][:]
 
         Ham = ham_real + ham_imag * 1.0j
 
-        wannR_real = root.variables[prefix + 'wannier_function_real'][:]
-        wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
+        wannR_real = root.variables[prefix + "wannier_function_real"][:]
+        wannR_imag = root.variables[prefix + "wannier_function_imag"][:]
         wannR = wannR_real + wannR_imag * 1.0j
         if order.strip().capitalize().startswith("F"):
             wannR = np.swapaxes(wannR, 1, 2)
@@ -410,48 +410,46 @@ class LWF(GenericWF):
 
         # FIXME: cell and wann_centers
         if has_atom:
-            numbers = root.variables[prefix + 'atomic_numbers'][:]
-            xcart = root.variables[prefix + 'atomic_xcart'][:]
-            #xcart = root.variables[prefix + 'xcart'][:]
-            cell = root.variables[prefix + 'cell'][:]
+            numbers = root.variables[prefix + "atomic_numbers"][:]
+            xcart = root.variables[prefix + "atomic_xcart"][:]
+            # xcart = root.variables[prefix + 'xcart'][:]
+            cell = root.variables[prefix + "cell"][:]
             atoms = Atoms(numbers, cell=cell, positions=xcart)
         else:
             atoms = None
 
         try:
-            wann_centers = root.variables[prefix + 'wannier_center_xred'][:]
+            wann_centers = root.variables[prefix + "wannier_center_xred"][:]
         except:
             print(
                 f"Warning: wannier centers {prefix+'wannier_center_xred'} not found, using 0 instead."
             )
             wann_centers = np.zeros((nwann, ndim))
-        return LWF(wannR,
-                   Ham,
-                   Rlist,
-                   cell=np.eye(3),
-                   wann_centers=wann_centers,
-                   atoms=atoms)
+        return LWF(
+            wannR, Ham, Rlist, cell=np.eye(3), wann_centers=wann_centers, atoms=atoms
+        )
 
     def make_supercell(self, sc_maker=None, sc_matrix=None):
         from minimulti.utils.supercell import SupercellMaker
+
         if sc_maker is None:
             sc_maker = SupercellMaker(sc_matrix)
         if self.atoms is not None:
             sc_atoms = sc_maker.sc_atoms(self.atoms)
-        sc_Rlist, sc_HR = sc_maker.sc_Rlist_HR(self.Rlist,
-                                               self.HwannR,
-                                               n_basis=self.nwann)
+        sc_Rlist, sc_HR = sc_maker.sc_Rlist_HR(
+            self.Rlist, self.HwannR, n_basis=self.nwann
+        )
         return sc_atoms, sc_Rlist, sc_HR
 
     def get_num_orbitals(self):
         return self.nwann
 
     def save_txt(self, fname):
-        with open(fname, 'w') as myfile:
+        with open(fname, "w") as myfile:
             myfile.write(f"Number_of_R: {self.nR}\n")
             myfile.write(f"Number_of_Wannier_functions: {self.nwann}\n")
-            #myfile.write(f"Cell parameter: {self.cell}\n")
-            myfile.write(f"Hamiltonian:  \n" + "=" * 60 + '\n')
+            # myfile.write(f"Cell parameter: {self.cell}\n")
+            myfile.write(f"Hamiltonian:  \n" + "=" * 60 + "\n")
             for iR, R in enumerate(self.Rlist):
                 myfile.write(f"index of R: {iR}.  R = {R}\n")
                 d = self.HwannR[iR]
@@ -460,7 +458,7 @@ class LWF(GenericWF):
                         myfile.write(
                             f"R = {R}, i = {i}, j={j} :: H(i,j,R)= {d[i,j]:.4f} \n"
                         )
-                myfile.write('-' * 60 + '\n')
+                myfile.write("-" * 60 + "\n")
 
     def modify_evals(self, func, kmesh):
         ret = copy.deepcopy(self)
@@ -479,12 +477,13 @@ class LWF(GenericWF):
 
 
 class LWF_COHP(LWF):
-
     def solve_all(self, k_list, eig_vectors=True, total_ham=True):
         nk = len(k_list)
-        evals, evecs, hams = np.zeros((self.nwann, nk)), np.zeros(
-            (self.nwann, nk, self.nwann), dtype=complex), np.zeros(
-                (nk, self.nwann, self.nwann), dtype=complex),
+        evals, evecs, hams = (
+            np.zeros((self.nwann, nk)),
+            np.zeros((self.nwann, nk, self.nwann), dtype=complex),
+            np.zeros((nk, self.nwann, self.nwann), dtype=complex),
+        )
         for ik, k in enumerate(k_list):
             evalue, evec, ham = self.solve_wann_k(k, ham=True)
             evals[:, ik] = evalue
@@ -493,37 +492,35 @@ class LWF_COHP(LWF):
         return evals, evecs, hams
 
     @staticmethod
-    def load_nc(fname, prefix='wann_'):
-        root = Dataset(fname, 'r')
-        ndim = root.dimensions['ndim'].size
-        nR = root.dimensions['nR'].size
-        nwann = root.dimensions[prefix + 'nwann'].size
-        nbasis = root.dimensions[prefix + 'nbasis'].size
+    def load_nc(fname, prefix="wann_"):
+        root = Dataset(fname, "r")
+        ndim = root.dimensions["ndim"].size
+        nR = root.dimensions["nR"].size
+        nwann = root.dimensions[prefix + "nwann"].size
+        nbasis = root.dimensions[prefix + "nbasis"].size
 
-        Rlist = root.variables[prefix + 'Rlist'][:]
-        ifc_real = root.variables[prefix + 'ifc_real'][:]
-        ifc_imag = root.variables[prefix + 'ifc_imag'][:]
+        Rlist = root.variables[prefix + "Rlist"][:]
+        ifc_real = root.variables[prefix + "ifc_real"][:]
+        ifc_imag = root.variables[prefix + "ifc_imag"][:]
         ifc = ifc_real + ifc_imag * 1.0j
 
-        wannR_real = root.variables[prefix + 'wannier_function_real'][:]
-        wannR_imag = root.variables[prefix + 'wannier_function_imag'][:]
+        wannR_real = root.variables[prefix + "wannier_function_real"][:]
+        wannR_imag = root.variables[prefix + "wannier_function_imag"][:]
         wannR = wannR_real + wannR_imag * 1.0j
 
-        return LWF_COHP(wannR,
-                        ifc,
-                        Rlist,
-                        cell=np.eye(3),
-                        wann_centers=np.zeros((nwann, ndim)))
+        return LWF_COHP(
+            wannR, ifc, Rlist, cell=np.eye(3), wann_centers=np.zeros((nwann, ndim))
+        )
 
 
 def test_modify_evals():
     fname = "/home/hexu/projects/LAO/scripts/Downfolded_hr.nc"
     wf = LWF.load_nc(fname)
-    ax = plot_band(wf, color='black')
+    ax = plot_band(wf, color="black")
     new_wf = wf.modify_evals(func=lambda x: x + 1.0, kmesh=[5, 5, 5])
 
     new_wf.write_lwf_nc("shifted_lwf.nc")
-    ax = plot_band(new_wf, color='blue', ax=ax)
+    ax = plot_band(new_wf, color="blue", ax=ax)
     plt.show()
 
 
@@ -542,14 +539,16 @@ def merge_two_LWF(wf1, wf2):
     Rlist = wf1.Rlist
     cell = wf1.cell
     wann_centers = np.vstack([wf1.wann_centers, wf2.wann_centers])
-    lwf = LWF(wannR,
-              HwannR,
-              Rlist,
-              cell,
-              wann_centers,
-              atoms=wf1.atoms,
-              fortran_order=False,
-              twobody_terms=None)
+    lwf = LWF(
+        wannR,
+        HwannR,
+        Rlist,
+        cell,
+        wann_centers,
+        atoms=wf1.atoms,
+        fortran_order=False,
+        twobody_terms=None,
+    )
     # TODO: add onebody terms and twobody_terms
     return lwf
 
