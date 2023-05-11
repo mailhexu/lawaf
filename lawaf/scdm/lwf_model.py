@@ -1,11 +1,4 @@
 import numpy
-import numba
-
-@numba.jit
-def rand():
-    x=numpy.random.random_integers()
-    #y=numpy.random.random_integers(1,3)
-    return x
 
 class LWF_model():
     def __init__(self):
@@ -21,4 +14,3 @@ class LWF_model():
         pass
 
 
-print(rand())

@@ -32,7 +32,7 @@ def plot_band(model,
         band = bandpath(kvectors, cell @ supercell_matrix, npoints)
     kpts = band.kpts
     x, X, _labels = band.get_linear_kpoint_axis()
-    evalues, _evecs = model.solve_all(kpts=kpts)
+    evalues, _evecs = model.solve_all(kpts=kpts)[:2]
     if evals_to_freq:
         evalues = np.where(evalues < 0, -np.sqrt(-evalues), np.sqrt(evalues))
     evalues *= unit_factor

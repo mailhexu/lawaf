@@ -50,14 +50,13 @@ def make_builder(
     selected_basis=[],
     anchor_kpt=(0, 0, 0),
     anchors=None,
-    has_nac=False,
 ):
     k = kmesh[0]
-    kpts = monkhorst_pack(kmesh)
+    kpts = monkhorst_pack(kmesh, gamma_center=True)
     nk = len(kpts)
     kweights = [1.0 / nk for k in kpts]
 
-    if has_nac:
+    if model.has_nac:
         evals, evecs, Hks, Hshorts, Hlongs=model.solve_all(kpts)
     else:
         evals, evecs = model.solve_all(kpts)
@@ -69,7 +68,7 @@ def make_builder(
             anchor_kpts.append(anchor)
     if anchor_kpt is not None:
         anchor_kpts.append(anchor_kpt)
-    evals_anchor, evecs_anchor = model.solve_all(anchor_kpts)
+    evals_anchor, evecs_anchor = model.solve_all(anchor_kpts)[0:2]
     wfn_anchor = {}
     for ik, k in enumerate(anchor_kpts):
         wfn_anchor[tuple(k)] = evecs_anchor[ik, :, :]
@@ -124,7 +123,7 @@ def make_builder(
     else:
         raise ValueError("method should be scdmk or projected")
     
-    if has_nac:
+    if model.has_nac:
         wann_builder.set_nac_Hks(Hks, Hshorts, Hlongs)
     return wann_builder
 
@@ -240,6 +239,7 @@ class Lawaf:
         ax=None,
         savefig="Downfolded_band.png",
         cell=np.eye(3),
+        plot_original=True,
         show=True,
         **kwargs,
     ):
@@ -259,7 +259,7 @@ class Lawaf:
         savefig: the filename of the figure to be saved.
         show: whether to show the band structure.
         """
-        if True:
+        if plot_original:
             ax = plot_band(
                 self.model,
                 kvectors=kvectors,
@@ -500,6 +500,7 @@ class PhonopyDownfolder(PhononDownfolder):
         self.atoms = self.model.atoms
         if self.has_nac:
             print("Calculating NACs")
+            self.builder.set_nac_params(self.model.born, self.model.dielectric, self.model.factor)
             self.ewf = self.builder.get_wannier_nac()
         else:
             self.ewf = self.builder.get_wannier()

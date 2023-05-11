@@ -65,10 +65,10 @@ class LWF(GenericWF):
     """
 
     name: str = "LWF"
-    atoms: Atoms = None
+    _atoms: Atoms = None
     has_nac: bool = False
     born_effective_charges: np.ndarray = None
-    dielectric_tensor: np.ndarray = None
+    dielectric: np.ndarray = None
     factor: float = 1.0
     Zwann: np.ndarray = None
 
@@ -87,13 +87,13 @@ class LWF(GenericWF):
         fortran_order=False,
         twobody_terms=None,
     ):
-        self.atoms = atoms
         self.wannR = wannR
         self.HwannR = HwannR
         self.Rlist = Rlist
         self.cell = cell
         self.wann_centers = wann_centers
         self.nR, self.nbasis, self.nwann = np.shape(wannR)
+        self.natom=self.nbasis//3
         self.ndim = np.shape(self.Rlist)[1]
         self.Rdict = {}
         for i, R in enumerate(Rlist):
@@ -101,19 +101,32 @@ class LWF(GenericWF):
         self.twobody_terms = twobody_terms
         self.has_nac = has_nac
         self.born_effective_charges = born
-        self.dielectric_tensor = dielectric
+        self.dielectric = dielectric
         self.factor = factor
-        if atoms is not None:
-            self.natom = len(self.atoms)
         self.atoms = atoms
 
+    @property
+    def atoms(self):
+        return self._atoms
+
+    @atoms.setter
+    def atoms(self, atoms):
+        self._atoms = atoms
+        if atoms is not None:
+            assert(self.nbasis == 3*len(atoms)) 
+
     def set_born_from_full(self, born, dielectric, factor):
+        self.born_effective_charges=born
+        self.dielectric=dielectric
+        self.factor=factor
         self.has_nac = True
         self.Zwann = np.zeros((self.nwann, 3))
+        self.natom = self.nbasis//3
         for i in range(self.nwann):
             W_R_tau_i = self.wannR[:, :, i].reshape(self.nR, self.natom, 3)
             # TODO: check the order of born effective charges (de or ed?)
             # R: Rvector. d & e: directions of dispalcement and efield
+            print(f"self.born_effective_charges: {self.born_effective_charges.shape}")
             self.Zwann[i, :] = np.einsum(
                 "Rad,ade->e", W_R_tau_i, self.born_effective_charges
             )

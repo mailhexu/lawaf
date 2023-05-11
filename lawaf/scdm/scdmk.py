@@ -130,13 +130,21 @@ class Lawaf(BasicLaWaf):
         lwf.atoms = copy.deepcopy(self.atoms)
         return lwf
 
-    def set_nac_Hk(self, Hks, Hshorts, Hlongs):
+    def set_nac_Hks(self, Hks, Hshorts, Hlongs):
+        """set  Hamiltonians including splited Hks, Hshorts and Hlongs. """
         self.has_nac=True
         self.Hks = Hks
         self.Hshorts=Hshorts
         self.Hlongs=Hlongs
 
-    def get_wannier_nac(self, Hshort, born, dielectric, factor):
+    def set_nac_params(self, born, dielectic, factor):
+        """set  Hamiltonians including splited Hks, Hshorts and Hlongs. """
+        self.has_nac=True
+        self.born = born
+        self.dielectic=dielectic
+        self.factor=factor
+
+    def get_wannier_nac(self):
         """
         Calculate Wannier functions but using non-analytic correction.
         """
@@ -144,8 +152,8 @@ class Lawaf(BasicLaWaf):
         self.get_Amn()
         self.get_wannk_and_Hk_nac()
         lwf = self.k_to_R()
-        lwf.set_born_from_full(born, dielectric, factor)
         lwf.atoms = copy.deepcopy(self.atoms)
+        lwf.set_born_from_full(self.born, self.dielectic, self.factor)
         return lwf
 
     def prepare(self):
@@ -236,7 +244,7 @@ class Lawaf(BasicLaWaf):
         """
         print("Using short range part of DM to build Hamiltonian")
         for ik in range(self.nkpt):
-            Ham=self.Hshorts[ik]
+            Ham=self.Hshorts[ik] + self.Hlongs[ik]
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
             psik=self.get_psi_k(ik)
             psiA=psik@self.Amn[ik, :, :]
@@ -358,6 +366,17 @@ class WannierProjectedBuilder(Lawaf):
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
 
+    def get_Amn_psi(self, psi):
+        """
+        Amnk_0=<gi|psi_n k>
+        Amn_0 is then orthogonalized using svd.
+        """
+        A = np.zeros((self.nband, self.nwann), dtype=complex)
+        for iband in range(self.nband):
+            for iproj, psi_a in enumerate(self.projectors):
+                A[iband, iproj] = np.vdot(psi[:, iband], psi_a) * self.occ[iband]
+        U, _S, VT = svd(A, full_matrices=False)
+        return U @ VT
 
 class WannierScdmkBuilder(Lawaf):
     """
@@ -491,13 +510,17 @@ class WannierScdmkBuilder(Lawaf):
         psik = self.get_psi_k(ik)
         occ = self.occ[ik]
         projs = self.projs[ik]
-        return self.get_Amn_psik(psik, occ=occ, projs=projs)
+        return self.get_Amn_psi(psik, occ=occ, projs=projs)
 
-    def get_Amn_psik(self, psik, occ, projs):
+    def get_Amn_psi(self, psik, occ=None, projs=None):
         if self.use_proj:
+            projs=np.einsum('iw,wb->b', self.psi_anchors,  psik.conj())
+            occ=1
             psi = psik[self.cols, :] * (occ * projs)[None, :]
-        else:
+        elif occ is not None:
             psi = psik[self.cols, :] * occ[None, :]
+        else:   
+            psi = psik[self.cols, :]
         U, _S, VT = svd(psi.T.conj(), full_matrices=False)
         Amn_k = U @ VT
         return Amn_k
@@ -507,6 +530,7 @@ class WannierScdmkBuilder(Lawaf):
         Calculate projection to anchors.
         """
         self._get_projection_to_anchors()
+
 
 
 def occupation_func(ftype=None, mu=0.0, sigma=1.0):

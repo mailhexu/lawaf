@@ -208,6 +208,7 @@ class PhonopyWrapper:
 
     def solve(self, k):
         # Hk = self.phonon.get_dynamical_matrix_at_q(k)
+        print("Solving at k = ", k)
         if self.has_nac:
             if self.phonon._dynamical_matrix is None:
                 msg = "Dynamical matrix has not yet built."
@@ -229,8 +230,9 @@ class PhonopyWrapper:
             Hlong *= phase
         if self.mode == "ifc":
             Hk *= self.Mmat
-            Hshort *= self.Mmat
-            Hlong *= self.Mmat
+            if self.has_nac:
+                Hshort *= self.Mmat
+                Hlong *= self.Mmat
         evals, evecs = eigh(Hk)
         if self.has_nac:
             return evals, evecs, Hk, Hshort, Hlong
@@ -288,14 +290,14 @@ class PhonopyWrapper:
         else:
             for ik, k in enumerate(kpts):
                 evalue, evec, Hk, Hshort, Hlong = self.solve(
-                    k, split_short_long=self.has_nac
+                    k 
                 )
                 evals.append(evalue)
                 evecs.append(evec)
                 Hks.append(Hk)
                 Hshorts.append(Hshort)
                 Hlongs.append(Hlong)
-        if split_short_long:
+        if self.has_nac:
             return (
                 np.array(evals, dtype=float),
                 np.array(evecs, dtype=complex, order="C"),
@@ -342,7 +344,7 @@ class PhonopyWrapper:
         d = 0
         for mode in modes:
             kpt, index, amp, phase, modulation_func = mode
-            _, evec = self.solve(kpt)
+            _, evec = self.solve(kpt)[:2]
             R = scmaker.Rvector_for_each_element(n_ind=self.natom * 3)
             # print(evec[index].reshape((self.natom, 3)))
             disp = (

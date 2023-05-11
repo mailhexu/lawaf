@@ -2,6 +2,8 @@ import numpy as np
 from phonopy import load
 from ase.io import write
 from lawaf.scdm import PhonopyDownfolder
+from lawaf.plot import plot_band
+from lawaf.wrapper.phonondownfolderwrapper import PhonopyDownfolderWrapper
 import matplotlib.pyplot as plt
 
 fname = 'phonopy_params.yaml'
@@ -15,10 +17,13 @@ downfolder=PhonopyDownfolder(phonopy_yaml=fname, mode="DM", has_nac=True)
 #          unitcell_filename="POSCAR-unitcell",supercell_matrix=np.eye(3)*3, mode="DM")
 lwf=downfolder.downfold(method='scdmk',nwann=3, #selected_basis=[2,5], 
                     anchors={(.0,.0,.0):(0,1, 2)},
-                    use_proj=True, mu=-0.25, sigma=9.4, weight_func='unity', kmesh=(3,3,3))
-print(lwf.get_wannier_born())
-write('POSCAR.vasp', downfolder.model.atoms, vasp5=True)
-ax=downfolder.plot_band_fitting(kvectors=np.array([[0. , 0. , 0. ],
+                    use_proj=True, mu=-0.25, sigma=9.4, weight_func='unity', kmesh=(2,2,2))
+
+m=PhonopyDownfolderWrapper(downfolder)
+
+ax = plot_band(
+    m, 
+    kvectors=np.array([[0. , 0. , 0. ],
            [0.5, 0.0, 0. ],
            [0.5, 0.5, 0.0],
            [0.5 , 0.5 , 0.5 ],
@@ -26,6 +31,24 @@ ax=downfolder.plot_band_fitting(kvectors=np.array([[0. , 0. , 0. ],
            [0.0,0.0,0],
            [0.5,0.5,0.5]                           
            ]), npoints=80,
-    knames=['$\\Gamma$', 'X','M', 'R', 'X', '$\\Gamma$', "R"], show=False)
+    knames=['$\\Gamma$', 'X','M', 'R', 'X', '$\\Gamma$', "R"],
+    efermi=0,
+    color="gray",
+    alpha=0.5,
+    marker=".",
+)
+
+
+print(lwf.get_wannier_born())
+write('POSCAR.vasp', downfolder.model.atoms, vasp5=True)
+ax=downfolder.plot_band_fitting(ax=ax, kvectors=np.array([[0. , 0. , 0. ],
+           [0.5, 0.0, 0. ],
+           [0.5, 0.5, 0.0],
+           [0.5 , 0.5 , 0.5 ],
+           [0.5, 0.0, 0.0],
+           [0.0,0.0,0],
+           [0.5,0.5,0.5]                           
+           ]), npoints=80,
+    knames=['$\\Gamma$', 'X','M', 'R', 'X', '$\\Gamma$', "R"], plot_original=True, show=False)
 plt.savefig('LWF_PTO.pdf')
 plt.show()
