@@ -15,7 +15,7 @@ downfolder = PhonopyDownfolder(phonopy_yaml=fname, mode="DM")
 #          unitcell_filename="POSCAR-unitcell",supercell_matrix=np.eye(3)*3, mode="DM")
 downfolder.downfold(method='scdmk', nwann=3,  # selected_basis=[2,5],
                     anchors={(.0, .0, .0): (0, 1, 2)},
-                    use_proj=True, mu=-0.25, sigma=9.4, weight_func='unity', kmesh=(2, 2, 2))
+                    use_proj=True, mu=-0.25, sigma=9.4, weight_func='unity', kmesh=(4, 4, 4), gamma=True)
 write('POSCAR.vasp', downfolder.model.atoms, vasp5=True)
 ax = downfolder.plot_band_fitting(kvectors=np.array([[0., 0., 0.],
                                                      [0.5, 0.0, 0.],

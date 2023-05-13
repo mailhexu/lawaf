@@ -3,7 +3,6 @@ from typing import Tuple, Union, List
 import os
 import copy
 import json
-from ase.dft.kpoints import monkhorst_pack
 from lawaf.utils.kpoints import monkhorst_pack
 import numpy as np
 from lawaf.scdm.scdmk import (
@@ -50,17 +49,17 @@ def make_builder(
     selected_basis=[],
     anchor_kpt=(0, 0, 0),
     anchors=None,
+    gamma=True,
 ):
     k = kmesh[0]
-    kpts = monkhorst_pack(kmesh, gamma_center=True)
+    kpts = monkhorst_pack(kmesh, gamma=gamma)
     nk = len(kpts)
     kweights = [1.0 / nk for k in kpts]
 
     if model.has_nac:
-        evals, evecs, Hks, Hshorts, Hlongs=model.solve_all(kpts)
+        evals, evecs, Hks, Hshorts, Hlongs = model.solve_all(kpts)
     else:
         evals, evecs = model.solve_all(kpts)
-
 
     anchor_kpts = []
     if anchors is not None:
@@ -122,7 +121,7 @@ def make_builder(
             wann_builder.set_projectors_with_anchors(anchors)
     else:
         raise ValueError("method should be scdmk or projected")
-    
+
     if model.has_nac:
         wann_builder.set_nac_Hks(Hks, Hshorts, Hlongs)
     return wann_builder
@@ -145,6 +144,7 @@ class Lawaf:
         self,
         method="scdmk",
         kmesh=(5, 5, 5),
+        gamma=True,
         nwann=0,
         weight_func="unity",
         mu=0.0,
@@ -187,7 +187,6 @@ class Lawaf:
 
         self.params = copy.deepcopy(locals())
         self.params.pop("self")
-        print(self.params)
 
     def save_info(self, output_path="./", fname="Downfold.json"):
         results = {"params": self.params}
@@ -240,7 +239,9 @@ class Lawaf:
         savefig="Downfolded_band.png",
         cell=np.eye(3),
         plot_original=True,
+        plot_downfolded=True,
         show=True,
+        fix_LOTO=False,
         **kwargs,
     ):
         """
@@ -273,23 +274,26 @@ class Lawaf:
                 efermi=efermi,
                 cell=cell,
                 ax=ax,
+                fix_LOTO=fix_LOTO,
                 **kwargs,
             )
-        ax = plot_band(
-            self.ewf,
-            kvectors=kvectors,
-            knames=knames,
-            supercell_matrix=supercell_matrix,
-            npoints=npoints,
-            efermi=efermi,
-            color=downfolded_band_color,
-            alpha=0.5,
-            marker=marker,
-            erange=erange,
-            cell=cell,
-            ax=ax,
-            **kwargs,
-        )
+        if plot_downfolded:
+            ax = plot_band(
+                self.ewf,
+                kvectors=kvectors,
+                knames=knames,
+                supercell_matrix=supercell_matrix,
+                npoints=npoints,
+                efermi=efermi,
+                color=downfolded_band_color,
+                alpha=0.5,
+                marker=marker,
+                erange=erange,
+                cell=cell,
+                ax=ax,
+                fix_LOTO=fix_LOTO,
+                **kwargs,
+            )
         if savefig is not None:
             plt.savefig(savefig)
         if show:
@@ -468,7 +472,7 @@ class PhononDownfolder(Lawaf):
 
 
 class PhonopyDownfolder(PhononDownfolder):
-    def __init__(self, phonon=None, mode="dm", has_nac=False,  *argv, **kwargs):
+    def __init__(self, phonon=None, mode="dm", has_nac=False, *argv, **kwargs):
         """
         Parameters:
         ========================================
@@ -481,7 +485,7 @@ class PhonopyDownfolder(PhononDownfolder):
             raise ImportError("phonopy is needed. Do you have phonopy installed?")
         if phonon is None:
             phonon = phonopy.load(*argv, **kwargs)
-        self.has_nac=has_nac
+        self.has_nac = has_nac
         model = PhonopyWrapper(phonon, mode=mode, has_nac=has_nac)
         super().__init__(model, atoms=model.atoms)
 
@@ -500,7 +504,9 @@ class PhonopyDownfolder(PhononDownfolder):
         self.atoms = self.model.atoms
         if self.has_nac:
             print("Calculating NACs")
-            self.builder.set_nac_params(self.model.born, self.model.dielectric, self.model.factor)
+            self.builder.set_nac_params(
+                self.model.born, self.model.dielectric, self.model.factor
+            )
             self.ewf = self.builder.get_wannier_nac()
         else:
             self.ewf = self.builder.get_wannier()

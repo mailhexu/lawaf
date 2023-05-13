@@ -209,11 +209,12 @@ class PhonopyWrapper:
     def solve(self, k):
         # Hk = self.phonon.get_dynamical_matrix_at_q(k)
         print("Solving at k = ", k)
+        if self.phonon._dynamical_matrix is None:
+            msg = "Dynamical matrix has not yet built."
+            raise RuntimeError(msg)
+
         if self.has_nac:
-            if self.phonon._dynamical_matrix is None:
-                msg = "Dynamical matrix has not yet built."
-                raise RuntimeError(msg)
-            # replace_phonon_dynamics_with_myGL(self.phonon)
+                    # replace_phonon_dynamics_with_myGL(self.phonon)
             # self.phonon._dynamical_matrix.run(k)
             # return self.phonon._dynamical_matrix.get_dynamical_matrix()
             # self.phonon.dynamical_matrix._compute_dynamical_matrix(k, [0, 0, 0])
@@ -222,8 +223,9 @@ class PhonopyWrapper:
             # Hk=self.phonon.dynamical_matrix.dynamical_matrix
             Hshort = self.phonon.dynamical_matrix.short_range_dynamical_matrix
             Hlong = self.phonon.dynamical_matrix.long_range_dynamical_matrix
+        else:
+            Hk = self.phonon.get_dynamical_matrix_at_q(k)
         phase = np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
-
         Hk *= phase
         if self.has_nac:
             Hshort *= phase

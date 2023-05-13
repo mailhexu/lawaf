@@ -38,6 +38,7 @@ class AbstractTB():
         #: 1: orb1_up, orb2_up,  ... orb1_down, orb2_down,...
         #: 2: orb1_up, orb1_down, orb2_up, orb2_down,...
         self.orb_order = orb_order
+        self.has_nac = False
 
     def get_hamR(self, R):
         """
@@ -119,6 +120,7 @@ class MyTB(AbstractTB):
         self.atoms = None
         self.R2kfactor = 2.0j * np.pi
         self.k2Rfactor = -2.0j * np.pi
+        self.has_nac=False
 
     def set_atoms(self, atoms):
         self.atoms = atoms

@@ -17,7 +17,7 @@ downfolder=PhonopyDownfolder(phonopy_yaml=fname, mode="DM", has_nac=True)
 #          unitcell_filename="POSCAR-unitcell",supercell_matrix=np.eye(3)*3, mode="DM")
 lwf=downfolder.downfold(method='scdmk',nwann=3, #selected_basis=[2,5], 
                     anchors={(.0,.0,.0):(0,1, 2)},
-                    use_proj=True, mu=-0.25, sigma=9.4, weight_func='unity', kmesh=(2,2,2))
+                    use_proj=True, mu=-0.25, sigma=9.4, weight_func='unity', kmesh=(3,3,3))
 
 m=PhonopyDownfolderWrapper(downfolder)
 
@@ -33,9 +33,10 @@ ax = plot_band(
            ]), npoints=80,
     knames=['$\\Gamma$', 'X','M', 'R', 'X', '$\\Gamma$', "R"],
     efermi=0,
-    color="gray",
+    color="green",
     alpha=0.5,
     marker=".",
+    fix_LOTO=True,
 )
 
 
@@ -48,7 +49,8 @@ ax=downfolder.plot_band_fitting(ax=ax, kvectors=np.array([[0. , 0. , 0. ],
            [0.5, 0.0, 0.0],
            [0.0,0.0,0],
            [0.5,0.5,0.5]                           
-           ]), npoints=80,
-    knames=['$\\Gamma$', 'X','M', 'R', 'X', '$\\Gamma$', "R"], plot_original=True, show=False)
+           ]),
+           npoints=200,
+    knames=['$\\Gamma$', 'X','M', 'R', 'X', '$\\Gamma$', "R"], plot_original=True, plot_downfolded=False, show=False, fix_LOTO=True )
 plt.savefig('LWF_PTO.pdf')
 plt.show()

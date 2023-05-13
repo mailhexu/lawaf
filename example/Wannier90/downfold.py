@@ -10,13 +10,14 @@ def main():
     model.downfold(
         method='scdmk',
         kmesh=(4, 4, 4),
-        nwann=2,
+        nwann=3,
         weight_func='Gauss',
         mu=10.0,
         sigma=3.0,
         selected_basis=None,
-        anchors={(0, 0, 0): (12,13)},
-        use_proj=True,
+        #anchors={(0, 0, 0): (12,13)},
+        anchors={(0, 0, 0): (9, 10,11)},
+        use_proj=False,
         write_hr_nc='Downfolded_hr.nc',
         write_hr_txt='Downfolded_hr.txt')
 
