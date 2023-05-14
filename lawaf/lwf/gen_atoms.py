@@ -25,8 +25,8 @@ def gen(mod, amp):
         datoms.set_positions(positions)
         spg=spglib.get_spacegroup(datoms,symprec=0.001)
         write(f"POSCAR_{i}.vasp", datoms, vasp5=True)
-        print(datoms.cell)
-        print(f"{spg}")
+        #print(datoms.cell)
+        #print(f"{spg}")
     return datoms
 
 def force_near_0(positions, max=0.93):

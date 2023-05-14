@@ -174,11 +174,11 @@ class PhonopyWrapper:
         else:
             self.has_nac = False
 
-        if self.has_nac:
-            print(
-                f"Phonopy DM replaces with myGL. Has NAC: {self.has_nac} \n"
-                + f" born charges: {self.born}, dielectric constant: {self.dielectric}"
-            )
+        #if self.has_nac:
+        #    print(
+        #        f"Phonopy DM replaces with myGL. Has NAC: {self.has_nac} \n"
+        #        + f" born charges: {self.born}, dielectric constant: {self.dielectric}"
+        #    )
 
         self._prepare()
         prim = self.phonon.get_primitive()
@@ -208,7 +208,6 @@ class PhonopyWrapper:
 
     def solve(self, k):
         # Hk = self.phonon.get_dynamical_matrix_at_q(k)
-        print("Solving at k = ", k)
         if self.phonon._dynamical_matrix is None:
             msg = "Dynamical matrix has not yet built."
             raise RuntimeError(msg)
