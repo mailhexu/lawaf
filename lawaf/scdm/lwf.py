@@ -126,10 +126,12 @@ class LWF(GenericWF):
             W_R_tau_i = self.wannR[:, :, i].reshape(self.nR, self.natom, 3)
             # TODO: check the order of born effective charges (de or ed?)
             # R: Rvector. d & e: directions of dispalcement and efield
-            print(f"self.born_effective_charges: {self.born_effective_charges.shape}")
+            #print(f"self.born_effective_charges: {self.born_effective_charges.shape}")
+            W_R_tau_i /= np.linalg.norm(W_R_tau_i)
             self.Zwann[i, :] = np.einsum(
                 "Rad,ade->e", W_R_tau_i, self.born_effective_charges
             )
+        print(f"Zwann:{self.Zwann=}")
 
     def get_wannier_born(self):
         return self.Zwann

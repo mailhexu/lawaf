@@ -489,6 +489,15 @@ class PhonopyDownfolder(PhononDownfolder):
         model = PhonopyWrapper(phonon, mode=mode, has_nac=has_nac)
         super().__init__(model, atoms=model.atoms)
 
+        self.mode=mode
+        self.factor = 15.6*33.6
+        self.convert_DM_parameters()
+
+    def convert_DM_parameters(self):
+        if self.mode=="dm":
+            self.params["mu"]= freqs_to_evals(self.params["mu"], factor=self.factor)
+            self.params["sigma"]= freqs_to_evals(self.params["sigma"], factor=self.factor)
+
     def downfold(
         self,
         post_func=None,
@@ -503,7 +512,6 @@ class PhonopyDownfolder(PhononDownfolder):
         self.builder = make_builder(self.model, **self.params)
         self.atoms = self.model.atoms
         if self.has_nac:
-            print("Calculating NACs")
             self.builder.set_nac_params(
                 self.model.born, self.model.dielectric, self.model.factor
             )

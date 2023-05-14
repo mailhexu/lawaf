@@ -54,7 +54,8 @@ def plot_band(model,
     else:
         evalues = copy.deepcopy(_evalues)
     if evals_to_freq:
-        evalues = np.where(evalues < 0, -np.sqrt(-evalues), np.sqrt(evalues))
+        #evalues = np.where(evalues < 0, -np.sqrt(-evalues), np.sqrt(evalues))
+        evalues = np.sign(evalues) * (np.sqrt(np.abs(evalues)))
     evalues *= unit_factor
     for i in range(evalues.shape[1]):
         if i == 0:

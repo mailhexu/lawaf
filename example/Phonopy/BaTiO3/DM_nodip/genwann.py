@@ -13,10 +13,10 @@ downfolder = PhonopyDownfolder(phonopy_yaml=fname, mode="DM")
 # downfolder=PhonopyDownfolder(force_sets_filename="FORCE_SETS",
 #          #born_filename="./BORN",
 #          unitcell_filename="POSCAR-unitcell",supercell_matrix=np.eye(3)*3, mode="DM")
-downfolder.downfold(method='scdmk', nwann=3,  # selected_basis=[2,5],
+downfolder.downfold(method='projected', nwann=3,  # selected_basis=[2,5],
                     anchors={(.0, .0, .0): (0, 1, 2)},
-                    use_proj=True, mu=-0.25, sigma=9.4, weight_func='unity', kmesh=(2, 2, 2), gamma=True)
-write('POSCAR.vasp', downfolder.model.atoms, vasp5=True)
+                    use_proj=True, mu=-200, sigma=100.4, weight_func='Gauss', kmesh=(2, 2, 2), gamma=True)
+#write('POSCAR.vasp', downfolder.model.atoms, vasp5=True)
 ax = downfolder.plot_band_fitting(kvectors=np.array([[0., 0., 0.],
                                                      [0.5, 0.0, 0.],
                                                      [0.5, 0.5, 0.0],
@@ -30,5 +30,5 @@ ax = downfolder.plot_band_fitting(kvectors=np.array([[0., 0., 0.],
                                                      ylabel="Frequency (cm^-1)",
                                                      evals_to_freq=True,
                                   knames=['$\\Gamma$', 'X', 'M', 'R', 'X', '$\\Gamma$', "R"], show=False)
-plt.savefig('LWF_PTO.pdf')
+plt.savefig('LWF_BTO.pdf')
 plt.show()

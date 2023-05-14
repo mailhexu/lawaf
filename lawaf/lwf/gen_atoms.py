@@ -24,7 +24,7 @@ def gen(mod, amp):
             positions+=np.real(mode)
         datoms.set_positions(positions)
         spg=spglib.get_spacegroup(datoms,symprec=0.001)
-        write(f"POSCAR_{i}.vasp", datoms, vasp5=True)
+        #write(f"POSCAR_{i}.vasp", datoms, vasp5=True)
         #print(datoms.cell)
         #print(f"{spg}")
     return datoms
@@ -45,7 +45,6 @@ def combine(alpha, cell=False):
     M1=read('M1.vasp')
     cell_R=R.get_cell()
     spos_R=force_near_0(R.get_scaled_positions())
-    print(spos_R)
 
     cell_M1=M1.get_cell()
     spos_M1=force_near_0(M1.get_scaled_positions())
@@ -57,12 +56,10 @@ def combine(alpha, cell=False):
     else:
         cell=cell_R
 
-    print(spos_M1)
     
     spos=(1-alpha)*spos_R+alpha*spos_M1
     atoms=Atoms(symbols, cell=cell, scaled_positions=spos)
     spg=spglib.get_spacegroup(atoms,symprec=0.001)
-    print(f"{spg}")
     return atoms
         
 atoms=combine(0.00,cell=True)
