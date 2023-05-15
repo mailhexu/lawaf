@@ -515,12 +515,15 @@ class WannierScdmkBuilder(Lawaf):
     def get_Amn_psi(self, psik, occ=None, projs=None):
         if self.use_proj:
             projs=np.einsum('iw,wb->b', self.psi_anchors,  psik.conj())
-            occ=1
-            psi = psik[self.cols, :] * (occ * projs)[None, :]
-        elif occ is not None:
-            psi = psik[self.cols, :] * occ[None, :]
-        else:   
-            psi = psik[self.cols, :]
+            if occ is None:
+                psi = psik[self.cols, :] * (projs)[None, :]
+            else:
+                psi = psik[self.cols, :] * (occ * projs)[None, :]
+        else:
+            if occ is not None:
+                psi = psik[self.cols, :] * occ[None, :]
+            else:   
+                psi = psik[self.cols, :]
         U, _S, VT = svd(psi.T.conj(), full_matrices=False)
         Amn_k = U @ VT
         return Amn_k
