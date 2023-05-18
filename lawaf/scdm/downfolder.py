@@ -12,9 +12,9 @@ from lawaf.scdm.scdmk import (
 )
 import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
-from lawaf.wrapper.ijR import ijR
-from lawaf.wrapper.wannier90 import wannier_to_model
-from lawaf.wrapper.sislwrapper import SislWrapper, SislHSWrapper, SislWFSXWrapper
+#from lawaf.wrapper.ijR import ijR
+#from lawaf.wrapper.wannier90 import wannier_to_model
+from lawaf.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 from lawaf.wrapper.phonopywrapper import PhonopyWrapper
 from lawaf.wrapper.myTB import MyTB
 

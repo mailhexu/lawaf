@@ -11,7 +11,7 @@ setup(
     packages=find_packages(),
     package_data={},
     install_requires=['numpy>=1.20', 'scipy',  'matplotlib', 'ase>=3.19',
-                      'netcdf4', 'sisl>=0.10', 'phonopy'
+                      'netcdf4', 'sisl>=0.10', 'phonopy', "ipywidgets"
                       ],
     scripts=['scripts/phonopy_to_netcdf.py'
              ],

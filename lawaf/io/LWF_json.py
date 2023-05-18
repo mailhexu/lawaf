@@ -4,7 +4,7 @@ import json
 import numpy as np
 from lawaf.scdm.lwf import LWF
 from minimulti.electron.basis2 import BasisSet, Basis
-from minimulti.utils.symbol import symbol_number
+from lawaf.utils.symbol import symbol_number
 from minimulti.electron.ijR import ijR
 from minimulti.utils.supercell import SupercellMaker
 from minimulti.electron.Hamiltonian import atoms_model
