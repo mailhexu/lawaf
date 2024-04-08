@@ -61,6 +61,7 @@ class Lawaf(BasicLaWaf):
         kpts,
         nwann,
         weight_func,
+        kshift=None,
         atoms=None,
         kweights=None,
         Sk=None,
@@ -267,7 +268,6 @@ class Lawaf(BasicLaWaf):
         """
         for iwann in range(self.nwann):
             norm = np.trace(self.wannR[:, :, iwann].conj().T @ self.wannR[:, :, iwann])
-            # print(f"Norm {iwann}: {norm}")
 
     def k_to_R(self):
         """

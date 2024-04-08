@@ -19,7 +19,7 @@ from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
 
 # from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
 from lawaf.plot import plot_band
-from lawaf.wrapper.ifcwrapper import IFC
+from .ifcwrapper import IFC
 import matplotlib.pyplot as plt
 
 # from supercellmap import SupercellMaker

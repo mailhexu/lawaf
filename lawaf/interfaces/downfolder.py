@@ -5,15 +5,13 @@ import copy
 import json
 from lawaf.utils.kpoints import monkhorst_pack
 import numpy as np
-from lawaf.scdm.scdmk import (
+from lawaf.wannierization.scdmk import (
     WannierProjectedBuilder,
     WannierScdmkBuilder,
     occupation_func,
 )
 import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
-#from lawaf.wrapper.ijR import ijR
-#from lawaf.wrapper.wannier90 import wannier_to_model
 from lawaf.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 from lawaf.wrapper.phonopywrapper import PhonopyWrapper
 from lawaf.wrapper.myTB import MyTB
@@ -23,6 +21,7 @@ from lawaf.wrapper.myTB import MyTB
 class WFParams:
     method = "scdmk"
     kmesh: Tuple[int] = (5, 5, 5)
+    kshift = np.array([1e-7, 3e-6, 5e-9])
     gamma: bool = True
     nwann: int = 0
     weight_func: str = "unity"
@@ -43,6 +42,7 @@ def make_builder(
     weight_func="unity",
     mu=0,
     sigma=0.01,
+    kshift=None,
     exclude_bands=[],
     use_proj=False,
     method="projected",
@@ -52,9 +52,12 @@ def make_builder(
     gamma=True,
 ):
     k = kmesh[0]
-    kpts = monkhorst_pack(kmesh, gamma=gamma)
+    kpts = monkhorst_pack(kmesh, gamma=gamma) 
     nk = len(kpts)
     kweights = [1.0 / nk for k in kpts]
+    if kshift is not None:
+        kpts+=kshift[None, :]
+        anchor_kpt=np.array(anchor_kpt)+kshift
 
     if model.has_nac:
         evals, evecs, Hks, Hshorts, Hlongs = model.solve_all(kpts)
@@ -86,6 +89,7 @@ def make_builder(
             positions=positions,
             kpts=kpts,
             kweights=kweights,
+            #kshift=kshift,
             nwann=nwann,
             weight_func=weight_func,
             has_phase=has_phase,
@@ -109,6 +113,7 @@ def make_builder(
             positions=positions,
             kpts=kpts,
             kweights=kweights,
+            kshift=kshift,
             nwann=nwann,
             weight_func=weight_func,
             Rgrid=kmesh,
@@ -152,6 +157,7 @@ class Lawaf:
         selected_basis=None,
         anchors=None,
         anchor_kpt=(0, 0, 0),
+        kshift=np.array([1e-7, 2e-8, 3e-9]),
         use_proj=True,
         exclude_bands=[],
         post_func=None,
@@ -490,7 +496,7 @@ class PhonopyDownfolder(PhononDownfolder):
         super().__init__(model, atoms=model.atoms)
 
         self.mode=mode
-        self.factor = 15.6*33.6
+        self.factor = 524.16 # to cm-1
         self.convert_DM_parameters()
 
     def convert_DM_parameters(self):

@@ -1,7 +1,7 @@
 import numpy as np
 from phonopy import load
 from ase.io import write
-from lawaf.scdm import PhonopyDownfolder
+from lawaf import PhonopyDownfolder
 import matplotlib.pyplot as plt
 
 fname = 'phonopy_params.yaml'

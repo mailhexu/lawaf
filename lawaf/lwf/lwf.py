@@ -292,8 +292,8 @@ class LWF(GenericWF):
 
     def masses_to_lwf_masses(self, masses):
         m3 = np.kron(masses, [1, 1, 1])
-        # print(self.wannR.conj()*self.wannR)
-        return np.einsum("rij,i->j", (self.wannR.conj() * self.wannR), m3)
+        lwf_masses=np.einsum("rij,i->j", (self.wannR.conj() * self.wannR), m3)
+        return lwf_masses
 
     def born_to_lwf(self, born):
         wborn = np.zeors((self.nwann, 3))
