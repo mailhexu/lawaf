@@ -1,4 +1,4 @@
-from lawaf.scdm.lwf import LWF
+from lawaf.lwf.lwf import LWF
 from lawaf.plot.mcif import write_mcif
 import numpy as np
 from minimulti.utils.supercell import SupercellMaker
@@ -8,7 +8,6 @@ from ase.io import read, write
 from scipy.sparse import dok_matrix, csr_matrix, save_npz, load_npz
 from ase.units import Bohr
 from ase import Atoms
-from pyDFTutils.ase_utils import vesta_view
 import copy
 import os
 
@@ -209,5 +208,5 @@ def gen_domain(size, interface=2, mo=-1):
     atoms.set_pbc(True)
     #write(f'supercell_{Q1:.1f}_{Q2:.1f}.vasp', atoms, vasp5=True, sort=True)
     #write(f'antidomain.vasp', atoms, vasp5=True, sort=True)
-    write(f'Rdomain.vasp', atoms, vasp5=True, sort=True)
+    write('Rdomain.vasp', atoms, vasp5=True, sort=True)
     vesta_view(atoms)

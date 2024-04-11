@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-import pickle
 import copy
-import os
 import numpy as np
-import matplotlib.pyplot as plt
 from phonopy import load
 from ase.atoms import Atoms
-from ase.io import write, read
+from ase.io import read
 from spglib import spglib
 from pyDFTutils.ase_utils.geometry import force_near_0
 

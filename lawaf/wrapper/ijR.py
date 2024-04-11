@@ -1,5 +1,3 @@
-import os
-import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
@@ -7,10 +5,7 @@ from scipy.linalg import eigh
 from scipy.sparse import csr_matrix
 from netCDF4 import Dataset
 from collections import defaultdict
-from scipy.optimize import curve_fit
 from lawaf.utils.supercell import SupercellMaker
-from scipy.sparse import coo_matrix
-from itertools import groupby
 from ase.dft.kpoints import bandpath
 
 class ijR(object):
@@ -156,7 +151,7 @@ class ijR(object):
             myfile.write(f"Number_of_R: {self.nR}\n")
             myfile.write(f"Number_of_basis_functions: {self.nbasis}\n")
             myfile.write(f"Cell parameter: {self.cell}\n")
-            myfile.write(f"Hamiltonian:  \n" + "="*60+'\n')
+            myfile.write("Hamiltonian:  \n" + "="*60+'\n')
             for iR,R in enumerate(self.Rlist):
                 myfile.write(f"index of R: {iR}.  R = {R}\n")
                 d=self.data[R]

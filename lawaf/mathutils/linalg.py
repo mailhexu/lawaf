@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.linalg import inv, eigh
+from scipy.linalg import eigh
 
 def Lowdin(S):
     """

@@ -5,15 +5,9 @@ import numpy as np
 from lawaf.scdm.lwf import LWF
 from minimulti.electron.basis2 import BasisSet, Basis
 from lawaf.utils.symbol import symbol_number
-from minimulti.electron.ijR import ijR
-from minimulti.utils.supercell import SupercellMaker
 from minimulti.electron.Hamiltonian import atoms_model
 from ase.atoms import Atoms
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit, minimize
-import pickle
-from functools import partial
-import numba
 
 
 def read_basis(fname):

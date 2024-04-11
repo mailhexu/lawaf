@@ -3,17 +3,10 @@ Wannier Module: For building Wannier functions and Hamiltonians.
 """
 
 import numpy as np
-from scipy.linalg import qr, svd, norm, eigh
-from scipy.special import erfc
-from netCDF4 import Dataset
-from ase.dft.kpoints import get_monkhorst_pack_size_and_offset
-from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
 from lawaf.scdm.lwf import LWF
 from lawaf.scdm.scdmk import Lawaf, scdm, occupation_func
 from ase.dft.kpoints import monkhorst_pack
-from minimulti.electron.density import density_matrix
 import os
-import matplotlib.pyplot as plt
 
 
 class SpinDensityMatricesDownfolder(Lawaf):

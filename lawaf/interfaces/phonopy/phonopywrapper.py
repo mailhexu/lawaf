@@ -1,6 +1,5 @@
 import copy
 from typing import Type, Union
-import phonopy
 from phonopy.structure.atoms import PhonopyAtoms
 from phonopy.structure.cells import Primitive
 from scipy.linalg import eigh
@@ -11,11 +10,10 @@ from phonopy.harmonic.dynamical_matrix import (
     DynamicalMatrix,
     DynamicalMatrixWang,
     DynamicalMatrixGL,
-    get_dynamical_matrix,
 )
 from ase import Atoms
 from ase.dft.kpoints import monkhorst_pack
-from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
+from lawaf.utils.kpoints import kmesh_to_R
 
 # from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
 from lawaf.plot import plot_band

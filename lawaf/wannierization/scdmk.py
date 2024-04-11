@@ -4,13 +4,13 @@ Wannier Module: For building Wannier functions and Hamiltonians.
 
 import copy
 import numpy as np
-from scipy.linalg import qr, svd, norm, eigh
+from scipy.linalg import qr, svd
 from scipy.special import erfc
 from netCDF4 import Dataset
 from ase.dft.kpoints import get_monkhorst_pack_size_and_offset
 from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
-from lawaf.scdm.lwf import LWF
-from typing import Callable, Optional, Tuple, Union
+from lawaf.lwf.lwf import LWF
+from typing import Callable, Optional, Tuple
 from dataclasses import dataclass
 
 

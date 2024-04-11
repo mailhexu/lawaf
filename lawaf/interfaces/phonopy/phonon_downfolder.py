@@ -1,10 +1,8 @@
 import numpy as np
 from scipy.linalg import eigh
-import copy
 import os
-from dataclasses import dataclass
 from lawaf.interfaces.downfolder import Lawaf, make_builder
-from lawaf.utils import freqs_to_evals
+from lawaf.mathutils.evals_freq import freqs_to_evals
 from .phonopywrapper import PhonopyWrapper
 
 
@@ -75,7 +73,8 @@ class PhonopyDownfolder(PhononDownfolder):
             os.makedirs(output_path)
         try:
             self.save_info(output_path=output_path)
-        except:
+        except Exception as E:
+            print(E)
             pass
         if write_hr_txt is not None:
             self.ewf.save_txt(os.path.join(output_path, write_hr_txt))

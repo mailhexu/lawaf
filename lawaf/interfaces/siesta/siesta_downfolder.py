@@ -1,8 +1,7 @@
 import os
 import json
-import numpy as np
 import sisl
-from lawaf.interfaces.downfolder import Lawaf, make_builder
+from lawaf.interfaces.downfolder import Lawaf
 from lawaf.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 
 

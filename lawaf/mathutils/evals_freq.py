@@ -10,6 +10,6 @@ def freqs_to_evals(freqs, factor):
     """
     convert phonon frequencies to eigenvalues
     """
-    return np.sign(evals/factor)*evals**2
+    return np.sign(freqs/factor)*freqs**2
 
     

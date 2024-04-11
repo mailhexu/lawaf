@@ -3,7 +3,7 @@ import copy
 from scipy.linalg import eigh
 from netCDF4 import Dataset
 from ase import Atoms
-from lawaf.scdm.eigen_modifer import HamModifier, force_ASR_kspace
+#from lawaf.scdm.eigen_modifer import HamModifier, force_ASR_kspace
 import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
 from dataclasses import dataclass
@@ -464,7 +464,7 @@ class LWF(GenericWF):
             myfile.write(f"Number_of_R: {self.nR}\n")
             myfile.write(f"Number_of_Wannier_functions: {self.nwann}\n")
             # myfile.write(f"Cell parameter: {self.cell}\n")
-            myfile.write(f"Hamiltonian:  \n" + "=" * 60 + "\n")
+            myfile.write("Hamiltonian:  \n" + "=" * 60 + "\n")
             for iR, R in enumerate(self.Rlist):
                 myfile.write(f"index of R: {iR}.  R = {R}\n")
                 d = self.HwannR[iR]

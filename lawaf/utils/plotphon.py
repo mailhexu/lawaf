@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
-import pickle
-import copy
 import os
-import numpy as np
 import matplotlib.pyplot as plt
 from pyDFTutils.ase_utils.kpoints import kpath
 from phonopy import load
-from ase.atoms import Atoms
-from ase.io import write
-from spglib import spglib
 
 
 def plot_phonon(path='./',color='blue', unit="cm^-1"):

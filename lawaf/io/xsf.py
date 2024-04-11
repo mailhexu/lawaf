@@ -2,7 +2,6 @@
 Read and write of xsf file.
 """
 
-import os
 import numpy as np
 from ase.units import Hartree
 

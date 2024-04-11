@@ -3,7 +3,7 @@ import numpy as np
 from minimulti.utils.supercell import SupercellMaker
 from pyDFTutils.ase_utils import vesta_view
 from netCDF4 import Dataset
-from ase.io import read, write
+from ase.io import write
 from ase.units import Bohr
 import copy
 from scipy.sparse import coo_matrix
@@ -43,8 +43,8 @@ def lwf_to_atoms_batch(mylwf: LWF,
     patoms = mylwf.atoms
     scatoms = scmaker.sc_atoms(patoms)
     scatoms.set_pbc(True)
-    write(f'scatoms.cif', scatoms)
-    write(f'scatoms.vasp', scatoms)
+    write('scatoms.cif', scatoms)
+    write('scatoms.vasp', scatoms)
     positions = scatoms.get_positions()
     nR, natom3, nlwf = mylwf.wannR.shape
     scnatom = len(scatoms)
