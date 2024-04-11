@@ -5,4 +5,4 @@ import os
 
 write_lwf_cif(lwf_fname="LWF.nc",
               listlwf=None,
-              sc_matrix=np.diag([3,3,3]), center=True)
+              sc_matrix=np.diag([5,5,5]), center=True)
