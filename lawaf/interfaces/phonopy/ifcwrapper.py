@@ -6,7 +6,7 @@ from scipy.linalg import eigh
 import numpy as np
 from lawaf.plot import plot_band
 import matplotlib.pyplot as plt
-from lawaf.utils import read_ifc_from_netcdf, save_ifc_to_netcdf
+#from lawaf.utils import read_ifc_from_netcdf, save_ifc_to_netcdf
 
 
 class IFC():

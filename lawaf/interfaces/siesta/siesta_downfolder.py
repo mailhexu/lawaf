@@ -4,6 +4,7 @@ import sisl
 from lawaf.interfaces.downfolder import Lawaf
 from lawaf.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 
+__all__ = ["SiestaDownfolder"]
 
 class SislDownfolder(Lawaf):
     def __init__(
@@ -151,3 +152,4 @@ class SislDownfolder(Lawaf):
 
         return grid
 
+SiestaDownfolder = SislDownfolder

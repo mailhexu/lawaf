@@ -3,7 +3,7 @@ from phonopy import load
 from ase.io import write
 from lawaf.scdm import PhonopyDownfolder
 from lawaf.plot import plot_band
-from lawaf.wrapper.phonondownfolderwrapper import PhonopyDownfolderWrapper
+from lawaf.phon import PhonopyDownfolderWrapper
 import matplotlib.pyplot as plt
 
 fname = 'phonopy_params.yaml'
