@@ -5,7 +5,7 @@ import numpy as np
 from scipy.linalg import eigh
 
 
-class Pert():
+class Pert:
     def __init__(self, H0=None, evals=None, evecs=None):
         if evals is not None and evecs is not None:
             self.evals, self.evecs = evals, evecs
@@ -32,7 +32,7 @@ class Pert():
 
     @staticmethod
     def Vpert1(evals, evecs, dH, n):
-        dV = np.zeros((n, n), dtype='complex')
+        dV = np.zeros((n, n), dtype="complex")
         dHH = evecs.T.conj() @ dH @ evecs
         for i in range(n):
             for k in range(n):
@@ -42,7 +42,7 @@ class Pert():
 
     @staticmethod
     def Epert2(evals, evecs, dH, n):
-        d2E = np.zeros(n, dtype='complex')
+        d2E = np.zeros(n, dtype="complex")
         dHH = evecs.T.conj() @ dH @ evecs
         for i in range(n):
             for k in range(n):
@@ -50,36 +50,39 @@ class Pert():
                     d2E[i] += dHH[i, k] * dHH[k, i] / (evals[i] - evals[k])
         return d2E
 
+
 def unit2(x=0.3):
-    return np.array([[np.cos(x), np.sin(x)],[-np.sin(x), np.cos(x)]])
+    return np.array([[np.cos(x), np.sin(x)], [-np.sin(x), np.cos(x)]])
+
 
 def test_pert_degenerate_2d(x=0.01):
-    H0=np.array([[2,0],[0,2]])
-    evals0, evecs0=np.linalg.eigh(H0)
+    H0 = np.array([[2, 0], [0, 2]])
+    evals0, evecs0 = np.linalg.eigh(H0)
 
-    H1=np.array([[1,2],[3,4]])
-    H1+=H1.T
+    H1 = np.array([[1, 2], [3, 4]])
+    H1 += H1.T
     print(evals0)
 
-    H=H0+H1*x
-    evals, evecs=eigh(H)
-    print("Fdiff of eval: ",(evals-evals0)/x)
-    print("Fdiff of evec: ", (evecs-evecs0))
+    H = H0 + H1 * x
+    evals, evecs = eigh(H)
+    print("Fdiff of eval: ", (evals - evals0) / x)
+    print("Fdiff of evec: ", (evecs - evecs0))
 
-    m=evecs0.T.conj().dot(H1).dot(evecs0)
-    E1, c=eigh(m)
+    m = evecs0.T.conj().dot(H1).dot(evecs0)
+    E1, c = eigh(m)
     print("Pert of eval: ", E1)
-    c=c-np.eye(2)
-    V10=np.dot( c[:,0], evecs0,)
-    V11=np.dot(evecs0, c[:,1])
+    c = c - np.eye(2)
+    V10 = np.dot(
+        c[:, 0],
+        evecs0,
+    )
+    V11 = np.dot(evecs0, c[:, 1])
     print(V10)
     print(V11)
 
 
+# test_pert_degenerate_2d()
 
-
-
-#test_pert_degenerate_2d()
 
 def test_pert(x, n=4):
     H0 = np.random.random([n, n])
@@ -87,7 +90,7 @@ def test_pert(x, n=4):
     evals0, evecs0 = eigh(H0)
 
     dH = np.random.random([n, n])
-    dH = (dH + dH.T.conj())
+    dH = dH + dH.T.conj()
 
     H = H0 + dH * x
     evals, evecs = eigh(H)
@@ -107,7 +110,7 @@ def test_pert(x, n=4):
     # eigen value perturbation (2nd order)
 
     # eigen vector perturbation
-    dV = (Pert.Vpert1(evals0, evecs0, dH, n))
+    dV = Pert.Vpert1(evals0, evecs0, dH, n)
     print("dV:", dV)
     print("dV_fD:", (evecs - evecs0) / x)
 
@@ -129,7 +132,7 @@ def test_pert_degenerate(x, n=2):
 
     dH = np.random.random([n, n])
     dH = (dH + dH.T.conj()) * 1
-    #dH = gen_degerate_mat(n=n)
+    # dH = gen_degerate_mat(n=n)
 
     H = H0 + dH * x
     evals, evecs = eigh(H)
@@ -151,7 +154,7 @@ def test_pert_degenerate(x, n=2):
     # eigen value perturbation (2nd order)
 
     # eigen vector perturbation
-    dV = (Pert.Vpert1(evals0, evecs0, dH, n))
+    dV = Pert.Vpert1(evals0, evecs0, dH, n)
     print("dV:", dV)
     print("dV_fD:", (evecs - evecs0) / x)
 
@@ -188,17 +191,18 @@ def test_pert_2only(x, n=2):
 
     # eigen vector perturbation
     print(evecs0)
-    dV = (Pert.Vpert1(evals0, evecs0, dH, n))
+    dV = Pert.Vpert1(evals0, evecs0, dH, n)
     print("dV:", dV)
     V = evecs0 + dV * x
     print(H)
     print("H:", V @ np.diag(evals) @ V.T.conj())
     print("dV_fD:", (evecs - evecs0) / x)
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     pass
-    #test_pert(x=0.1, n=4)
-    #print("========= Degenerate test=========")
-    #test_pert_degenerate(x=0.11, n=4)
-    #print("========= Degenerate test=========")
-    #test_pert_2only(x=0.04)
+    # test_pert(x=0.1, n=4)
+    # print("========= Degenerate test=========")
+    # test_pert_degenerate(x=0.11, n=4)
+    # print("========= Degenerate test=========")
+    # test_pert_2only(x=0.04)

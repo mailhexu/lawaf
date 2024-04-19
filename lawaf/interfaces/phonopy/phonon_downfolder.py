@@ -6,7 +6,6 @@ from lawaf.mathutils.evals_freq import freqs_to_evals
 from .phonopywrapper import PhonopyWrapper
 
 
-
 class PhononDownfolder(Lawaf):
     def __init__(self, model, atoms=None):
         self.model = model
@@ -38,14 +37,16 @@ class PhonopyDownfolder(PhononDownfolder):
         model = PhonopyWrapper(phonon, mode=mode, has_nac=has_nac)
         super().__init__(model, atoms=model.atoms)
 
-        self.mode=mode
-        self.factor = 524.16 # to cm-1
+        self.mode = mode
+        self.factor = 524.16  # to cm-1
         self.convert_DM_parameters()
 
     def convert_DM_parameters(self):
-        if self.mode=="dm":
-            self.params["mu"]= freqs_to_evals(self.params["mu"], factor=self.factor)
-            self.params["sigma"]= freqs_to_evals(self.params["sigma"], factor=self.factor)
+        if self.mode == "dm":
+            self.params["mu"] = freqs_to_evals(self.params["mu"], factor=self.factor)
+            self.params["sigma"] = freqs_to_evals(
+                self.params["sigma"], factor=self.factor
+            )
 
     def downfold(
         self,
@@ -84,7 +85,6 @@ class PhonopyDownfolder(PhononDownfolder):
         return self.ewf
 
 
-
 class PhonopyDownfolderWrapper:
     downfolder = None
     solver: PhonopyWrapper = None
@@ -99,7 +99,7 @@ class PhonopyDownfolderWrapper:
         # return evals, evecs
         Amn = self.downfolder.get_Amn_psi(evecs)
         h = Amn.T.conj() @ np.diag(evals) @ Amn
-        #h= Amn.T.conj()@evecs.T.conj()@Hshort@evecs@Amn
+        # h= Amn.T.conj()@evecs.T.conj()@Hshort@evecs@Amn
         evals, evecs = eigh(h)
         return evals, evecs
 

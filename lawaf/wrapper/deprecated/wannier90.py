@@ -2,7 +2,8 @@ import numpy as np
 from ase.io import read
 import os
 from collections import OrderedDict
-#import lawaf.wrapper.pythtb as pythtb
+
+# import lawaf.wrapper.pythtb as pythtb
 
 
 def _red_to_cart(tmp, red):
@@ -20,20 +21,19 @@ def read_basis(fname):
     return basis names from file (often named as basis.txt). Return a dict. key: basis name. value: basis index, from 0
     """
     bdict = OrderedDict()
-    if fname.endswith('.win'):
+    if fname.endswith(".win"):
         with open(fname) as myfile:
             inside = False
             iline = 0
             for line in myfile.readlines():
-                if line.strip().startswith('end projections'):
+                if line.strip().startswith("end projections"):
                     inside = False
                 if inside:
-                    a = line.strip().split('#')
-                    assert len(
-                        a) == 2, "The format should be .... # label_of_basis"
+                    a = line.strip().split("#")
+                    assert len(a) == 2, "The format should be .... # label_of_basis"
                     bdict[a[-1].strip()] = iline
                     iline += 1
-                if line.strip().startswith('begin projections'):
+                if line.strip().startswith("begin projections"):
                     inside = True
     else:
         with open(fname) as myfile:
@@ -44,30 +44,33 @@ def read_basis(fname):
     return bdict
 
 
-def wannier_to_model(path_up,
-                     path_down,
-                     inmodel=None,
-                     prefix_up='wannier90.up',
-                     prefix_down='wannier90.dn',
-                     atoms_file='POSCAR',
-                     atoms=None,
-                     zero_energy=0.0,
-                     min_hopping_norm=None,
-                     max_distance=None,
-                     ignorable_imaginary_part=None):
+def wannier_to_model(
+    path_up,
+    path_down,
+    inmodel=None,
+    prefix_up="wannier90.up",
+    prefix_down="wannier90.dn",
+    atoms_file="POSCAR",
+    atoms=None,
+    zero_energy=0.0,
+    min_hopping_norm=None,
+    max_distance=None,
+    ignorable_imaginary_part=None,
+):
     if atoms is None:
         atoms = read(os.path.join(path_up, atoms_file))
 
     w = w90_two_spin(path_up, prefix_up, path_down, prefix_down, atoms=atoms)
-    bset=w.bset
+    bset = w.bset
     bset.set_atoms(atoms)
-    inmodel=atoms_model(atoms, basis_dict=None, basis_set=bset, nspin=2)
+    inmodel = atoms_model(atoms, basis_dict=None, basis_set=bset, nspin=2)
     model = w.model(
         inmodel=inmodel,
         zero_energy=zero_energy,
         min_hopping_norm=min_hopping_norm,
         max_distance=max_distance,
-        ignorable_imaginary_part=ignorable_imaginary_part)
+        ignorable_imaginary_part=ignorable_imaginary_part,
+    )
     return model
 
 
@@ -319,28 +322,27 @@ def wannier_to_model(path_up,
 #             self.bset.set_atoms(atoms)
 
 
-
 def test():
-    path = os.path.expanduser('~/project/electy/test/wannier90/dat')
-    b = read_basis(os.path.join(path, 'wannier90.up.win'))
-    atoms=read(os.path.join(path, 'POSCAR'))
+    path = os.path.expanduser("~/project/electy/test/wannier90/dat")
+    b = read_basis(os.path.join(path, "wannier90.up.win"))
+    atoms = read(os.path.join(path, "POSCAR"))
     w = w90_two_spin(
         path_up=path,
-        prefix_up='wannier90.up',
+        prefix_up="wannier90.up",
         path_down=path,
-        prefix_down='wannier90.up',
-        atoms=atoms
+        prefix_down="wannier90.up",
+        atoms=atoms,
     )
-    bset=w.bset
+    bset = w.bset
     bset.set_atoms(atoms)
-    model=atoms_model( atoms, basis_dict=None, basis_set=bset, nspin=2)
-    #w.get_basis_set(atoms=atoms)
+    model = atoms_model(atoms, basis_dict=None, basis_set=bset, nspin=2)
+    # w.get_basis_set(atoms=atoms)
     model = w.model(min_hopping_norm=0.1, inmodel=model)
-    model.set_Hubbard_U( Utype='SUN', Hubbard_dict={'Ni':{'U':1, 'J':0}})
+    model.set_Hubbard_U(Utype="SUN", Hubbard_dict={"Ni": {"U": 1, "J": 0}})
     model.set(nel=20)
-    model.set_kmesh([4,4,4])
-    model.save('nickelate.pickle')
+    model.set_kmesh([4, 4, 4])
+    model.save("nickelate.pickle")
     model.scf_solve()
 
 
-#test()
+# test()

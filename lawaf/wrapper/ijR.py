@@ -8,21 +8,23 @@ from collections import defaultdict
 from lawaf.utils.supercell import SupercellMaker
 from ase.dft.kpoints import bandpath
 
+
 class ijR(object):
-    def __init__(self,
-                 nbasis,
-                 cell=np.eye(3, dtype=float),
-                 data=None,
-                 positions=None,
-                 sparse=False,
-                 double_site_energy=2.0):
+    def __init__(
+        self,
+        nbasis,
+        cell=np.eye(3, dtype=float),
+        data=None,
+        positions=None,
+        sparse=False,
+        double_site_energy=2.0,
+    ):
         self.cell = cell
         self.nbasis = nbasis
         if data is not None:
             self.data = data
         else:
-            self.data = defaultdict(lambda: np.zeros(
-                (nbasis, nbasis), dtype=float))
+            self.data = defaultdict(lambda: np.zeros((nbasis, nbasis), dtype=float))
         if positions is None:
             self.positions = np.zeros((nbasis, 3))
         else:
@@ -50,8 +52,7 @@ class ijR(object):
         for R, mat in self.data.items():
             for i in range(self.nbasis):
                 for j in range(self.nbasis):
-                    for sc_i, sc_j, sc_R in scmaker.sc_ijR_only(
-                            i, j, R, self.nbasis):
+                    for sc_i, sc_j, sc_R in scmaker.sc_ijR_only(i, j, R, self.nbasis):
                         ret.data[sc_R][sc_i, sc_j] = mat[i, j]
         return ret
 
@@ -93,10 +94,9 @@ class ijR(object):
         return newR, newmat
 
     def _to_positive_R(self):
-        new_ijR = ijR(self.nbasis,
-                      cell=self.cell,
-                      positions=self.positions,
-                      sparse=self.sparse)
+        new_ijR = ijR(
+            self.nbasis, cell=self.cell, positions=self.positions, sparse=self.sparse
+        )
         for R, mat in self.data:
             newR, newmat = self._positive_R_mat(R, mat)
             new_ijR.data[newR] = newmat
@@ -104,7 +104,7 @@ class ijR(object):
 
     def shift_position(self, rpos):
         pos = self.positions
-        shift = np.zeros((self.nbasis, 3), dtype='int')
+        shift = np.zeros((self.nbasis, 3), dtype="int")
         shift[:, :] = np.round(pos - rpos)
         newpos = copy.deepcopy(pos)
         for i in range(self.nbasis):
@@ -132,14 +132,14 @@ class ijR(object):
             from netCDF4 import Dataset
         except ImportError():
             print("Warning: ")
-        root = Dataset(fname, 'w', format="NETCDF4")
+        root = Dataset(fname, "w", format="NETCDF4")
         root.createDimension("nR", self.nR)
         root.createDimension("three", 3)
         root.createDimension("nbasis", self.nbasis)
-        R = root.createVariable("R", 'i4', ("nR", "three"))
-        data = root.createVariable("data", 'f8', ("nR", "nbasis", "nbasis"))
-        positions = root.createVariable("positions", 'f8', ("nbasis", "three"))
-        cell = root.createVariable("cell", 'f8', ("three", "three"))
+        R = root.createVariable("R", "i4", ("nR", "three"))
+        data = root.createVariable("data", "f8", ("nR", "nbasis", "nbasis"))
+        positions = root.createVariable("positions", "f8", ("nbasis", "three"))
+        cell = root.createVariable("cell", "f8", ("three", "three"))
         R[:] = np.array(self.Rlist)
         data[:] = np.array(tuple(self.data.values()))
         positions[:] = np.array(self.positions)
@@ -147,30 +147,30 @@ class ijR(object):
         root.close()
 
     def write_txt(self, fname):
-        with open(fname, 'w') as myfile:
+        with open(fname, "w") as myfile:
             myfile.write(f"Number_of_R: {self.nR}\n")
             myfile.write(f"Number_of_basis_functions: {self.nbasis}\n")
             myfile.write(f"Cell parameter: {self.cell}\n")
-            myfile.write("Hamiltonian:  \n" + "="*60+'\n')
-            for iR,R in enumerate(self.Rlist):
+            myfile.write("Hamiltonian:  \n" + "=" * 60 + "\n")
+            for iR, R in enumerate(self.Rlist):
                 myfile.write(f"index of R: {iR}.  R = {R}\n")
-                d=self.data[R]
+                d = self.data[R]
                 for i in rang(nbais):
                     for j in range(nbasis):
                         myfile.write(f"R = {R}\t. i = {i}, j={j}, H(i,j,R)= {d[i,j]}")
-                myfile.write('-'*60+'\n')
+                myfile.write("-" * 60 + "\n")
 
     @staticmethod
     def load_ijR(fname):
-        root = Dataset(fname, 'r')
-        nbasis = root.dimensions['nbasis'].size
-        Rlist = root.variables['R'][:]
+        root = Dataset(fname, "r")
+        nbasis = root.dimensions["nbasis"].size
+        Rlist = root.variables["R"][:]
         m = ijR(nbasis)
-        mdata = root.variables['data'][:]
+        mdata = root.variables["data"][:]
         for iR, R in enumerate(Rlist):
             m.data[tuple(R)] = mdata[iR]
-        m.positions = root.variables['positions'][:]
-        m.cell = root.variables['cell'][:]
+        m.positions = root.variables["positions"][:]
+        m.cell = root.variables["cell"][:]
         return m
 
     @staticmethod
@@ -185,6 +185,7 @@ class ijR(object):
     @staticmethod
     def from_tbmodel_hdf5(fname):
         from tbmodels import Model
+
         m = Model.from_hdf5_file(fname)
         ret = ijR(nbasis=m.size)
         for R, v in m.hop.items():
@@ -195,7 +196,7 @@ class ijR(object):
 
     def to_spin_polarized(self, order=1):
         """
-        repeat 
+        repeat
         order =1 : orb1_up, orb1_dn, orb2_up, orb2_dn...
         order =2 : orb1_up, orb2_up, ... orb1_dn, orb2_dn...
         """
@@ -210,7 +211,7 @@ class ijR(object):
         return ret
 
     def gen_ham(self, k):
-        Hk = np.zeros((self.nbasis, self.nbasis), dtype='complex')
+        Hk = np.zeros((self.nbasis, self.nbasis), dtype="complex")
         np.fill_diagonal(Hk, self.site_energies)
         for R, mat in self.hoppings.items():
             phase = np.exp(2j * np.pi * np.dot(k, R))
@@ -220,21 +221,24 @@ class ijR(object):
     def solve_all(self, kpts):
         nk = len(kpts)
         evals = np.zeros((nk, self.nbasis))
-        evecs = np.zeros((nk, self.nbasis, self.nbasis),dtype=complex)
+        evecs = np.zeros((nk, self.nbasis, self.nbasis), dtype=complex)
         for ik, k in enumerate(kpts):
             evals_k, evecs_k = eigh(self.gen_ham(k))
             evals[ik, :] = evals_k
             evecs[ik, :, :] = evecs_k
         return evals, evecs
 
-    def plot_band(self,
-                  kvectors=np.array([[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0],
-                                     [0, 0, 0], [.5, .5, .5]]),
-                  knames=['$\Gamma$', 'X', 'M', '$\Gamma$', 'R'],
-                  supercell_matrix=None,
-                  npoints=100,
-                  efermi=None,
-                  ax=None):
+    def plot_band(
+        self,
+        kvectors=np.array(
+            [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]
+        ),
+        knames=["$\Gamma$", "X", "M", "$\Gamma$", "R"],
+        supercell_matrix=None,
+        npoints=100,
+        efermi=None,
+        ax=None,
+    ):
         if ax is None:
             _fig, ax = plt.subplots()
         if supercell_matrix is not None:
@@ -242,22 +246,22 @@ class ijR(object):
         kpts, x, X = bandpath(kvectors, self.cell, npoints)
         evalues, _evecs = self.solve_all(kpts=kpts)
         for i in range(evalues.shape[1]):
-            ax.plot(x, evalues[:, i], color='blue', alpha=1)
+            ax.plot(x, evalues[:, i], color="blue", alpha=1)
 
         if efermi is not None:
-            plt.axhline(self.get_fermi_level(), linestyle='--', color='gray')
+            plt.axhline(self.get_fermi_level(), linestyle="--", color="gray")
         else:
             try:
-                plt.axhline(self.get_fermi_level(), linestyle='--', color='gray')
+                plt.axhline(self.get_fermi_level(), linestyle="--", color="gray")
             except:
                 pass
-        ax.set_xlabel('k-point')
-        ax.set_ylabel('Energy (eV)')
+        ax.set_xlabel("k-point")
+        ax.set_ylabel("Energy (eV)")
         ax.set_xlim(x[0], x[-1])
         ax.set_xticks(X)
         ax.set_xticklabels(knames)
         for x in X:
-            ax.axvline(x, linewidth=0.6, color='gray')
+            ax.axvline(x, linewidth=0.6, color="gray")
         return ax
 
     def validate(self):

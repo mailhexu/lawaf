@@ -6,14 +6,14 @@ from lawaf.utils.kpoints import kmesh_to_R
 
 def HR_to_k(HR, Rlist, kpts):
     # Hk[k,:,:] = sum_R (H[R] exp(i2pi k.R))
-    phase = np.exp(2.0j*np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
-    Hk = np.einsum('rlm, kr -> klm', HR, phase)
+    phase = np.exp(2.0j * np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
+    Hk = np.einsum("rlm, kr -> klm", HR, phase)
     return Hk
 
 
 def Hk_to_R(Hk, Rlist, kpts, kweights):
-    phase = np.exp(-2.0j*np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
-    HR = np.einsum('klm, kr, k->rlm', Hk, phase, kweights)
+    phase = np.exp(-2.0j * np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
+    HR = np.einsum("klm, kr, k->rlm", Hk, phase, kweights)
     return HR
 
 
@@ -28,7 +28,7 @@ def modify_one_kpoint(evals, evecs, func):
     return new_Hk
 
 
-def force_ASR_kspace(HR, Rlist, kmesh, maxrk=np.sqrt(3)*0.40):
+def force_ASR_kspace(HR, Rlist, kmesh, maxrk=np.sqrt(3) * 0.40):
     """
     Force the acoustic at Gamma while preserve the zone boundary phonon frequency.
 
@@ -38,15 +38,13 @@ def force_ASR_kspace(HR, Rlist, kmesh, maxrk=np.sqrt(3)*0.40):
     kweights = np.ones(nkpt, dtype=float) / nkpt
     Rlist = kmesh_to_R(kmesh)
     Hks = HR_to_k(HR, Rlist, kpts)
-    sumH= np.diag(np.sum(HR, axis=(0,1)))
+    sumH = np.diag(np.sum(HR, axis=(0, 1)))
     for ik, k in enumerate(kpts):
         # TODO: Move k into first BZ
-        factor=1.0 - 1.0/maxrk*np.linalg.norm(k)
-        Hks[ik]-= factor*sumH
+        factor = 1.0 - 1.0 / maxrk * np.linalg.norm(k)
+        Hks[ik] -= factor * sumH
     new_HR = Hk_to_R(Hks, Rlist, kpts, kweights)
     return new_HR
-
-
 
 
 def ftest(x):
@@ -57,7 +55,7 @@ def ftest(x):
 
 def test_modify_one_kpoint():
     H0 = np.random.random((3, 3))
-    H0 = H0+H0.conj().T
+    H0 = H0 + H0.conj().T
     evals, evecs = eigh(H0)
     print(evecs)
 
@@ -68,7 +66,7 @@ def test_modify_one_kpoint():
     print(new_evecs)
 
 
-class HamModifier():
+class HamModifier:
     def __init__(self, HR, Rlist):
         self.HR = HR
         self.Rlist = Rlist
@@ -79,8 +77,7 @@ class HamModifier():
         kweights = np.ones(nkpt, dtype=float) / nkpt
         Rlist = kmesh_to_R(kmesh)
         if keepR and (not np.all(self.Rlist == Rlist)):
-            raise ValueError(
-                "The kmesh given is not consistent with the Rlist")
+            raise ValueError("The kmesh given is not consistent with the Rlist")
 
         Hks = HR_to_k(self.HR, self.Rlist, kpts)
         for ik, k in enumerate(kpts):
@@ -90,9 +87,6 @@ class HamModifier():
 
         new_HR = Hk_to_R(Hks, Rlist, kpts, kweights)
         return new_HR, Rlist
-
-
-
 
 
 if __name__ == "__main__":

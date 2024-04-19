@@ -3,7 +3,8 @@ import copy
 from scipy.linalg import eigh
 from netCDF4 import Dataset
 from ase import Atoms
-#from lawaf.scdm.eigen_modifer import HamModifier, force_ASR_kspace
+
+# from lawaf.scdm.eigen_modifer import HamModifier, force_ASR_kspace
 import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
 from dataclasses import dataclass
@@ -93,7 +94,7 @@ class LWF(GenericWF):
         self.cell = cell
         self.wann_centers = wann_centers
         self.nR, self.nbasis, self.nwann = np.shape(wannR)
-        self.natom=self.nbasis//3
+        self.natom = self.nbasis // 3
         self.ndim = np.shape(self.Rlist)[1]
         self.Rdict = {}
         for i, R in enumerate(Rlist):
@@ -113,20 +114,20 @@ class LWF(GenericWF):
     def atoms(self, atoms):
         self._atoms = atoms
         if atoms is not None:
-            assert(self.nbasis == 3*len(atoms)) 
+            assert self.nbasis == 3 * len(atoms)
 
     def set_born_from_full(self, born, dielectric, factor):
-        self.born_effective_charges=born
-        self.dielectric=dielectric
-        self.factor=factor
+        self.born_effective_charges = born
+        self.dielectric = dielectric
+        self.factor = factor
         self.has_nac = True
         self.Zwann = np.zeros((self.nwann, 3))
-        self.natom = self.nbasis//3
+        self.natom = self.nbasis // 3
         for i in range(self.nwann):
             W_R_tau_i = self.wannR[:, :, i].reshape(self.nR, self.natom, 3)
             # TODO: check the order of born effective charges (de or ed?)
             # R: Rvector. d & e: directions of dispalcement and efield
-            #print(f"self.born_effective_charges: {self.born_effective_charges.shape}")
+            # print(f"self.born_effective_charges: {self.born_effective_charges.shape}")
             W_R_tau_i /= np.linalg.norm(W_R_tau_i)
             self.Zwann[i, :] = np.einsum(
                 "Rad,ade->e", W_R_tau_i, self.born_effective_charges
@@ -157,7 +158,6 @@ class LWF(GenericWF):
             vals = rw[iR, ids]
             for i, val in zip(ids, vals):
                 print(f"{i}: {val}")
-
 
     @property
     def site_energies(self):
@@ -292,7 +292,7 @@ class LWF(GenericWF):
 
     def masses_to_lwf_masses(self, masses):
         m3 = np.kron(masses, [1, 1, 1])
-        lwf_masses=np.einsum("rij,i->j", (self.wannR.conj() * self.wannR), m3)
+        lwf_masses = np.einsum("rij,i->j", (self.wannR.conj() * self.wannR), m3)
         return lwf_masses
 
     def born_to_lwf(self, born):

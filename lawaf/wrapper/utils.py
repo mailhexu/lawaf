@@ -27,20 +27,19 @@ def read_basis(fname):
     return basis names from file (often named as basis.txt). Return a dict. key: basis name. value: basis index, from 0
     """
     bdict = OrderedDict()
-    if fname.endswith('.win'):
+    if fname.endswith(".win"):
         with open(fname) as myfile:
             inside = False
             iline = 0
             for line in myfile.readlines():
-                if line.strip().startswith('end projections'):
+                if line.strip().startswith("end projections"):
                     inside = False
                 if inside:
-                    a = line.strip().split('#')
-                    assert len(
-                        a) == 2, "The format should be .... # label_of_basis"
+                    a = line.strip().split("#")
+                    assert len(a) == 2, "The format should be .... # label_of_basis"
                     bdict[a[-1].strip()] = iline
                     iline += 1
-                if line.strip().startswith('begin projections'):
+                if line.strip().startswith("begin projections"):
                     inside = True
     else:
         with open(fname) as myfile:
@@ -51,8 +50,7 @@ def read_basis(fname):
     return bdict
 
 
-def auto_assign_wannier_to_atom(positions, atoms, max_distance=0.1,
-                                half=False):
+def auto_assign_wannier_to_atom(positions, atoms, max_distance=0.1, half=False):
     """
     assign
     half: only half of orbitals. if half, only the first half is used.
@@ -81,10 +79,7 @@ def auto_assign_wannier_to_atom(positions, atoms, max_distance=0.1,
     return ind_atoms, newpos
 
 
-def auto_assign_wannier_to_atom2(positions,
-                                 atoms,
-                                 max_distance=0.1,
-                                 half=False):
+def auto_assign_wannier_to_atom2(positions, atoms, max_distance=0.1, half=False):
     """
     assign
     half: only half of orbitals. if half, only the first half is used.
@@ -103,8 +98,7 @@ def auto_assign_wannier_to_atom2(positions,
         distance_vecs = []
         for iatom, patom in enumerate(patoms):
             d = porb - patom
-            rd = np.min(
-                np.array([d % 1.0 % 1.0, (1.0 - d) % 1.0 % 1.0]), axis=0)
+            rd = np.min(np.array([d % 1.0 % 1.0, (1.0 - d) % 1.0 % 1.0]), axis=0)
             rdn = np.linalg.norm(rd)
             distance_vecs.append(rd)
             distances.append(rdn)
@@ -114,31 +108,35 @@ def auto_assign_wannier_to_atom2(positions,
         if min(distances) > max_distance:
             print(
                 "Warning: the minimal distance between wannier function No. %s is large. Check if the MLWFs are well localized."
-                % iorb)
+                % iorb
+            )
     if half:
         ind_atoms = np.vstack([ind_atoms, ind_atoms], dtype=int)
         shifted_pos = np.vstack([shifted_pos, shifted_pos], dtype=float)
     return ind_atoms, shifted_pos
 
 
-def auto_assign_basis_name(positions,
-                           atoms,
-                           max_distance=0.1,
-                           write_basis_file='assigned_basis.txt',
-                           half=False):
+def auto_assign_basis_name(
+    positions,
+    atoms,
+    max_distance=0.1,
+    write_basis_file="assigned_basis.txt",
+    half=False,
+):
     ind_atoms, shifted_pos = auto_assign_wannier_to_atom(
-        positions=positions, atoms=atoms, max_distance=max_distance, half=half)
+        positions=positions, atoms=atoms, max_distance=max_distance, half=half
+    )
     basis_dict = {}
     a = defaultdict(int)
     symdict = symbol_number(atoms)
     syms = list(symdict.keys())
     for i, iatom in enumerate(ind_atoms):
         a[iatom] = a[iatom] + 1
-        basis_dict['%s|orb_%d' % (syms[iatom], a[iatom])] = i + 1
+        basis_dict["%s|orb_%d" % (syms[iatom], a[iatom])] = i + 1
     if write_basis_file is not None:
-        with open(write_basis_file, 'w') as myfile:
+        with open(write_basis_file, "w") as myfile:
             for key, val in basis_dict.items():
-                myfile.write('%s  %d \n' % (key, val))
+                myfile.write("%s  %d \n" % (key, val))
     return basis_dict, shifted_pos
 
 
@@ -212,7 +210,7 @@ def match_kq_mesh(klist, qlist):
     """
     nk = len(klist)
     nq = len(qlist)
-    ret = np.zeros((nq, nk), dtype='int')
+    ret = np.zeros((nq, nk), dtype="int")
     for iq, q in enumerate(qlist):
         for ik, k in enumerate(klist):
             ikq, kshift = match_k(k + q, klist)
@@ -220,11 +218,12 @@ def match_kq_mesh(klist, qlist):
     return ret
 
 
-
 def kmesh_to_R(kmesh):
     k1, k2, k3 = kmesh
-    Rlist = [(R1, R2, R3) for R1 in range(-k1 // 2 + 1, k1 // 2 + 1)
-             for R2 in range(-k2 // 2 + 1, k2 // 2 + 1)
-             for R3 in range(-k3 // 2 + 1, k3 // 2 + 1)]
+    Rlist = [
+        (R1, R2, R3)
+        for R1 in range(-k1 // 2 + 1, k1 // 2 + 1)
+        for R2 in range(-k2 // 2 + 1, k2 // 2 + 1)
+        for R3 in range(-k3 // 2 + 1, k3 // 2 + 1)
+    ]
     return Rlist
-

@@ -172,7 +172,7 @@ class PhonopyWrapper:
         else:
             self.has_nac = False
 
-        #if self.has_nac:
+        # if self.has_nac:
         #    print(
         #        f"Phonopy DM replaces with myGL. Has NAC: {self.has_nac} \n"
         #        + f" born charges: {self.born}, dielectric constant: {self.dielectric}"
@@ -211,7 +211,7 @@ class PhonopyWrapper:
             raise RuntimeError(msg)
 
         if self.has_nac:
-                    # replace_phonon_dynamics_with_myGL(self.phonon)
+            # replace_phonon_dynamics_with_myGL(self.phonon)
             # self.phonon._dynamical_matrix.run(k)
             # return self.phonon._dynamical_matrix.get_dynamical_matrix()
             # self.phonon.dynamical_matrix._compute_dynamical_matrix(k, [0, 0, 0])
@@ -288,9 +288,7 @@ class PhonopyWrapper:
                 evecs.append(evec)
         else:
             for ik, k in enumerate(kpts):
-                evalue, evec, Hk, Hshort, Hlong = self.solve(
-                    k 
-                )
+                evalue, evec, Hk, Hshort, Hlong = self.solve(k)
                 evals.append(evalue)
                 evecs.append(evec)
                 Hks.append(Hk)

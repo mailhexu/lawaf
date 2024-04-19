@@ -6,10 +6,11 @@ from scipy.linalg import eigh
 import numpy as np
 from lawaf.plot import plot_band
 import matplotlib.pyplot as plt
-#from lawaf.utils import read_ifc_from_netcdf, save_ifc_to_netcdf
+
+# from lawaf.utils import read_ifc_from_netcdf, save_ifc_to_netcdf
 
 
-class IFC():
+class IFC:
     def __init__(self, atoms, Rlist, ifc):
         self.atoms = atoms
         self.Rlist = Rlist
@@ -26,8 +27,13 @@ class IFC():
         return IFC(atoms, Rlist, ifc)
 
     def save_to_netcdf(self, fname):
-        save_ifc_to_netcdf(fname=fname, ifc=self.ifc, Rlist=self.Rlist,
-                           atoms=self.atoms, ref_energy=0.0)
+        save_ifc_to_netcdf(
+            fname=fname,
+            ifc=self.ifc,
+            Rlist=self.Rlist,
+            atoms=self.atoms,
+            ref_energy=0.0,
+        )
 
     def eval_modifier(self, kmesh, func):
         pass
@@ -53,12 +59,12 @@ class IFC():
 
 
 def test():
-    #fname = './R_VO2_ifc_scaled.nc'
+    # fname = './R_VO2_ifc_scaled.nc'
     fname = "/home/hexu/projects/VO2_new/perhaps_good_potential/latt_lwf/R_VO2_ifc_scaled.nc"
     ifc = IFC.load_from_netcdf(fname)
     ifc.plot_band()
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test()
