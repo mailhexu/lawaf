@@ -56,10 +56,10 @@ def make_builder(
         kpts+=kshift[None, :]
         anchor_kpt=np.array(anchor_kpt)+kshift
 
-    if model.has_nac:
-        evals, evecs, Hks, Hshorts, Hlongs = model.solve_all(kpts)
-    else:
-        evals, evecs = model.solve_all(kpts)
+    #if model.has_nac:
+    #    evals, evecs, Hks, Hshorts, Hlongs = model.solve_all(kpts)
+    #else:
+    evals, evecs = model.solve_all(kpts)
 
     anchor_kpts = []
     if anchors is not None:
@@ -124,8 +124,8 @@ def make_builder(
     else:
         raise ValueError("method should be scdmk or projected")
 
-    if model.has_nac:
-        wann_builder.set_nac_Hks(Hks, Hshorts, Hlongs)
+    #if model.has_nac:
+    #    wann_builder.set_nac_Hks(Hks, Hshorts, Hlongs)
     return wann_builder
 
 

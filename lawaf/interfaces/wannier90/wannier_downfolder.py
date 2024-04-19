@@ -1,5 +1,5 @@
 
-from lawaf.wrapper.myTB import MyTB
+from HamiltonIO.wannier.myTB import MyTB
 from lawaf.interfaces.downfolder import Lawaf
 
 class W90Downfolder(Lawaf):
