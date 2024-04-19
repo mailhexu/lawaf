@@ -6,6 +6,7 @@ from lawaf.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 
 __all__ = ["SiestaDownfolder"]
 
+
 class SislDownfolder(Lawaf):
     def __init__(
         self,
@@ -59,13 +60,13 @@ class SislDownfolder(Lawaf):
                 self.efermi = fdf.read_fermi_level()
             if recover_fermi:
                 self.shift_fermi = self.efermi
-                self.model = SislHSWrapper(
-                    H,
-                    shift_fermi=self.shift_fermi,
-                    ispin=ispin,
-                    format=format,
-                    nbands=nbands,
-                )
+            self.model = SislHSWrapper(
+                H,
+                shift_fermi=self.shift_fermi,
+                ispin=ispin,
+                format=format,
+                nbands=nbands,
+            )
         elif mode == "WFSX":
             wfsx_sile = sisl.get_sile(os.path.join(folder, wfsx_file))
             fdf = sisl.get_sile(os.path.join(folder, fdf_file))
@@ -151,5 +152,6 @@ class SislDownfolder(Lawaf):
         wavefunction(coeffs, grid, geometry=geom)
 
         return grid
+
 
 SiestaDownfolder = SislDownfolder
