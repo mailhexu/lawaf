@@ -53,7 +53,8 @@ def make_builder(
     nk = len(kpts)
     kweights = [1.0 / nk for k in kpts]
     if kshift is not None:
-        kpts+=kshift[None, :]
+        kshift=np.array(kshift)
+        #kpts+=kshift[None, :]
         anchor_kpt=np.array(anchor_kpt)+kshift
 
     if model.has_nac:
@@ -86,7 +87,6 @@ def make_builder(
             positions=positions,
             kpts=kpts,
             kweights=kweights,
-            #kshift=kshift,
             nwann=nwann,
             weight_func=weight_func,
             has_phase=has_phase,
