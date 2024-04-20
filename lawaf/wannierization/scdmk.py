@@ -17,6 +17,11 @@ from dataclasses import dataclass
 def scdm(psiT, ncol):
     """
     select columns for a psiT.
+    params:
+        psiT: a matrix of shape [nbasis, nband]
+        ncol: number of columns to be selected.
+    return:
+        cols: the indices of selected columns.
     """
     _Q, _R, piv = qr(psiT, mode="full", pivoting=True)
     cols = piv[:ncol]
@@ -47,12 +52,11 @@ class BasicLaWaf:
     Hlongs: Optional[np.ndarray] = None
 
 
-
-
 class Lawaf(BasicLaWaf):
     """
     General Wannier function builder
     """
+
     def __init__(
         self,
         evals,
@@ -132,18 +136,18 @@ class Lawaf(BasicLaWaf):
         return lwf
 
     def set_nac_Hks(self, Hks, Hshorts, Hlongs):
-        """set  Hamiltonians including splited Hks, Hshorts and Hlongs. """
-        self.has_nac=True
+        """set  Hamiltonians including splited Hks, Hshorts and Hlongs."""
+        self.has_nac = True
         self.Hks = Hks
-        self.Hshorts=Hshorts
-        self.Hlongs=Hlongs
+        self.Hshorts = Hshorts
+        self.Hlongs = Hlongs
 
     def set_nac_params(self, born, dielectic, factor):
-        """set  Hamiltonians including splited Hks, Hshorts and Hlongs. """
-        self.has_nac=True
+        """set  Hamiltonians including splited Hks, Hshorts and Hlongs."""
+        self.has_nac = True
         self.born = born
-        self.dielectic=dielectic
-        self.factor=factor
+        self.dielectic = dielectic
+        self.factor = factor
 
     def get_wannier_nac(self):
         """
@@ -236,22 +240,20 @@ class Lawaf(BasicLaWaf):
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
 
-
     def get_wannk_and_Hk_nac(self):
         """
-        calculate Wannier function and H in k-space 
-        but onlythe short range part of the Hk. Ham is the 
+        calculate Wannier function and H in k-space
+        but onlythe short range part of the Hk. Ham is the
         short range part of the Hamiltonian in the original basis.
         """
         print("Using short range part of DM to build Hamiltonian")
         for ik in range(self.nkpt):
-            Ham=self.Hshorts[ik] + self.Hlongs[ik]
+            Ham = self.Hshorts[ik] + self.Hlongs[ik]
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
-            psik=self.get_psi_k(ik)
-            psiA=psik@self.Amn[ik, :, :]
+            psik = self.get_psi_k(ik)
+            psiA = psik @ self.Amn[ik, :, :]
             self.Hwann_k[ik] = psiA.T.conj() @ Ham @ psiA
         return self.Hwann_k
-
 
     def get_wannier_centers(self):
         self.wann_centers = np.zeros((self.nwann, 3), dtype=float)
@@ -303,7 +305,6 @@ class Lawaf(BasicLaWaf):
         kpoints[:] = self.kpts
         Amnk[:] = self.Amn
         root.close()
-
 
 
 class WannierProjectedBuilder(Lawaf):
@@ -377,6 +378,7 @@ class WannierProjectedBuilder(Lawaf):
                 A[iband, iproj] = np.vdot(psi[:, iband], psi_a) * self.occ[iband]
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
+
 
 class WannierScdmkBuilder(Lawaf):
     """
@@ -514,7 +516,7 @@ class WannierScdmkBuilder(Lawaf):
 
     def get_Amn_psi(self, psik, occ=None, projs=None):
         if self.use_proj:
-            projs=np.einsum('iw,wb->b', self.psi_anchors,  psik.conj())
+            projs = np.einsum("iw,wb->b", self.psi_anchors, psik.conj())
             if occ is None:
                 psi = psik[self.cols, :] * (projs)[None, :]
             else:
@@ -522,7 +524,7 @@ class WannierScdmkBuilder(Lawaf):
         else:
             if occ is not None:
                 psi = psik[self.cols, :] * occ[None, :]
-            else:   
+            else:
                 psi = psik[self.cols, :]
         U, _S, VT = svd(psi.T.conj(), full_matrices=False)
         Amn_k = U @ VT
@@ -533,7 +535,6 @@ class WannierScdmkBuilder(Lawaf):
         Calculate projection to anchors.
         """
         self._get_projection_to_anchors()
-
 
 
 def occupation_func(ftype=None, mu=0.0, sigma=1.0):
@@ -568,7 +569,6 @@ def occupation_func(ftype=None, mu=0.0, sigma=1.0):
     else:
         raise NotImplementedError("function type %s not implemented." % ftype)
     return func
-
 
 
 def Amnk_to_Hk(Amn, psi, Hk0, kpts):

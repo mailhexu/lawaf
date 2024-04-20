@@ -14,7 +14,7 @@ def parse_xyz(fname):
     atoms_pos = []
     atoms_symbols = []
     for s, x in zip(symbols, pos):
-        if s == 'X':
+        if s == "X":
             wann_pos.append(x)
         else:
             atoms_symbols.append(s)
@@ -23,7 +23,7 @@ def parse_xyz(fname):
 
 
 def remove_comment(line: str):
-    x = re.split('!|#', line)[0]
+    x = re.split("!|#", line)[0]
     return x
 
 
@@ -38,21 +38,21 @@ def parse_win(fname):
     with open(fname) as myfile:
         for line in myfile:
             line = remove_comment(line)
-            if re.match('begin\s+unit_cell_cart', line):
-                while (not re.match('end\s+unit_cell_cart', line)):
+            if re.match("begin\s+unit_cell_cart", line):
+                while not re.match("end\s+unit_cell_cart", line):
                     line = remove_comment(next(myfile))
                     ts = line.split()
                     if len(ts) == 3:
                         cell.append([float(x) for x in ts])
-            elif re.match('begin\s+atoms_cart', line):
-                while (not re.match('end\s+atoms_cart', line)):
+            elif re.match("begin\s+atoms_cart", line):
+                while not re.match("end\s+atoms_cart", line):
                     line = remove_comment(next(myfile))
                     ts = line.split()
                     if len(ts) == 4:
                         symbols.append(ts[0])
                         xcart.append([float(x) for x in ts[1:]])
-            elif re.match('begin\s+atoms_frac', line):
-                while (not re.match('end\s+atoms_frac', line)):
+            elif re.match("begin\s+atoms_frac", line):
+                while not re.match("end\s+atoms_frac", line):
                     line = remove_comment(next(myfile))
                     ts = line.split()
                     if len(ts) == 4:
@@ -64,22 +64,19 @@ def parse_win(fname):
     if xcart != []:
         atoms = Atoms(symbols=symbols, positions=xcart, cell=cell, pbc=True)
     elif xred != []:
-        atoms = Atoms(symbols=symbols,
-                      scaled_positions=xred,
-                      cell=cell,
-                      pbc=True)
+        atoms = Atoms(symbols=symbols, scaled_positions=xred, cell=cell, pbc=True)
     else:
         raise IOError("Failed to read atomic structure from %s" % fname)
     return atoms
 
 
-def parse_ham(fname='wannier90_hr.dat', cutoff=None):
+def parse_ham(fname="wannier90_hr.dat", cutoff=None):
     """
     wannier90 hr file phaser.
 
     :param cutoff: the energy cutoff.  None | number | list (of Emin, Emax).
     """
-    with open(fname, 'r') as myfile:
+    with open(fname, "r") as myfile:
         lines = myfile.readlines()
     n_wann = int(lines[1].strip())
     n_R = int(lines[2].strip())
@@ -99,7 +96,7 @@ def parse_ham(fname='wannier90_hr.dat', cutoff=None):
         n = n - 1
         H_real, H_imag = map(float, t[5:])
         val = H_real + 1j * H_imag
-        if (m == n and np.linalg.norm(R) < 0.001):
+        if m == n and np.linalg.norm(R) < 0.001:
             H_mnR[R][m, n] = val / 2.0
         elif cutoff is not None:
             if abs(val) > cutoff:
@@ -109,8 +106,7 @@ def parse_ham(fname='wannier90_hr.dat', cutoff=None):
     return n_wann, H_mnR
 
 
-def auto_assign_wannier_to_atom(positions, atoms, max_distance=0.1,
-                                half=False):
+def auto_assign_wannier_to_atom(positions, atoms, max_distance=0.1, half=False):
     """
     assign
     half: only half of orbitals. if half, only the first half is used.
@@ -137,4 +133,3 @@ def auto_assign_wannier_to_atom(positions, atoms, max_distance=0.1,
         refpos.append(rpos)
         newpos.append(rmin + rpos)
     return ind_atoms, newpos
-

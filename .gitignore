@@ -2,7 +2,7 @@ Downfolded_hr.nc
 Downfolded_hr.txt 
 Downfold.json
 lwf.nc
-paper
+docs/paper
 *.vasp
 *.pdf
 *.png

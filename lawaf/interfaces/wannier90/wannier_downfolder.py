@@ -1,6 +1,6 @@
-
-from lawaf.wrapper.myTB import MyTB
+from HamiltonIO.wannier.myTB import MyTB
 from lawaf.interfaces.downfolder import Lawaf
+
 
 class W90Downfolder(Lawaf):
     def __init__(self, folder, prefix):
@@ -10,4 +10,3 @@ class W90Downfolder(Lawaf):
         """
         m = MyTB.read_from_wannier_dir(folder, prefix)
         self.model = m
-
