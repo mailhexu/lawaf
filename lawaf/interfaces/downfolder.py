@@ -5,9 +5,9 @@ import copy
 import json
 from lawaf.utils.kpoints import monkhorst_pack
 import numpy as np
-from lawaf.wannierization.scdmk import (
-    WannierProjectedBuilder,
-    WannierScdmkBuilder,
+from lawaf.wannierization import (
+    ProjectedWannierizer,
+    ScdmkWannierizer,
     occupation_func,
 )
 import matplotlib.pyplot as plt
@@ -104,7 +104,7 @@ def make_builder(
             wann_builder.auto_set_anchors(anchor_kpt)
 
     elif method == "projected":
-        wann_builder = WannierProjectedBuilder(
+        wann_builder = ProjectedWannierizer(
             evals=evals,
             wfn=evecs,
             has_phase=has_phase,
@@ -132,7 +132,7 @@ def make_builder(
 
 class Lawaf:
     params = {}
-    builder: Union[WannierProjectedBuilder, WannierScdmkBuilder] = None
+    builder: Union[ProjectedWannierizer, ScdmkWannierizer] = None
     model = None
 
     def __init__(self, model):
@@ -141,7 +141,7 @@ class Lawaf:
         """
         self.model = model
         self.params = {}
-        self.builder: Union[WannierProjectedBuilder, WannierScdmkBuilder] = None
+        self.builder  = None
 
     def set_parameters(
         self,

@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'BandDownfolder'
+project = 'LaWaF'
 copyright = '2020-2021, Xu He'
 author = 'Xu He'
 
