@@ -1,13 +1,14 @@
 import numpy as np
 from scipy.linalg import eigh
 import os
-from lawaf.interfaces.downfolder import Lawaf, make_builder
+from lawaf.interfaces.downfolder import Lawaf
 from lawaf.mathutils.evals_freq import freqs_to_evals
 from .phonopywrapper import PhonopyWrapper
 
 
 class PhononDownfolder(Lawaf):
-    def __init__(self, model, atoms=None):
+    def __init__(self, model, atoms=None, params=None):
+        super().__init__(model, params=params )
         self.model = model
         if atoms is not None:
             self.atoms = atoms
@@ -16,7 +17,9 @@ class PhononDownfolder(Lawaf):
                 self.atoms = self.model.atoms
             except Exception:
                 self.atoms = None
-        self.params = {}
+        self.params = params
+
+
 
 
 class PhonopyDownfolder(PhononDownfolder):
@@ -57,17 +60,14 @@ class PhonopyDownfolder(PhononDownfolder):
         **params,
     ):
         self.params.update(params)
-        if "post_func" in self.params:
-            self.params.pop("post_func")
-        self.builder = make_builder(self.model, **self.params)
         self.atoms = self.model.atoms
         if self.has_nac:
             self.builder.set_nac_params(
                 self.model.born, self.model.dielectric, self.model.factor
             )
-            self.ewf = self.builder.get_wannier_nac()
+            self.ewf = self.builder.get_wannier_nac(Rlist=self.Rlist)
         else:
-            self.ewf = self.builder.get_wannier()
+            self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
         if post_func is not None:
             post_func(self.ewf)
         if not os.path.exists(output_path):

@@ -10,6 +10,13 @@ class ProjectedWannierizer(Wannierizer):
     We define a set of projectors, which is a nwann*nbasis matrix.
     Each projector is vector of size nbasis.
     """
+    def set_params(self,params):
+        if params.selected_basis:
+            self.set_projectors_with_basis(params.selected_basis)
+        elif params.anchors:
+            self.set_projectors_with_anchors(params.anchors)
+
+
 
     def set_projectors_with_anchors(self, anchors):
         """
@@ -84,6 +91,8 @@ class MaxProjectedWannierizer(ProjectedWannierizer):
         Amnk_0 is then orthogonalized using svd.
         m is the band index and n is the Wannier index.
         """
+        kpt= self.kpts[ik]
+        print(f"MaxProjectedWannierizer: ik={ik}, kpt={kpt}.")
         A = np.zeros((self.nband, self.nwann), dtype=complex)
         for iproj, psi_a in enumerate(self.projectors):
             for iband in range(self.nband):
@@ -92,6 +101,12 @@ class MaxProjectedWannierizer(ProjectedWannierizer):
                 )
             # select the maximum value of A[:, iproj] and set to 1. Others are set to 0.  
             imax=np.argmax(np.abs(np.abs(A[:, iproj])))
-            A[:, iproj] =  A[imax, iproj]
+            imax = iproj
+            print(f"MaxProjectedWannierizer: iproj={iproj}, imax={imax}.")
+            tmp=A[imax, iproj]
+            A[:, iproj] =0
+            A[imax, iproj] = 1
+        print(f"MaxProjectedWannierizer: A={A}.")
         U, _S, VT = svd(A, full_matrices=False)
-        return U @ VT
+        A=U @ VT
+        return A

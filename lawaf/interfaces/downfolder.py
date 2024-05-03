@@ -3,131 +3,32 @@ from typing import Tuple, Union, List
 import os
 import copy
 import json
+from ase import Atoms
 from lawaf.utils.kpoints import monkhorst_pack
 import numpy as np
 from lawaf.wannierization import (
     ProjectedWannierizer,
     ScdmkWannierizer,
-    occupation_func,
+    MaxProjectedWannierizer,
 )
+from lawaf.params import WannierParams
 import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
+from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
 
 
-@dataclass
-class WFParams:
-    method = "scdmk"
-    kmesh: Tuple[int] = (5, 5, 5)
-    kshift = np.array([1e-7, 3e-6, 5e-9])
-    gamma: bool = True
-    nwann: int = 0
-    weight_func: str = "unity"
-    mu: float = 0.0
-    sigma: float = 2.0
-    selected_basis: Union[None, List[int]] = None
-    anchors: Union[None, List[int]] = None
-    anchor_kpt: Tuple[int] = (0, 0, 0)
-    use_proj: bool = True
-    exclude_bands: Tuple[int] = ()
-
-
-def make_builder(
-    model,
-    kmesh,
-    nwann,
-    has_phase=False,
-    weight_func="unity",
-    mu=0,
-    sigma=0.01,
-    kshift=None,
-    exclude_bands=[],
-    use_proj=False,
-    method="projected",
-    selected_basis=[],
-    anchor_kpt=(0, 0, 0),
-    anchors=None,
-    gamma=True,
-):
-    k = kmesh[0]
-    kpts = monkhorst_pack(kmesh, gamma=gamma)
-    nk = len(kpts)
-    kweights = [1.0 / nk for k in kpts]
-    if kshift is not None:
-        kshift=np.array(kshift)
-        #kpts+=kshift[None, :]
-        anchor_kpt=np.array(anchor_kpt)+kshift
-
-    # if model.has_nac:
-    #    evals, evecs, Hks, Hshorts, Hlongs = model.solve_all(kpts)
-    # else:
-    evals, evecs = model.solve_all(kpts)
-
-    anchor_kpts = []
-    if anchors is not None:
-        for anchor in anchors:
-            anchor_kpts.append(anchor)
-    if anchor_kpt is not None:
-        anchor_kpts.append(anchor_kpt)
-    evals_anchor, evecs_anchor = model.solve_all(anchor_kpts)[0:2]
-    wfn_anchor = {}
-    for ik, k in enumerate(anchor_kpts):
-        wfn_anchor[tuple(k)] = evecs_anchor[ik, :, :]
-
-    try:
-        positions = model.positions
-    except Exception:
-        positions = None
-    if isinstance(weight_func, str):
-        weight_func = occupation_func(ftype=weight_func, mu=mu, sigma=sigma)
-
-    if method == "scdmk":
-        wann_builder = WannierScdmkBuilder(
-            evals=evals,
-            wfn=evecs,
-            positions=positions,
-            kpts=kpts,
-            kweights=kweights,
-            # kshift=kshift,
-            nwann=nwann,
-            weight_func=weight_func,
-            has_phase=has_phase,
-            Rgrid=kmesh,
-            exclude_bands=exclude_bands,
-            use_proj=use_proj,
-            wfn_anchor=wfn_anchor,
-        )
-        if selected_basis:
-            wann_builder.set_selected_cols(selected_basis)
-        elif anchors:
-            wann_builder.set_anchors(anchors)
-        else:
-            wann_builder.auto_set_anchors(anchor_kpt)
-
-    elif method == "projected":
-        wann_builder = ProjectedWannierizer(
-            evals=evals,
-            wfn=evecs,
-            has_phase=has_phase,
-            positions=positions,
-            kpts=kpts,
-            kweights=kweights,
-            kshift=kshift,
-            nwann=nwann,
-            weight_func=weight_func,
-            Rgrid=kmesh,
-            exclude_bands=exclude_bands,
-            wfn_anchor=wfn_anchor,
-        )
-        if selected_basis:
-            wann_builder.set_projectors_with_basis(selected_basis)
-        elif anchors:
-            wann_builder.set_projectors_with_anchors(anchors)
+def select_wannierizer(method):
+    # select the Wannierizer based on the method.
+    if method.lower().startswith("scdmk"):
+        w = ScdmkWannierizer
+    elif method.lower().startswith("projected"):
+        w = ProjectedWannierizer
+    elif method.lower().startswith("maxprojected"):
+        w = MaxProjectedWannierizer
     else:
-        raise ValueError("method should be scdmk or projected")
-
-    # if model.has_nac:
-    #    wann_builder.set_nac_Hks(Hks, Hshorts, Hlongs)
-    return wann_builder
+        raise ValueError("Unknown method")
+    print(f"Using {w.__name__} method")
+    return w
 
 
 class Lawaf:
@@ -135,13 +36,14 @@ class Lawaf:
     builder: Union[ProjectedWannierizer, ScdmkWannierizer] = None
     model = None
 
-    def __init__(self, model):
+    def __init__(self, model,  params=None):
         """
         Setup the model
         """
         self.model = model
         self.params = {}
-        self.builder  = None
+        self.builder = None
+        self.Rgrid = None
 
     def set_parameters(
         self,
@@ -150,8 +52,7 @@ class Lawaf:
         gamma=True,
         nwann=0,
         weight_func="unity",
-        mu=0.0,
-        sigma=2.0,
+        weight_func_params={0, 0.01},
         selected_basis=None,
         anchors=None,
         anchor_kpt=(0, 0, 0),
@@ -189,8 +90,100 @@ class Lawaf:
         write_hr_txt: write the Hamiltonian into a txt file.
         """
 
-        self.params = copy.deepcopy(locals())
-        self.params.pop("self")
+        self.params = WannierParams(
+            method=method,
+            kmesh=kmesh,
+            gamma=gamma,
+            nwann=nwann,
+            weight_func=weight_func,
+            weight_func_params=weight_func_params,
+            selected_basis=selected_basis,
+            anchors=anchors,
+            anchor_kpt=anchor_kpt,
+            kshift=kshift,
+            use_proj=use_proj,
+            exclude_bands=exclude_bands,
+        )
+        self._prepare_data()
+
+    def _prepare_data(self):
+        """
+        Prepare the data for the downfolding. e.g. eigen values, eigen vectors, kpoints
+        """
+        self._prepare_kpoints()
+        self._prepare_eigen()
+        self._prepare_Rlist()
+        self._prepare_positions()
+        self._parepare_builder()
+
+    def _parepare_builder(self):
+        params = self.params
+        wannierizer = select_wannierizer(params.method)
+        self.builder = wannierizer(evals=self.evals, evecs=self.evecs, kpts=self.kpts, kweights=self.kweights, params=self.params)
+
+    def _prepare_positions(self):
+        try:
+            self.atoms = self.model.atoms
+        except:
+            self.atoms = Atoms(cell=np.eye(3))
+        try:
+            positions = self.model.positions
+        except Exception:
+            positions = None
+        self.positions = positions
+ 
+
+    def _prepare_kpoints(self):
+        """
+        Prepare the kpoints
+        """
+        if self.params.kpts is not None:
+            self.kpts = np.array(self.params.kpts)
+        else:
+            self.kpts = monkhorst_pack(self.params.kmesh, gamma=self.params.gamma)
+        self.nkpt = len(self.kpts)
+        if self.params.kshift is not None:
+            kshift = np.array(self.params.kshift)
+            self.kpts += kshift[None, :]
+            self.params.anchor_kpt = np.array(self.params.anchor_kpt) + kshift
+        if not self.params.kweights:
+            self.kweights = np.ones(self.nkpt, dtype=float) / self.nkpt
+        else:
+            self.kweights = self.params.kweights
+
+    def _prepare_Rlist(self):
+        self.Rgrid = self.params.kmesh
+        if self.Rgrid is None:
+            self.Rlist = kmesh_to_R(self.params.kmesh)
+        else:
+            self.Rlist = build_Rgrid(self.Rgrid)
+
+    def _prepare_eigen(self, has_phase=False):
+        evals, evecs = self.model.solve_all(self.kpts)
+        # remove e^ikr from wfn
+        self.has_phase = has_phase
+        if not has_phase:
+           self.psi = evecs
+        else:
+           self._remove_phase(evecs)
+        self.evals = evals
+        self.evecs = evecs
+        return self.evals, self.evecs
+
+    def _remove_phase_k(self, wfnk, k, positions):
+        # phase = np.exp(-2j * np.pi * np.einsum('j, kj->k', k, self.positions))
+        # return wfnk[:, :] * phase[:, None]
+        nbasis = wfnk.shape[0]
+        psi = np.zeros_like(wfnk)
+        for ibasis in range(self.nbasis):
+            phase = np.exp(-2j * np.pi * np.dot(k, positions[ibasis, :]))
+            psi[ibasis, :] = wfnk[ibasis, :] * phase
+        return psi
+
+    def _remove_phase(self, wfn):
+        self.psi = np.zeros_like(wfn)
+        for ik, k in enumerate(self.kpts):
+            self.psi[ik, :, :] = self._remove_phase_k(wfn[ik, :, :], k)
 
     def save_info(self, output_path="./", fname="Downfold.json"):
         results = {"params": self.params}
@@ -205,12 +198,11 @@ class Lawaf:
         write_hr_txt="LWF.txt",
         **params,
     ):
-        self.params.update(params)
-        if "post_func" in self.params:
-            self.params.pop("post_func")
-        self.builder = make_builder(self.model, **self.params)
+        #self.params.update(params)
+        #if "post_func" in self.params:
+        #    self.params.pop("post_func")
         self.atoms = self.model.atoms
-        self.ewf = self.builder.get_wannier()
+        self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
         if post_func is not None:
             post_func(self.ewf)
         if not os.path.exists(output_path):

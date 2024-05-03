@@ -1,4 +1,4 @@
-from HamiltonIO.wannier.myTB import MyTB
+from HamiltonIO import WannierHam
 from lawaf.interfaces.downfolder import Lawaf
 
 
@@ -8,5 +8,5 @@ class W90Downfolder(Lawaf):
         folder   # The folder containing the Wannier function files
         prefix,   # The prefix of Wannier90 outputs. e.g. wannier90_up
         """
-        m = MyTB.read_from_wannier_dir(folder, prefix)
+        m = WannierHam.read_from_wannier_dir(folder, prefix)
         self.model = m

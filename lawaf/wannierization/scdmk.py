@@ -27,44 +27,21 @@ class ScdmkWannierizer(Wannierizer):
     """
     Build Wannier functions using the SCDMk method.
     """
-
-    def __init__(
-        self,
-        evals,
-        wfn,
-        positions,
-        kpts,
-        nwann,
-        weight_func,
-        kweights=None,
-        Sk=None,
-        has_phase=True,
-        Rgrid=None,
-        exclude_bands=[],
-        sort_cols=True,
-        wfn_anchor=None,
-        use_proj=True,
-    ):
-        super().__init__(
-            evals=evals,
-            wfn=wfn,
-            positions=positions,
-            kpts=kpts,
-            kweights=kweights,
-            nwann=nwann,
-            Sk=Sk,
-            weight_func=weight_func,
-            has_phase=has_phase,
-            Rgrid=Rgrid,
-            wfn_anchor=wfn_anchor,
-            exclude_bands=exclude_bands,
-        )
-        # anchors
+    def set_params(self, params):
         self.psi_anchors = []
         self.cols = []
-        self.use_proj = use_proj
+        self.use_proj = params.use_proj
         self.projs = np.zeros((self.nkpt, self.nband), dtype=float)
-        self.sort_cols = sort_cols
+        self.sort_cols = params.sort_cols
+
+        if params.selected_basis:
+            self.set_selected_cols(params.selected_basis)
+        elif params.anchors:
+            self.set_anchors(params.anchors)
+        else:
+            self.auto_set_anchors(params.anchor_kpt)
+
+
 
     def set_selected_cols(self, cols):
         """

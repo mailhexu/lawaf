@@ -15,9 +15,16 @@ downfolder=PhonopyDownfolder(phonopy_yaml=fname, mode="DM", has_nac=True)
 #downfolder=PhonopyDownfolder(force_sets_filename="FORCE_SETS", 
 #          #born_filename="./BORN", 
 #          unitcell_filename="POSCAR-unitcell",supercell_matrix=np.eye(3)*3, mode="DM")
-lwf=downfolder.downfold(method='scdmk',nwann=3, #selected_basis=[2,5], 
-                    anchors={(.0,.0,.0):(0,1, 2)},
-                    use_proj=True, mu=-200, sigma=300.4, weight_func='Gauss', kmesh=(2, 2, 2) )
+
+params=dict(method='scdmk',nwann=3, 
+            #selected_basis=[2,5],
+            anchors={(.0,.0,.0):(0,1, 2)},
+            use_proj=True, mu=-200, sigma=300.4, weight_func='Gauss', kmesh=(2, 2, 2)
+            )
+
+lwf=downfolder.downfold(params=params)
+
+
 
 # For testing 
 # FIXME: remove this

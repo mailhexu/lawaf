@@ -75,11 +75,11 @@ class LWF(GenericWF):
 
     def __init__(
         self,
-        wannR,
-        HwannR,
-        Rlist,
-        cell,
-        wann_centers,
+        wannR=None,
+        HwannR=None,
+        Rlist=None,
+        cell=None,
+        wann_centers=None,
         atoms=None,
         born=None,
         has_nac=False,
@@ -92,8 +92,12 @@ class LWF(GenericWF):
         self.HwannR = HwannR
         self.Rlist = Rlist
         self.cell = cell
-        self.wann_centers = wann_centers
+
         self.nR, self.nbasis, self.nwann = np.shape(wannR)
+        if wann_centers is None:
+            self.wann_centers = np.zeros((self.nwann, 3))
+        else:
+            self.wann_centers = wann_centers
         self.natom = self.nbasis // 3
         self.ndim = np.shape(self.Rlist)[1]
         self.Rdict = {}
