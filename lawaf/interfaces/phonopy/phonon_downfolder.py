@@ -23,7 +23,7 @@ class PhononDownfolder(Lawaf):
 
 
 class PhonopyDownfolder(PhononDownfolder):
-    def __init__(self, phonon=None, mode="dm", has_nac=False, *argv, **kwargs):
+    def __init__(self, phonon=None, mode="dm",  *argv, **kwargs):
         """
         Parameters:
         ========================================
@@ -36,8 +36,8 @@ class PhonopyDownfolder(PhononDownfolder):
             raise ImportError("phonopy is needed. Do you have phonopy installed?")
         if phonon is None:
             phonon = phonopy.load(*argv, **kwargs)
-        self.has_nac = has_nac
-        model = PhonopyWrapper(phonon, mode=mode, has_nac=has_nac)
+        self.has_nac = False
+        model = PhonopyWrapper(phonon, mode=mode, has_nac=self.has_nac)
         super().__init__(model, atoms=model.atoms)
 
         self.mode = mode
@@ -61,13 +61,7 @@ class PhonopyDownfolder(PhononDownfolder):
     ):
         self.params.update(params)
         self.atoms = self.model.atoms
-        if self.has_nac:
-            self.builder.set_nac_params(
-                self.model.born, self.model.dielectric, self.model.factor
-            )
-            self.ewf = self.builder.get_wannier_nac(Rlist=self.Rlist)
-        else:
-            self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
+        self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
         if post_func is not None:
             post_func(self.ewf)
         if not os.path.exists(output_path):
@@ -83,6 +77,49 @@ class PhonopyDownfolder(PhononDownfolder):
             # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
             self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         return self.ewf
+
+class NACPhonopyDownfolder(PhonopyDownfolder):
+    def __init__(self, phonon=None, mode="dm",  *argv, **kwargs):
+        """
+        Parameters:
+        """
+        self.has_nac=True
+
+        self.set_nac_params(
+                self.model.born, self.model.dielectric, self.model.factor
+            )
+
+
+    def set_nac_Hks(self, Hks, Hshorts, Hlongs):
+        """set  Hamiltonians including splited Hks, Hshorts and Hlongs."""
+        self.has_nac = True
+        self.Hks = Hks
+        self.Hshorts = Hshorts
+        self.Hlongs = Hlongs
+
+    def set_nac_params(self, born, dielectic, factor):
+        """set  Hamiltonians including splited Hks, Hshorts and Hlongs."""
+        self.has_nac = True
+        self.born = born
+        self.dielectic = dielectic
+        self.factor = factor
+
+    def get_wannier_nac(self, Rlist=None):
+        """
+        Calculate Wannier functions but using non-analytic correction.
+        """
+        self.prepare()
+        self.get_Amn()
+        self.get_wannk_and_Hk_nac()
+        if Rlist is not None:
+            lwf = self.k_to_R(Rlist=Rlist)
+            #lwf.atoms = copy.deepcopy(self.atoms)
+        lwf.set_born_from_full(self.born, self.dielectic, self.factor)
+        return lwf
+
+
+    #def get_wannk_and_Hk_nac(self):
+    #    self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
 
 
 class PhonopyDownfolderWrapper:

@@ -105,4 +105,5 @@ def run_model(model: atoms_model, alpha, U, J, plot=False):
         plt.close()
 
 
-run_model()
+if __name__=="__main__":
+    run_model()

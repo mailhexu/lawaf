@@ -16,6 +16,7 @@ dependencies = [
     "matplotlib>=3.4.0",
     "ase>=3.19",
     "phonopy>=2.11.0",
+    "toml",
 ]
 	
 

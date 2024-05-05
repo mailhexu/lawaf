@@ -54,6 +54,10 @@ class ScdmkWannierizer(Wannierizer):
             self.cols = cols
             if self.sort_cols:
                 self.cols = np.sort(self.cols)
+            for col in cols:
+                projector = np.zeros(self.nbasis, dtype=complex)
+                projector[col] = 1.0
+                self.psi_anchors.append(projector)
 
     def add_anchors(self, psi, ianchors):
         """

@@ -9,7 +9,6 @@ with ui.pyplot():
     y = np.sin(x)
     plt.plot(x, y)
 
-
 ui.run()
 
 

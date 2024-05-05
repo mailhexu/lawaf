@@ -157,7 +157,6 @@ def my_get_dynamical_matrix(
 
 class PhonopyWrapper:
     phonon: Phonopy = None
-
     def __init__(
         self, phonon=None, phonon_fname="phonopy_params.yaml", mode="ifc", has_nac=False
     ):
