@@ -39,16 +39,15 @@ class MyDynamicalMatrixGL(DynamicalMatrixGL):
         use_openmp=False,
     ):
         super().__init__(
-            supercell,
-            primitive,
-            force_constants,
-            nac_params,
-            num_G_points,
-            with_full_terms,
-            decimals,
-            symprec,
-            log_level,
-            use_openmp,
+            supercell=supercell,
+            primitive=primitive,
+            force_constants=force_constants,
+            nac_params=nac_params,
+            num_G_points=num_G_points,
+            with_full_terms=with_full_terms,
+            decimals=decimals,
+            log_level=log_level,
+            use_openmp=use_openmp,
         )
         self._short_range_dynamical_matrix = None
         self._long_range_dynamical_matrix = None
@@ -157,6 +156,7 @@ def my_get_dynamical_matrix(
 
 class PhonopyWrapper:
     phonon: Phonopy = None
+
     def __init__(
         self, phonon=None, phonon_fname="phonopy_params.yaml", mode="ifc", has_nac=False
     ):
@@ -168,6 +168,7 @@ class PhonopyWrapper:
         if has_nac:
             self.has_nac = True
             self.get_nac_params()
+            print("replace_phonon_dynamics_with_myGL")
             replace_phonon_dynamics_with_myGL(self.phonon)
         else:
             self.has_nac = False
@@ -218,8 +219,8 @@ class PhonopyWrapper:
             # Hk, Hshort, Hlong = self.phonon.dynamical_matrix.get_dynamical_matrix(split_short_long=True)
             Hk = self.phonon.get_dynamical_matrix_at_q(k)
             # Hk=self.phonon.dynamical_matrix.dynamical_matrix
-            Hshort = self.phonon.dynamical_matrix.short_range_dynamical_matrix
-            Hlong = self.phonon.dynamical_matrix.long_range_dynamical_matrix
+            Hshort = self.phonon.dynamical_matrix._short_range_dynamical_matrix
+            Hlong = self.phonon.dynamical_matrix._long_range_dynamical_matrix
         else:
             Hk = self.phonon.get_dynamical_matrix_at_q(k)
         phase = np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))

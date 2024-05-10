@@ -97,6 +97,10 @@ class NACLWF:
     HR_noNAC: np.ndarray = None
     HR_short: np.ndarray = None
     NAC_phonon: PhonopyWrapper = None
+    nac: bool = True
+
+    def set_nac(self, nac=True):
+        self.nac = nac
 
     def get_Hk_short(self, kpt):
         """
@@ -130,15 +134,15 @@ class NACLWF:
 
     def get_Hk_nac(self, kpt):
         evals, evecs, Hk, Hk_short, Hk_long = self.NAC_phonon.solve(kpt)
-        wannk  = self.get_wannk(kpt)
-        Hwannk= wannk.conj().T @ Hk @ wannk
+        wannk = self.get_wannk(kpt)
+        Hwannk = wannk.conj().T @ Hk @ wannk
         return Hwannk
 
-    def get_Hk(self, kpt, nac=True):
+    def get_Hk(self, kpt):
         """
         get the Hamiltonian at k-point.
         """
-        if nac:
+        if self.nac:
             return self.get_Hk_nac(kpt)
             Hk_short = self.get_Hk_short(kpt)
             Hk_long = self.get_Hk_long(kpt)
@@ -146,13 +150,13 @@ class NACLWF:
             return Hk_tot
         else:
             return self.get_Hk_noNAC(kpt)
-        #return self.get_Hk_nac(kpt)
+        # return self.get_Hk_nac(kpt)
 
     def solve_k(self, kpt):
         """
         solve the Hamiltonian at k-point with NAC.
         """
-        if np.linalg.norm(kpt)< 1e-6:
+        if np.linalg.norm(kpt) < 1e-6:
             Hk = self.get_Hk_noNAC(kpt)
         else:
             Hk = self.get_Hk(kpt)
@@ -170,6 +174,7 @@ class NACLWF:
             evals.append(e)
             evecs.append(v)
         return np.array(evals), np.array(evecs)
+
 
 class NACPhonopyDownfolder(PhonopyDownfolder):
     def __init__(
@@ -233,13 +238,16 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
         wannk, Hwannk_noNAC = self.builder.get_wannk_and_Hk()
-        HwannR_noNAC = k_to_R(self.kpts, self.Rlist, Hwannk_noNAC, kweights=self.kweights)
+        HwannR_noNAC = k_to_R(
+            self.kpts, self.Rlist, Hwannk_noNAC, kweights=self.kweights
+        )
 
         wannR = k_to_R(self.kpts, self.Rlist, wannk, kweights=self.kweights)
         # prepare the H and the eigens for all k-points.
         evals_nac, evecs_nac, Hk_tot, Hk_short, Hk_long = self.model_NAC.solve_all(
             self.kpts
         )
+        np.save("Hk_short.npy", Hk_short)
 
         # compute the short range Hamiltonian in Wannier space
         Hwannk_short = self.get_Hwannk_short(wannk, Hk_short)
@@ -259,20 +267,20 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             NAC_phonon=self.model_NAC,
         )
 
-        #if post_func is not None:
+        # if post_func is not None:
         #    post_func(self.ewf)
-        #if not os.path.exists(output_path):
+        # if not os.path.exists(output_path):
         #    os.makedirs(output_path)
-        #try:
+        # try:
         #    self.save_info(output_path=output_path)
-        #except:
+        # except:
         #    pass
-        #if write_hr_txt is not None:
+        # if write_hr_txt is not None:
         #    self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
-        #if write_hr_nc is not None:
+        # if write_hr_nc is not None:
         #    # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         #    self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
-        #return self.ewf
+        # return self.ewf
 
     def get_Hwannk_short(self, wannk=None, Hk_short=None):
         """
@@ -303,7 +311,6 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         """
         wannk = R_to_onek(qpt, self.Rlist, self.ewf.wannR)
         return wannk
-
 
     def get_wannier_nac(self, Rlist=None):
         """

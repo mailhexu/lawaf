@@ -36,7 +36,7 @@ class Lawaf:
     builder: Union[ProjectedWannierizer, ScdmkWannierizer] = None
     model = None
 
-    def __init__(self, model,  params=None):
+    def __init__(self, model, params=None):
         """
         Setup the model
         """
@@ -120,7 +120,13 @@ class Lawaf:
     def _parepare_builder(self):
         params = self.params
         wannierizer = select_wannierizer(params.method)
-        self.builder = wannierizer(evals=self.evals, evecs=self.evecs, kpts=self.kpts, kweights=self.kweights, params=self.params)
+        self.builder = wannierizer(
+            evals=self.evals,
+            evecs=self.evecs,
+            kpts=self.kpts,
+            kweights=self.kweights,
+            params=self.params,
+        )
 
     def _prepare_positions(self):
         try:
@@ -132,7 +138,6 @@ class Lawaf:
         except Exception:
             positions = None
         self.positions = positions
- 
 
     def _prepare_kpoints(self):
         """
@@ -164,9 +169,9 @@ class Lawaf:
         # remove e^ikr from wfn
         self.has_phase = has_phase
         if not has_phase:
-           self.psi = evecs
+            self.psi = evecs
         else:
-           self._remove_phase(evecs)
+            self._remove_phase(evecs)
         self.evals = evals
         self.evecs = evecs
         return self.evals, self.evecs
@@ -203,7 +208,6 @@ class Lawaf:
         self.atoms = self.model.atoms
         self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
 
-
         if not os.path.exists(output_path):
             os.makedirs(output_path)
         try:
@@ -217,8 +221,6 @@ class Lawaf:
             # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
             self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         return self.ewf
-
-
 
     def plot_band_fitting(
         self,
@@ -238,6 +240,7 @@ class Lawaf:
         cell=np.eye(3),
         plot_original=True,
         plot_downfolded=True,
+        plot_nonac=False,
         show=True,
         fix_LOTO=False,
         **kwargs,
@@ -284,6 +287,24 @@ class Lawaf:
                 npoints=npoints,
                 efermi=efermi,
                 color=downfolded_band_color,
+                alpha=0.5,
+                marker=marker,
+                erange=erange,
+                cell=cell,
+                ax=ax,
+                fix_LOTO=fix_LOTO,
+                **kwargs,
+            )
+        if plot_nonac:
+            self.ewf.set_nac(False)
+            ax = plot_band(
+                self.ewf,
+                kvectors=kvectors,
+                knames=knames,
+                supercell_matrix=supercell_matrix,
+                npoints=npoints,
+                efermi=efermi,
+                color="red",
                 alpha=0.5,
                 marker=marker,
                 erange=erange,
