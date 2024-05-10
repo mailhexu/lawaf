@@ -60,7 +60,6 @@ class Lawaf:
         use_proj=True,
         exclude_bands=[],
         post_func=None,
-        has_nac=False,
     ):
         """
         Downfold the Band structure.
@@ -104,6 +103,8 @@ class Lawaf:
             use_proj=use_proj,
             exclude_bands=exclude_bands,
         )
+        self.nwann = self.params.nwann
+
         self._prepare_data()
 
     def _prepare_data(self):
@@ -198,18 +199,17 @@ class Lawaf:
         write_hr_txt="LWF.txt",
         **params,
     ):
-        #self.params.update(params)
-        #if "post_func" in self.params:
-        #    self.params.pop("post_func")
+        self.params.update(params)
         self.atoms = self.model.atoms
         self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
-        if post_func is not None:
-            post_func(self.ewf)
+
+
         if not os.path.exists(output_path):
             os.makedirs(output_path)
         try:
             self.save_info(output_path=output_path)
-        except:
+        except Exception as E:
+            print(E)
             pass
         if write_hr_txt is not None:
             self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
@@ -217,6 +217,8 @@ class Lawaf:
             # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
             self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         return self.ewf
+
+
 
     def plot_band_fitting(
         self,

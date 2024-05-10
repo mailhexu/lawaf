@@ -1,14 +1,17 @@
+from dataclasses import dataclass
 import numpy as np
 from scipy.linalg import eigh
 import os
 from lawaf.interfaces.downfolder import Lawaf
 from lawaf.mathutils.evals_freq import freqs_to_evals
 from .phonopywrapper import PhonopyWrapper
+from lawaf.wannierization.wannierizer import Amnk_to_Hk, Hk_to_Hreal
+from lawaf.mathutils.kR_convert import k_to_R, R_to_k, R_to_onek
 
 
 class PhononDownfolder(Lawaf):
     def __init__(self, model, atoms=None, params=None):
-        super().__init__(model, params=params )
+        super().__init__(model, params=params)
         self.model = model
         if atoms is not None:
             self.atoms = atoms
@@ -20,10 +23,8 @@ class PhononDownfolder(Lawaf):
         self.params = params
 
 
-
-
 class PhonopyDownfolder(PhononDownfolder):
-    def __init__(self, phonon=None, mode="dm",  *argv, **kwargs):
+    def __init__(self, phonon=None, mode="dm", params=None, *argv, **kwargs):
         """
         Parameters:
         ========================================
@@ -38,7 +39,7 @@ class PhonopyDownfolder(PhononDownfolder):
             phonon = phonopy.load(*argv, **kwargs)
         self.has_nac = False
         model = PhonopyWrapper(phonon, mode=mode, has_nac=self.has_nac)
-        super().__init__(model, atoms=model.atoms)
+        super().__init__(model, atoms=model.atoms, params=params)
 
         self.mode = mode
         self.factor = 524.16  # to cm-1
@@ -46,10 +47,13 @@ class PhonopyDownfolder(PhononDownfolder):
 
     def convert_DM_parameters(self):
         if self.mode == "dm":
-            self.params["mu"] = freqs_to_evals(self.params["mu"], factor=self.factor)
-            self.params["sigma"] = freqs_to_evals(
-                self.params["sigma"], factor=self.factor
-            )
+            # self.params["mu"] = freqs_to_evals(self.params["mu"], factor=self.factor)
+            # self.params["sigma"] = freqs_to_evals(
+            #    self.params["sigma"], factor=self.factor
+            # )
+            p = self.params["weight_func_params"]
+            p = [freqs_to_evals(pe, factor=self.factor) for pe in p]
+            self.params["weight_func_params"] = p
 
     def downfold(
         self,
@@ -78,24 +82,131 @@ class PhonopyDownfolder(PhononDownfolder):
             self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         return self.ewf
 
+
+@dataclass
+class NACLWF:
+    """
+    LWF with NAC
+    """
+
+    born: np.ndarray = None
+    dielectric: np.ndarray = None
+    factor: float = None
+    Rlist: np.ndarray = None
+    wannR: np.ndarray = None
+    HR_noNAC: np.ndarray = None
+    HR_short: np.ndarray = None
+    NAC_phonon: PhonopyWrapper = None
+
+    def get_Hk_short(self, kpt):
+        """
+        get the short range Hamiltonian at k-point.
+        """
+        Hk_short = R_to_onek(kpt, self.Rlist, self.HR_short)
+        return Hk_short
+
+    def get_wannk(self, kpt):
+        """
+        get the Wannier functions at k-point.
+        """
+        wannk = R_to_onek(kpt, self.Rlist, self.wannR)
+        return wannk
+
+    def get_Hk_long(self, kpt):
+        """
+        get the long range Hamiltonian at k-point.
+        """
+        evals, evecs, Hk, Hk_short, Hk_long = self.NAC_phonon.solve(kpt)
+        wannk = self.get_wannk(kpt)
+        Hwannk_long = wannk.conj().T @ Hk_long @ wannk
+        return Hwannk_long
+
+    def get_Hk_noNAC(self, kpt):
+        """
+        get the Hamiltonian at k-point without NAC.
+        """
+        Hk_noNAC = R_to_onek(kpt, self.Rlist, self.HR_noNAC)
+        return Hk_noNAC
+
+    def get_Hk_nac(self, kpt):
+        evals, evecs, Hk, Hk_short, Hk_long = self.NAC_phonon.solve(kpt)
+        wannk  = self.get_wannk(kpt)
+        Hwannk= wannk.conj().T @ Hk @ wannk
+        return Hwannk
+
+    def get_Hk(self, kpt, nac=True):
+        """
+        get the Hamiltonian at k-point.
+        """
+        if nac:
+            return self.get_Hk_nac(kpt)
+            Hk_short = self.get_Hk_short(kpt)
+            Hk_long = self.get_Hk_long(kpt)
+            Hk_tot = Hk_short + Hk_long
+            return Hk_tot
+        else:
+            return self.get_Hk_noNAC(kpt)
+        #return self.get_Hk_nac(kpt)
+
+    def solve_k(self, kpt):
+        """
+        solve the Hamiltonian at k-point with NAC.
+        """
+        if np.linalg.norm(kpt)< 1e-6:
+            Hk = self.get_Hk_noNAC(kpt)
+        else:
+            Hk = self.get_Hk(kpt)
+        evals, evecs = eigh(Hk)
+        return evals, evecs
+
+    def solve_all(self, kpts):
+        """
+        solve the Hamiltonian at all k-points with NAC.
+        """
+        evals = []
+        evecs = []
+        for k in kpts:
+            e, v = self.solve_k(k)
+            evals.append(e)
+            evecs.append(v)
+        return np.array(evals), np.array(evecs)
+
 class NACPhonopyDownfolder(PhonopyDownfolder):
-    def __init__(self, phonon=None, mode="dm",  *argv, **kwargs):
+    def __init__(
+        self, phonon=None, phonon_NAC=None, mode="dm", params=None, *argv, **kwargs
+    ):
         """
         Parameters:
         """
-        self.has_nac=True
+        try:
+            import phonopy
+        except ImportError:
+            raise ImportError("phonopy is needed. Do you have phonopy installed?")
+        print(kwargs)
+        if phonon is None:
+            phonon = phonopy.load(is_nac=False, *argv, **kwargs)
+        model = PhonopyWrapper(phonon, mode=mode, has_nac=False)
+        super().__init__(phonon=phonon, atoms=model.atoms, params=params)
 
-        self.set_nac_params(
-                self.model.born, self.model.dielectric, self.model.factor
-            )
+        if phonon_NAC is None:
+            phonon_NAC = phonopy.load(*argv, **kwargs)
+        self.model_NAC = PhonopyWrapper(phonon_NAC, mode=mode, has_nac=True)
 
-
-    def set_nac_Hks(self, Hks, Hshorts, Hlongs):
-        """set  Hamiltonians including splited Hks, Hshorts and Hlongs."""
         self.has_nac = True
-        self.Hks = Hks
-        self.Hshorts = Hshorts
-        self.Hlongs = Hlongs
+        self.set_nac_params(
+            self.model_NAC.born, self.model_NAC.dielectric, self.model_NAC.factor
+        )
+
+    def get_Hks_with_nac(self, q):
+        """
+        get the dynmaical matrix at q with NAC.
+        params:
+            q: q-vector
+        return:
+            Htotal, Hshort, Hlong, eigenvalues, eigenvectors
+        """
+        evals, evecs, Hk, Hshort, Hlong = self.model_NAC.solve(q)
+        return evals, evecs, Hk, Hshort, Hlong
 
     def set_nac_params(self, born, dielectic, factor):
         """set  Hamiltonians including splited Hks, Hshorts and Hlongs."""
@@ -103,6 +214,96 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         self.born = born
         self.dielectic = dielectic
         self.factor = factor
+
+    def downfold(
+        self,
+        post_func=None,
+        output_path="./",
+        write_hr_nc="LWF.nc",
+        write_hr_txt="LWF.txt",
+        **params,
+    ):
+        # self.params.update(params)
+        # if "post_func" in self.params:
+        #    self.params.pop("post_func")
+        self.atoms = self.model.atoms
+        self.builder.prepare()
+        # compute the Amn matrix from phonons without NAC
+        Amn = self.builder.get_Amn()
+        # compute the Wannier functions and the Hamiltonian in k-space without NAC
+        # wannk: (nkpt, nbasis, nwann)
+        wannk, Hwannk_noNAC = self.builder.get_wannk_and_Hk()
+        HwannR_noNAC = k_to_R(self.kpts, self.Rlist, Hwannk_noNAC, kweights=self.kweights)
+
+        wannR = k_to_R(self.kpts, self.Rlist, wannk, kweights=self.kweights)
+        # prepare the H and the eigens for all k-points.
+        evals_nac, evecs_nac, Hk_tot, Hk_short, Hk_long = self.model_NAC.solve_all(
+            self.kpts
+        )
+
+        # compute the short range Hamiltonian in Wannier space
+        Hwannk_short = self.get_Hwannk_short(wannk, Hk_short)
+        HwannR_short = self.get_HwannR_short(
+            Hwannk_short, self.kpts, self.Rlist, kweights=self.kweights
+        )
+
+        # save the lwf model into a NACLWF object
+        self.ewf = NACLWF(
+            born=self.born,
+            dielectric=self.dielectic,
+            factor=self.factor,
+            Rlist=self.Rlist,
+            wannR=wannR,
+            HR_noNAC=HwannR_noNAC,
+            HR_short=HwannR_short,
+            NAC_phonon=self.model_NAC,
+        )
+
+        #if post_func is not None:
+        #    post_func(self.ewf)
+        #if not os.path.exists(output_path):
+        #    os.makedirs(output_path)
+        #try:
+        #    self.save_info(output_path=output_path)
+        #except:
+        #    pass
+        #if write_hr_txt is not None:
+        #    self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
+        #if write_hr_nc is not None:
+        #    # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+        #    self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+        #return self.ewf
+
+    def get_Hwannk_short(self, wannk=None, Hk_short=None):
+        """
+        compute theh Hk_short in Wannier space
+        params:
+            wannk: Wannier functions in k-space, (nkpt, nbasis, nwann)
+            Hk_short: short range Hamiltonian in k-space
+        """
+        Hk_wann_short = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
+        for ik in range(self.nkpt):
+            Hk_wann_short[ik] = wannk[ik].conj().T @ Hk_short[ik] @ wannk[ik]
+        return Hk_wann_short
+
+    def get_HwannR_short(
+        self, Hk_wann_short=None, kpts=None, Rlist=None, kweights=None
+    ):
+        """
+        compute the HR_short in Wannier space
+        """
+        if Hk_wann_short is None:
+            Hk_wann_short = self.get_Hwannk_short()
+        HwannR_short = k_to_R(kpts, Rlist, Hk_wann_short, kweights=kweights)
+        return HwannR_short
+
+    def get_wannk_interpolated(self, qpt):
+        """
+        Interpolate Wannier functions from real space to k-space.
+        """
+        wannk = R_to_onek(qpt, self.Rlist, self.ewf.wannR)
+        return wannk
+
 
     def get_wannier_nac(self, Rlist=None):
         """
@@ -113,13 +314,9 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         self.get_wannk_and_Hk_nac()
         if Rlist is not None:
             lwf = self.k_to_R(Rlist=Rlist)
-            #lwf.atoms = copy.deepcopy(self.atoms)
+            # lwf.atoms = copy.deepcopy(self.atoms)
         lwf.set_born_from_full(self.born, self.dielectic, self.factor)
         return lwf
-
-
-    #def get_wannk_and_Hk_nac(self):
-    #    self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
 
 
 class PhonopyDownfolderWrapper:

@@ -163,7 +163,8 @@ class PhonopyWrapper:
         if phonon is not None:
             self.phonon = phonon
         else:
-            self.phonon = load(phonon_fname)
+            self.phonon = load(phonon_fname, is_nac=has_nac)
+            print(f"Phonon loaded from file {phonon_fname} ")
         if has_nac:
             self.has_nac = True
             self.get_nac_params()

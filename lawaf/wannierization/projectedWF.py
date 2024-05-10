@@ -68,6 +68,7 @@ class ProjectedWannierizer(Wannierizer):
                 A[iband, iproj] = (
                     np.vdot(self.get_psi_k(ik)[:, iband], psi_a) * self.occ[ik, iband]
                 )
+        # using einsum
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
 
