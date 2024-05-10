@@ -41,16 +41,15 @@ class MyDynamicalMatrixGL(DynamicalMatrixGL):
         use_openmp=False,
     ):
         super().__init__(
-            supercell,
-            primitive,
-            force_constants,
-            nac_params,
-            num_G_points,
-            with_full_terms,
-            decimals,
-            symprec,
-            log_level,
-            use_openmp,
+            supercell=supercell,
+            primitive=primitive,
+            force_constants=force_constants,
+            nac_params=nac_params,
+            num_G_points=num_G_points,
+            with_full_terms=with_full_terms,
+            decimals=decimals,
+            log_level=log_level,
+            use_openmp=use_openmp,
         )
         self._short_range_dynamical_matrix = None
         self._long_range_dynamical_matrix = None
