@@ -1,5 +1,6 @@
-import numpy as np
 import copy
+import pickle
+import numpy as np
 from scipy.linalg import eigh
 from netCDF4 import Dataset
 from ase import Atoms
@@ -202,6 +203,12 @@ class LWF(GenericWF):
             ind = np.unravel_index(np.argmax(a, axis=None), a.shape)
             ret.append({"R": self.Rlist[ind[0]], "orb": ind[1]})
         return ret
+
+    def save_hr_pickle(self, fname):
+        with open(fname, "wb") as f:
+            pickle.dump(
+                {"HR:": self.HwannR, "Rlist:": self.Rlist, "atoms": self.atoms}, f
+            )
 
     def write_nc(self, fname, prefix="wann_", atoms=None):
         root = Dataset(fname, "w")

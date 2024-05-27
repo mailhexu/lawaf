@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 from ase.dft.kpoints import bandpath
+from lawaf.utils.kpoints import autopath
 import matplotlib.pyplot as plt
 
 
@@ -20,10 +21,12 @@ def fix_evals_LOTO(evals, xs, kpts, N=4):
 
 def plot_band(
     model,
-    kvectors=np.array(
-        [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]
-    ),
-    knames=["$\Gamma$", "X", "M", "$\Gamma$", "R"],
+    # kvectors=np.array(
+    #    [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]
+    # ),
+    # knames=["$\Gamma$", "X", "M", "$\Gamma$", "R"],
+    kvectors=None,
+    knames=None,
     supercell_matrix=None,
     npoints=100,
     efermi=None,
@@ -42,19 +45,28 @@ def plot_band(
     if ax is None:
         _fig, ax = plt.subplots()
 
-    if supercell_matrix is None:
-        supercell_matrix = np.eye(3)
-    kvectors = [np.dot(k, supercell_matrix) for k in kvectors]
-    if "cell" not in model.__dict__:
-        band = bandpath(kvectors, cell @ supercell_matrix, npoints)
-    else:
-        band = bandpath(kvectors, cell @ supercell_matrix, npoints)
-    kpts = band.kpts
-    x, X, _labels = band.get_linear_kpoint_axis()
+    # if supercell_matrix is None:
+    #    supercell_matrix = np.eye(3)
+    # kvectors = [np.dot(k, supercell_matrix) for k in kvectors]
+    if cell is None:
+        if "atoms" in model.__dict__:
+            cell = model.atoms.cell
+        elif "cell" in model.__dict__:
+            cell = model.cell
+
+    knames, kpts, xs, Xs = autopath(
+        knames=knames,
+        kvectors=kvectors,
+        npoints=npoints,
+        supercell_matrix=supercell_matrix,
+        cell=cell,
+    )
+    kpts = np.vstack(kpts)
+    xs = np.hstack(xs)
     _evalues, _evecs = model.solve_all(kpts=kpts)[:2]
 
     if fix_LOTO:
-        evalues = fix_evals_LOTO(_evalues, x, kpts)
+        evalues = fix_evals_LOTO(_evalues, xs, kpts)
     else:
         evalues = copy.deepcopy(_evalues)
     if evals_to_freq:
@@ -64,10 +76,10 @@ def plot_band(
     for i in range(evalues.shape[1]):
         if i == 0:
             ax.plot(
-                x, evalues[:, i], color=color, alpha=alpha, marker=marker, label=label
+                xs, evalues[:, i], color=color, alpha=alpha, marker=marker, label=label
             )
         else:
-            ax.plot(x, evalues[:, i], color=color, alpha=alpha, marker=marker)
+            ax.plot(xs, evalues[:, i], color=color, alpha=alpha, marker=marker)
 
     if efermi is not None:
         ax.axhline(efermi, linestyle="--", color="gray")
@@ -77,11 +89,11 @@ def plot_band(
         except AttributeError:
             pass
     ax.set_ylabel(ylabel)
-    ax.set_xlim(x[0], x[-1])
-    ax.set_xticks(X)
+    ax.set_xlim(xs[0], xs[-1])
+    ax.set_xticks(Xs)
     ax.set_xticklabels(knames)
     if erange is not None:
         ax.set_ylim(erange)
-    for x in X:
-        ax.axvline(x, linewidth=0.6, color="gray")
+    for X in Xs:
+        ax.axvline(X, linewidth=0.6, color="gray")
     return ax

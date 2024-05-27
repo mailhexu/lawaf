@@ -15,6 +15,7 @@ from lawaf.params import WannierParams
 import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
 from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
+from lawaf.utils.kpoints import autopath
 
 
 def select_wannierizer(method):
@@ -214,8 +215,8 @@ class Lawaf:
         self,
         post_func=None,
         output_path="./",
-        write_hr_nc="LWF.nc",
-        write_hr_txt="LWF.txt",
+        write_hr_nc=None,
+        write_hr_txt=None,
         **params,
     ):
         self.params.update(params)
@@ -229,19 +230,21 @@ class Lawaf:
         except Exception as E:
             print(E)
             pass
-        if write_hr_txt is not None:
-            self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
-        if write_hr_nc is not None:
-            # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
-            self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+        # if write_hr_txt is not None:
+        #    self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
+        # if write_hr_nc is not None:
+        #    # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+        #    self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         return self.ewf
 
     def plot_band_fitting(
         self,
-        kvectors=np.array(
-            [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]
-        ),
-        knames=["$\Gamma$", "X", "M", "$\Gamma$", "R"],
+        # kvectors=np.array(
+        #    [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]
+        # ),
+        # knames=["$\Gamma$", "X", "M", "$\Gamma$", "R"],
+        kvectors=None,
+        knames=None,
         supercell_matrix=None,
         npoints=100,
         efermi=None,
