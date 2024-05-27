@@ -61,6 +61,7 @@ class Lawaf:
         use_proj=True,
         exclude_bands=[],
         post_func=None,
+        pwf_order=1,
     ):
         """
         Downfold the Band structure.
@@ -103,7 +104,9 @@ class Lawaf:
             kshift=kshift,
             use_proj=use_proj,
             exclude_bands=exclude_bands,
+            pwf_order=pwf_order,
         )
+
         self.nwann = self.params.nwann
 
         self._prepare_data()
