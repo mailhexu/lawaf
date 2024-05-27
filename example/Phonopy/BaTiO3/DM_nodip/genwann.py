@@ -9,13 +9,13 @@ fname = "phonopy_params.yaml"
 # print(phonon.nac_params)
 # exit()
 params = dict(
-    method="projected",
+    method="scdmk",
     nwann=3,  # selected_basis=[9, 10, 11],
     anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
     use_proj=True,
     weight_func_params=(0, 0.06),
-    weight_func="Fermi",
-    kmesh=(4,4,4),
+    weight_func="unity",
+    kmesh=(4, 4, 4),
     gamma=True,
     kshift=(0.000, 0.001, 0.002),
 )

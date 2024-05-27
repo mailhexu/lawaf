@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 
 # from supercellmap import SupercellMaker
 from lawaf.utils.supercell import SupercellMaker
+from lawaf.mathutils.align_evecs import align_all_degenerate_eigenvectors
 
 
 class MyDynamicalMatrixGL(DynamicalMatrixGL):
@@ -234,6 +235,7 @@ class PhonopyWrapper:
                 Hshort *= self.Mmat
                 Hlong *= self.Mmat
         evals, evecs = eigh(Hk)
+        evecs = align_all_degenerate_eigenvectors(evals, evecs)
         if self.has_nac:
             return evals, evecs, Hk, Hshort, Hlong
         else:

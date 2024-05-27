@@ -7,6 +7,7 @@ from lawaf.mathutils.evals_freq import freqs_to_evals
 from .phonopywrapper import PhonopyWrapper
 from lawaf.wannierization.wannierizer import Amnk_to_Hk, Hk_to_Hreal
 from lawaf.mathutils.kR_convert import k_to_R, R_to_k, R_to_onek
+from lawaf.mathutils.align_evecs import align_evecs
 
 
 class PhononDownfolder(Lawaf):
@@ -37,13 +38,14 @@ class PhonopyDownfolder(PhononDownfolder):
             raise ImportError("phonopy is needed. Do you have phonopy installed?")
         if phonon is None:
             phonon = phonopy.load(*argv, **kwargs)
-        self.has_nac = False
-        model = PhonopyWrapper(phonon, mode=mode, has_nac=self.has_nac)
-        super().__init__(model, atoms=model.atoms, params=params)
-
+        self.params = params
         self.mode = mode
         self.factor = 524.16  # to cm-1
         self.convert_DM_parameters()
+        self.has_nac = False
+        model = PhonopyWrapper(phonon, mode=mode, has_nac=self.has_nac)
+        print(self.params)
+        super().__init__(model, atoms=model.atoms, params=self.params)
 
     def convert_DM_parameters(self):
         if self.mode == "dm":
@@ -54,6 +56,7 @@ class PhonopyDownfolder(PhononDownfolder):
             p = self.params["weight_func_params"]
             p = [freqs_to_evals(pe, factor=self.factor) for pe in p]
             self.params["weight_func_params"] = p
+            print(self.params["weight_func_params"])
 
     def downfold(
         self,
@@ -96,6 +99,7 @@ class NACLWF:
     wannR: np.ndarray = None
     HR_noNAC: np.ndarray = None
     HR_short: np.ndarray = None
+    HR_total: np.ndarray = None
     NAC_phonon: PhonopyWrapper = None
     nac: bool = True
 
@@ -138,12 +142,16 @@ class NACLWF:
         Hwannk = wannk.conj().T @ Hk @ wannk
         return Hwannk
 
+    def get_Hk_nac_total(self, kpt):
+        return R_to_onek(kpt, self.Rlist, self.HR_total)
+
     def get_Hk(self, kpt):
         """
         get the Hamiltonian at k-point.
         """
         if self.nac:
-            return self.get_Hk_nac(kpt)
+            # return self.get_Hk_nac_total(kpt)
+            # return self.get_Hk_nac(kpt)
             Hk_short = self.get_Hk_short(kpt)
             Hk_long = self.get_Hk_long(kpt)
             Hk_tot = Hk_short + Hk_long
@@ -187,7 +195,6 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             import phonopy
         except ImportError:
             raise ImportError("phonopy is needed. Do you have phonopy installed?")
-        print(kwargs)
         if phonon is None:
             phonon = phonopy.load(is_nac=False, *argv, **kwargs)
         model = PhonopyWrapper(phonon, mode=mode, has_nac=False)
@@ -247,12 +254,16 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         evals_nac, evecs_nac, Hk_tot, Hk_short, Hk_long = self.model_NAC.solve_all(
             self.kpts
         )
-        np.save("Hk_short.npy", Hk_short)
 
         # compute the short range Hamiltonian in Wannier space
-        Hwannk_short = self.get_Hwannk_short(wannk, Hk_short)
+        Hwannk_short = self.get_Hwannk_short(wannk, Hk_short, evecs_nac)
         HwannR_short = self.get_HwannR_short(
             Hwannk_short, self.kpts, self.Rlist, kweights=self.kweights
+        )
+
+        Hwannk_total = self.get_Hwannk_short(wannk, Hk_tot, evecs_nac)
+        HwannR_total = self.get_HwannR_short(
+            Hwannk_total, self.kpts, self.Rlist, kweights=self.kweights
         )
 
         # save the lwf model into a NACLWF object
@@ -264,6 +275,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             wannR=wannR,
             HR_noNAC=HwannR_noNAC,
             HR_short=HwannR_short,
+            HR_total=HwannR_total,
             NAC_phonon=self.model_NAC,
         )
 
@@ -282,7 +294,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         #    self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         # return self.ewf
 
-    def get_Hwannk_short(self, wannk=None, Hk_short=None):
+    def get_Hwannk_short(self, wannk=None, Hk_short=None, evecs=None):
         """
         compute theh Hk_short in Wannier space
         params:
@@ -291,6 +303,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         """
         Hk_wann_short = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
         for ik in range(self.nkpt):
+            # Hk_wann_short[ik] = wannk[ik].conj().T @ evecs[ik].conj().T@ Hk_short[ik] @ evecs[ik] @ wannk[ik]
             Hk_wann_short[ik] = wannk[ik].conj().T @ Hk_short[ik] @ wannk[ik]
         return Hk_wann_short
 

@@ -147,6 +147,7 @@ class Lawaf:
             self.kpts = np.array(self.params.kpts)
         else:
             self.kpts = monkhorst_pack(self.params.kmesh, gamma=self.params.gamma)
+
         self.nkpt = len(self.kpts)
         if self.params.kshift is not None:
             kshift = np.array(self.params.kshift)
@@ -156,6 +157,19 @@ class Lawaf:
             self.kweights = np.ones(self.nkpt, dtype=float) / self.nkpt
         else:
             self.kweights = self.params.kweights
+
+        self.anchor_kpt = np.array(self.params.anchor_kpt)
+
+        abs_kdistance_to_anchor = np.abs(
+            np.linalg.norm(self.kpts - self.anchor_kpt[None, :], axis=1)
+        )
+        if not np.any(abs_kdistance_to_anchor < 1e-5):
+            self.nkpt += 1
+            self.kpts = np.vstack([self.kpts, self.anchor_kpt])
+            self.kweights = np.hstack([self.kweights, 0.0])
+            self.anchor_kpt = self.kpts[-1]
+        else:
+            self.anchor_kpt = self.kpts[0]
 
     def _prepare_Rlist(self):
         self.Rgrid = self.params.kmesh

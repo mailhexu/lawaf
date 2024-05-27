@@ -77,7 +77,6 @@ def align_all_degenerate_eigenvectors(evals, evecs, H=None, tol=1e-4):
     degenerate_with_previous = False
     ind_degenerate = []
     for i, ev in enumerate(evals):
-        print(i)
         if i == 0:
             continue
         if np.abs(ev - evals[i - 1]) < tol:
@@ -85,17 +84,16 @@ def align_all_degenerate_eigenvectors(evals, evecs, H=None, tol=1e-4):
             if i - 1 not in ind_degenerate:
                 ind_degenerate.append(i - 1)
             ind_degenerate.append(i)
-            print("degenerate: ", ind_degenerate)
         else:
             if not degenerate_with_previous:
                 # previous is not degenerate
                 pass
             else:
                 evecs_degenerate = evecs[:, ind_degenerate]
-                print("aligning degenerate eigenvectors: ", ind_degenerate)
-                print("evecs_degenerate: ", evecs_degenerate)
+                # print("aligning degenerate eigenvectors: ", ind_degenerate)
+                # print("evecs_degenerate: ", evecs_degenerate)
                 aligned_evecs[:, ind_degenerate] = align_evecs(evecs_degenerate, H=H)
-                print("aligned_evecs: ", aligned_evecs[:, ind_degenerate])
+                # print("aligned_evecs: ", aligned_evecs[:, ind_degenerate])
             degenerate_with_previous = False
             ind_degenerate = []
 

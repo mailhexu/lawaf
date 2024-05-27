@@ -16,16 +16,13 @@ def test():
 
     # check if psi1\dagger psi
 
-    P2 = evecs1.conj().T @ evecs2.conj().T 
-    C=P2 @ B @ P2.conj().T
-    
-    evals3, evecs3=eigh(C)
+    P2 = evecs1.conj().T @ evecs2.conj().T
+    C = P2 @ B @ P2.conj().T
+
+    evals3, evecs3 = eigh(C)
 
     print(f"eigenvalues of B: {evals2}")
     print(f"eigenvalues of C: {evals3}")
-
-
-
 
 
 test()
