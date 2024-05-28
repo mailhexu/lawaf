@@ -113,6 +113,7 @@ def easy_downfold_magnon(
     params.update(kwargs)
 
     wann.set_parameters(**params)
+    print("begin downfold")
     ewf = wann.downfold()
     ewf.save_hr_pickle(downfolded_pickle_fname)
 

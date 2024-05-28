@@ -12,6 +12,7 @@ from typing import Callable, Optional, Tuple, Union, List
 from dataclasses import dataclass
 from lawaf.params import WannierParams
 from lawaf.mathutils.occupation_functions import occupation_func
+import matplotlib.pyplot as plt
 
 
 @dataclass
@@ -195,6 +196,7 @@ class Wannierizer(BasicWannierizer):
         """
         for ik in range(self.nkpt):
             self.Amn[ik, :, :] = np.array(self.get_Amn_one_k(ik), dtype=complex)
+        Amn = enhance_A(self.Amn, self.evals.real)
         return self.Amn
 
     def get_wannk_and_Hk(self, shift=0.0):
@@ -289,3 +291,47 @@ def Hk_to_Hreal(Hk, kpts, kweights, Rpts):
             phase = np.exp(-2j * np.pi * np.dot(R, k))
             HR[iR] += Hk[ik] * phase * kweights[ik]
     return HR
+
+
+def enhance_A(A, evals):
+    """
+    Enhance the A matrix by adding the eigenvalues to the diagonal.
+    The idea is to treat A as an weight and do a statistics of the energy range.
+    Then apply a non-linear function to amplify the enegy range which are larger.
+    """
+    Areal = np.abs(A)
+    nk, nband, nwann = A.shape
+    emin, emax = np.min(evals), np.max(evals)
+    rangeE = emax - emin
+    emin = emin - 0.1 * rangeE
+    emax = emax + 0.1 * rangeE
+    Egrid = np.linspace(emin, emax, 100)
+    dE = Egrid[1] - Egrid[0]
+    dos_tot = np.zeros_like(Egrid)
+    wdos_tot = np.zeros_like(Egrid)
+    # for each Amnk, add a weight to the corresponding Erange with a gaussian smearing
+    for ik in range(nk):
+        wk = np.sum(Areal[ik, :, :], axis=1)
+        # wk /= np.sum(wk)
+        wdosE = np.zeros_like(Egrid)
+        dosE = np.zeros_like(Egrid)
+        for iband in range(nband):
+            wdosE += wk[iband] * erfc((Egrid - evals[ik, iband]) / dE / 5)
+            dosE += erfc((Egrid - evals[ik, iband]) / dE / 5)
+        dos_tot += dosE
+        wdos_tot += wdosE / dosE
+    # wdos_tot /= dos_tot
+    # interpolate the dos_tot
+    occ = np.interp(evals, Egrid, wdos_tot)
+
+    # plt.plot(Egrid, dos_tot)
+    plt.plot(Egrid, wdos_tot)
+    plt.show()
+
+    occ = occ**2
+    for ik in range(nk):
+        A[ik, :, :] *= occ[ik, :, None]
+        # print(f"Enhanced A: {A[ik, :, :]}")
+        U, _, VT = svd(A[ik, :, :], full_matrices=False)
+        A[ik, :, :] = U @ VT
+    return A

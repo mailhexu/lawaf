@@ -10,13 +10,12 @@ class ProjectedWannierizer(Wannierizer):
     We define a set of projectors, which is a nwann*nbasis matrix.
     Each projector is vector of size nbasis.
     """
-    def set_params(self,params):
+
+    def set_params(self, params):
         if params.selected_basis:
             self.set_projectors_with_basis(params.selected_basis)
         elif params.anchors:
             self.set_projectors_with_anchors(params.anchors)
-
-
 
     def set_projectors_with_anchors(self, anchors):
         """
@@ -71,6 +70,7 @@ class ProjectedWannierizer(Wannierizer):
         # using einsum
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
+        # return A
 
     def get_Amn_psi(self, psi):
         """
@@ -80,7 +80,13 @@ class ProjectedWannierizer(Wannierizer):
         A = np.zeros((self.nband, self.nwann), dtype=complex)
         for iband in range(self.nband):
             for iproj, psi_a in enumerate(self.projectors):
-                A[iband, iproj] = np.vdot(psi[:, iband], psi_a) * self.occ[iband]
+                A[iband, iproj] = (
+                    np.vdot(
+                        psi[:, iband],
+                        psi_a,
+                    )
+                    * self.occ[iband]
+                ) ** self.params.pwf_order
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
 
@@ -92,7 +98,7 @@ class MaxProjectedWannierizer(ProjectedWannierizer):
         Amnk_0 is then orthogonalized using svd.
         m is the band index and n is the Wannier index.
         """
-        kpt= self.kpts[ik]
+        kpt = self.kpts[ik]
         print(f"MaxProjectedWannierizer: ik={ik}, kpt={kpt}.")
         A = np.zeros((self.nband, self.nwann), dtype=complex)
         for iproj, psi_a in enumerate(self.projectors):
@@ -100,14 +106,14 @@ class MaxProjectedWannierizer(ProjectedWannierizer):
                 A[iband, iproj] = (
                     np.vdot(self.get_psi_k(ik)[:, iband], psi_a) * self.occ[ik, iband]
                 )
-            # select the maximum value of A[:, iproj] and set to 1. Others are set to 0.  
-            imax=np.argmax(np.abs(np.abs(A[:, iproj])))
+            # select the maximum value of A[:, iproj] and set to 1. Others are set to 0.
+            imax = np.argmax(np.abs(np.abs(A[:, iproj])))
             imax = iproj
             print(f"MaxProjectedWannierizer: iproj={iproj}, imax={imax}.")
-            tmp=A[imax, iproj]
-            A[:, iproj] =0
+            tmp = A[imax, iproj]
+            A[:, iproj] = 0
             A[imax, iproj] = 1
         print(f"MaxProjectedWannierizer: A={A}.")
         U, _S, VT = svd(A, full_matrices=False)
-        A=U @ VT
+        A = U @ VT
         return A
