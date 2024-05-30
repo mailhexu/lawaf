@@ -91,11 +91,24 @@ class PhonopyDownfolder(PhononDownfolder):
 class NACLWF:
     """
     LWF with NAC
+    elements:
+        born: Born effective charges. (natoms, 3, 3)
+        dielectric: dielectric tensor. (3, 3)
+        factor: factor to convert the unit.
+        masses: masses of atoms. (natoms)
+        Rlist: list of R-vectors. (nR, 3)
+        wannR: Wannier functions in real space
+        HR_noNAC: Hamiltonian in real space without NAC
+        HR_short: short range Hamiltonian in real space
+        HR_total: total Hamiltonian in real space
+        NAC_phonon: PhonopyWrapper object
+        nac: whether to include NAC
     """
 
     born: np.ndarray = None
     dielectric: np.ndarray = None
     factor: float = None
+    masses: np.ndarray = None
     Rlist: np.ndarray = None
     wannR: np.ndarray = None
     HR_noNAC: np.ndarray = None
@@ -104,8 +117,70 @@ class NACLWF:
     NAC_phonon: PhonopyWrapper = None
     nac: bool = True
 
+    def __post_init__(self):
+        self.natoms = self.born.shape[0]
+        self.nwann = self.wannR.shape[1]
+        self.nkpt = self.wannR.shape[0]
+        self.nR = self.Rlist.shape[0]
+        self.born_wann = self.get_born_wann()
+        self.get_masses_wann()
+        self.get_disp_wann()
+        self.check_normalization()
+
+        nac_q = self._get_charge_sum(q=[0, 0, 0.001])
+
     def set_nac(self, nac=True):
         self.nac = nac
+
+    def get_born_wann(self):
+        """
+        get the Born effective charges in Wannier space.
+        """
+        born = self.born.reshape(self.natoms * 3, 3)
+        self.born_wan = np.einsum("Rji,jk->ik", self.wannR**2, born).real
+        print(self.born_wan)
+
+    def get_masses_wann(self):
+        """
+        get the masses of lattice wannier functions.
+        m_wann_i = sum_Rj m_j * WannR_Rji
+        """
+        masses = np.repeat(self.masses, 3).real
+        self.masses_lwf = np.einsum("j,Rji->i", masses, self.wannR**2)
+        print(self.masses_lwf)
+
+    def check_normalization(self):
+        """
+        check the normalization of the LWF.
+        """
+        norm = np.sum(self.wannR**2, axis=(0, 1)).real
+        print(f"Norm of Wannier functions: {norm}")
+
+    def get_disp_wann(self):
+        """
+        get the displacement of the LWF.
+        """
+        masses = np.repeat(self.masses, 3)
+        self.disp_wannR = self.wannR / np.sqrt(masses)[None, :, None]
+
+    def get_constant_factor_wang(self, q):
+        # unit_conversion * 4.0 * np.pi / volume / np.dot(q.T, np.dot(dielectric, q))
+        return self.factor * 4.0 * np.pi / np.dot(q.T, np.dot(self.dielectric, q))
+
+    def get_dipdip_wang_q(self, qpt):
+        nac_q = self._get_charge_sum(self.natoms, qpt, self.born)
+        dd = nac_q * self.get_constant_factor_wang(qpt)
+        mmat = np.sqrt(np.outer(self.masses_lwf, self.masses_lwf))
+        return dd / mmat
+
+    def _get_charge_sum(self, q):
+        nac_q = np.zeros((self.nwann, self.nwann), dtype="double", order="C")
+        A = np.dot(self.born_wan, q)
+        nac_q = np.outer(A, A)
+        # for i in range(num_atom):
+        #    for j in range(num_atom):
+        #        nac_q[i, j] = np.outer(A[i], A[j])
+        return nac_q
 
     def get_Hk_short(self, kpt):
         """
@@ -286,6 +361,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             born=self.born,
             dielectric=self.dielectic,
             factor=self.factor,
+            masses=self.atoms.get_masses(),
             Rlist=self.Rlist,
             wannR=wannR,
             HR_noNAC=HwannR_noNAC,
