@@ -221,7 +221,7 @@ class Lawaf:
     ):
         self.params.update(params)
         self.atoms = self.model.atoms
-        self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
+        self.ewf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
 
         if not os.path.exists(output_path):
             os.makedirs(output_path)

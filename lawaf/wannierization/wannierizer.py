@@ -242,9 +242,9 @@ class Wannierizer(BasicWannierizer):
             for ik, k in enumerate(self.kpts):
                 phase = np.exp(-2j * np.pi * np.dot(R, k))
                 HwannR[iR] += (
-                    self.Hwann_k[ik, :, :] * phase * self.kweights[ik] * Rdeg[ik]
+                    self.Hwann_k[ik, :, :] * phase * self.kweights[ik] * Rdeg[iR]
                 )
-                wannR[iR] += self.wannk[ik, :, :] * phase * self.kweights[ik] * Rdeg[ik]
+                wannR[iR] += self.wannk[ik, :, :] * phase * self.kweights[ik] * Rdeg[iR]
         self._assure_normalized(wannR)
         # wann_centers=self.get_wannier_centers(wannR, Rlist, positions)
         return LWF(

@@ -57,7 +57,6 @@ class PhonopyDownfolder(PhononDownfolder):
             p = self.params["weight_func_params"]
             p = [freqs_to_evals(pe, factor=self.factor) for pe in p]
             self.params["weight_func_params"] = p
-            print(self.params["weight_func_params"])
 
     def downfold(
         self,
@@ -69,7 +68,7 @@ class PhonopyDownfolder(PhononDownfolder):
     ):
         self.params.update(params)
         self.atoms = self.model.atoms
-        self.ewf = self.builder.get_wannier(Rlist=self.Rlist)
+        self.ewf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
         if post_func is not None:
             post_func(self.ewf)
         if not os.path.exists(output_path):
@@ -103,6 +102,9 @@ class NACLWF:
         HR_total: total Hamiltonian in real space
         NAC_phonon: PhonopyWrapper object
         nac: whether to include NAC
+        kpts: k-points
+        kweights: weights of k-points
+        wann_centers: centers of Wannier functions.
     """
 
     born: np.ndarray = None
@@ -110,6 +112,7 @@ class NACLWF:
     factor: float = None
     masses: np.ndarray = None
     Rlist: np.ndarray = None
+    Rdeg: np.ndarray = None
     wannR: np.ndarray = None
     HR_noNAC: np.ndarray = None
     HR_short: np.ndarray = None
@@ -117,6 +120,7 @@ class NACLWF:
     NAC_phonon: PhonopyWrapper = None
     nac: bool = True
     kpts: np.ndarray = None
+    kweights: np.ndarray = None
     wann_centers: np.ndarray = None
 
     def __post_init__(self):
@@ -124,10 +128,10 @@ class NACLWF:
         self.nwann = self.wannR.shape[2]
         self.nkpt = self.wannR.shape[0]
         self.nR = self.Rlist.shape[0]
+        self.check_normalization()
         self.born_wann = self.get_born_wann()
         self.get_masses_wann()
         self.get_disp_wann()
-        self.check_normalization()
 
         # nac_q = self._get_charge_sum(q=[0, 0, 0.001])
         self.split_short_long_wang()
@@ -151,7 +155,9 @@ class NACLWF:
         # self.born_wan = np.einsum("Rji,kj->ik", self.wannR**2, born).real
         # born = self.born.swapaxes(1,2).reshape( self.natoms * 3, 3)
         born = self.born.reshape(self.natoms * 3, 3)
-        self.born_wan = np.einsum("Rji,jk->ik", self.wannR**2, born).real
+        self.born_wan = np.einsum(
+            "Rji,jk->ik", self.wannR**2, born
+        )  # /self.wann_norm[None, :]
         print(self.born_wan)
 
     def get_masses_wann(self):
@@ -160,15 +166,18 @@ class NACLWF:
         m_wann_i = sum_Rj m_j * WannR_Rji
         """
         masses = np.repeat(self.masses, 3).real
-        self.masses_lwf = np.einsum("j,Rji->i", masses, self.wannR**2)
+        self.masses_lwf = (
+            np.einsum("j,Rji->i", masses, self.wannR * self.wannR.conj())
+            / self.wann_norm
+        )
         print(self.masses_lwf)
 
     def check_normalization(self):
         """
         check the normalization of the LWF.
         """
-        norm = np.sum(self.wannR**2, axis=(0, 1)).real
-        print(f"Norm of Wannier functions: {norm}")
+        self.wann_norm = np.sum(self.wannR * self.wannR.conj(), axis=(0, 1)).real
+        print(f"Norm of Wannier functions: {self.wann_norm}")
 
     def get_disp_wann(self):
         """
@@ -203,15 +212,15 @@ class NACLWF:
         # return dd / mmat
 
     def split_short_long_wang(self):
-        # Hks_tot = k_to_R(self.kpts, self.Rlist, self.HR_total)
         self.nkpt = len(self.kpts)
-        print(self.nwann)
         Hks_short = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
         for ik, kpt in enumerate(self.kpts):
             Hk_tot = self.get_Hk_nac_total(kpt)
             Hk_long = self.get_Hk_wang_long(kpt)
             Hks_short[ik] = Hk_tot - Hk_long
-        HRs_short = k_to_R(self.kpts, self.Rlist, Hks_short)
+        HRs_short = k_to_R(
+            self.kpts, self.Rlist, Hks_short, kweights=self.kweights, Rdeg=self.Rdeg
+        )
         self.HRs_wang_short = HRs_short
 
     def _get_charge_sum(self, q):
@@ -348,7 +357,6 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             self.model.dielectric,
             self.model.factor,
         )
-        print(self.model.is_nac)
 
     def get_Hks_with_nac(self, q):
         """
@@ -386,10 +394,12 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         # wannk: (nkpt, nbasis, nwann)
         wannk, Hwannk_noNAC = self.builder.get_wannk_and_Hk()
         HwannR_noNAC = k_to_R(
-            self.kpts, self.Rlist, Hwannk_noNAC, kweights=self.kweights
+            self.kpts, self.Rlist, Hwannk_noNAC, kweights=self.kweights, Rdeg=self.Rdeg
         )
 
-        wannR = k_to_R(self.kpts, self.Rlist, wannk, kweights=self.kweights)
+        wannR = k_to_R(
+            self.kpts, self.Rlist, wannk, kweights=self.kweights, Rdeg=self.Rdeg
+        )
         # prepare the H and the eigens for all k-points.
         evals_nac, evecs_nac, Hk_tot, Hk_short, Hk_long = self.model_NAC.solve_all(
             self.kpts, output_H=True
@@ -398,16 +408,16 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         # compute the short range Hamiltonian in Wannier space
         Hwannk_short = self.get_Hwannk_short(wannk, Hk_short, evecs_nac)
         HwannR_short = self.get_HwannR_short(
-            Hwannk_short, self.kpts, self.Rlist, kweights=self.kweights
+            Hwannk_short, self.kpts, self.Rlist, kweights=self.kweights, Rdeg=self.Rdeg
         )
 
         Hwannk_total = self.get_Hwannk_short(wannk, Hk_tot, evecs_nac)
         HwannR_total = self.get_HwannR_short(
-            Hwannk_total, self.kpts, self.Rlist, kweights=self.kweights
+            Hwannk_total, self.kpts, self.Rlist, kweights=self.kweights, Rdeg=self.Rdeg
         )
 
         wann_centers = get_wannier_centers(
-            wannR, self.Rlist, self.atoms.get_scaled_positions()
+            wannR, self.Rlist, self.atoms.get_scaled_positions(), Rdeg=self.Rdeg
         )
         print(wann_centers)
 
@@ -418,12 +428,14 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             factor=self.factor,
             masses=self.atoms.get_masses(),
             Rlist=self.Rlist,
+            Rdeg=self.Rdeg,
             wannR=wannR,
             HR_noNAC=HwannR_noNAC,
             HR_short=HwannR_short,
             HR_total=HwannR_total,
             NAC_phonon=self.model_NAC,
             kpts=self.kpts,
+            kweights=self.kweights,
             wann_centers=wann_centers,
         )
 
@@ -456,14 +468,16 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         return Hk_wann_short
 
     def get_HwannR_short(
-        self, Hk_wann_short=None, kpts=None, Rlist=None, kweights=None
+        self, Hk_wann_short=None, kpts=None, Rlist=None, kweights=None, Rdeg=None
     ):
         """
         compute the HR_short in Wannier space
         """
+        if Rdeg is None:
+            Rdeg = np.ones(len(Rlist))
         if Hk_wann_short is None:
             Hk_wann_short = self.get_Hwannk_short()
-        HwannR_short = k_to_R(kpts, Rlist, Hk_wann_short, kweights=kweights)
+        HwannR_short = k_to_R(kpts, Rlist, Hk_wann_short, kweights=kweights, Rdeg=Rdeg)
         return HwannR_short
 
     def get_wannk_interpolated(self, qpt):
@@ -518,7 +532,7 @@ class PhonopyDownfolderWrapper:
         return np.array(evals), np.array(evecs)
 
 
-def get_wannier_centers(wannR, Rlist, positions):
+def get_wannier_centers(wannR, Rlist, positions, Rdeg):
     nR = len(Rlist)
     nwann = wannR.shape[2]
     wann_centers = np.zeros((nwann, 3), dtype=float)
@@ -527,6 +541,8 @@ def get_wannier_centers(wannR, Rlist, positions):
     for iR, R in enumerate(Rlist):
         c = wannR[iR, :, :]
         # wann_centers += (c.conj() * c).real @ positions + R[None, :]
-        wann_centers += np.einsum("ij, ik-> jk", (c.conj() * c).real, p + R[None, :])
+        wann_centers += (
+            np.einsum("ij, ik-> jk", (c.conj() * c).real, p + R[None, :]) * Rdeg[iR]
+        )
     print(f"Wannier Centers: {wann_centers}")
     return wann_centers

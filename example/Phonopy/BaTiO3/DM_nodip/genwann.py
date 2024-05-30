@@ -17,7 +17,7 @@ params = dict(
     weight_func="unity",
     kmesh=(4, 4, 4),
     gamma=True,
-    kshift=(0.000, 0.001, 0.002),
+    kshift=(0.000, 0.000, 0.000),
 )
 downfolder = PhonopyDownfolder(phonopy_yaml=fname, mode="DM")
 downfolder.set_parameters(**params)
