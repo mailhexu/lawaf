@@ -8,13 +8,15 @@ def HR_to_k(HR, Rlist, kpts):
     return Hk
 
 
-def Hk_to_R(Hk, Rlist, kpts, kweights):
+def Hk_to_R(Hk, Rlist, kpts, kweights, Rdeg=None):
+    if Rdeg is None:
+        Rdeg = np.ones(Rlist.shape[0], dtype=float)
     phase = np.exp(-2.0j * np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
-    HR = np.einsum("klm, kr, k->rlm", Hk, phase, kweights)
+    HR = np.einsum("klm, kr, k, r->rlm", Hk, phase, kweights, rdeg)
     return HR
 
 
-def k_to_R(kpts, Rlist, Mk, kweights=None):
+def k_to_R(kpts, Rlist, Mk, kweights=None, Rdeg=None):
     """
     Transform k-space wavefunctions to real space.
     params:
@@ -26,12 +28,14 @@ def k_to_R(kpts, Rlist, Mk, kweights=None):
         MR: matrix of shape [nR, n1, n2], the matrix in R-space.
 
     """
+    if Rdeg is None:
+        Rdeg = np.ones(Rlist.shape[0], dtype=float)
     nkpt, n1, n2 = Mk.shape
     if kweights is None:
         kweights = np.ones(nkpt, dtype=float) / nkpt
     # phase=np.exp(-2.0j*np.pi*np.tensordot(kpts, Rlist, axes=([1], [1])))
     phase = np.exp(-2.0 * np.pi * 1j * np.einsum("kd, rd-> kr", kpts, Rlist))
-    MR = np.einsum("klm, kr, k -> rlm", Mk, phase, kweights)
+    MR = np.einsum("klm, kr, k, r -> rlm", Mk, phase, kweights, Rdeg)
     return MR
 
     # nkpt, n1, n2 = Mk.shape

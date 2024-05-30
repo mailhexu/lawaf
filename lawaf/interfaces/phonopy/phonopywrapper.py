@@ -279,6 +279,11 @@ class PhonopyWrapper:
             self._cache[key] = res
         return res
 
+    def remove_phase(self, Hk, k):
+        phase = np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
+        Hk *= phase
+        return Hk
+
     def assure_ASR(self, HR, Rlist):
         igamma = np.argmin(np.linalg.norm(Rlist, axis=1))
         shift = np.sum(np.sum(HR, axis=0), axis=0)

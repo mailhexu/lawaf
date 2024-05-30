@@ -116,10 +116,12 @@ class NACLWF:
     HR_total: np.ndarray = None
     NAC_phonon: PhonopyWrapper = None
     nac: bool = True
+    kpts: np.ndarray = None
+    wann_centers: np.ndarray = None
 
     def __post_init__(self):
         self.natoms = self.born.shape[0]
-        self.nwann = self.wannR.shape[1]
+        self.nwann = self.wannR.shape[2]
         self.nkpt = self.wannR.shape[0]
         self.nR = self.Rlist.shape[0]
         self.born_wann = self.get_born_wann()
@@ -127,15 +129,27 @@ class NACLWF:
         self.get_disp_wann()
         self.check_normalization()
 
-        nac_q = self._get_charge_sum(q=[0, 0, 0.001])
+        # nac_q = self._get_charge_sum(q=[0, 0, 0.001])
+        self.split_short_long_wang()
 
     def set_nac(self, nac=True):
         self.nac = nac
+
+    def remove_phase(self, Hk, k):
+        """
+        remove the phase of the R-vector
+        """
+        self.dr = self.wann_centers[None, :, :] - self.wann_centers[:, None, :]
+        phase = np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
+        return Hk * phase
 
     def get_born_wann(self):
         """
         get the Born effective charges in Wannier space.
         """
+        # born = self.born.reshape(3, self.natoms * 3)
+        # self.born_wan = np.einsum("Rji,kj->ik", self.wannR**2, born).real
+        # born = self.born.swapaxes(1,2).reshape( self.natoms * 3, 3)
         born = self.born.reshape(self.natoms * 3, 3)
         self.born_wan = np.einsum("Rji,jk->ik", self.wannR**2, born).real
         print(self.born_wan)
@@ -163,15 +177,42 @@ class NACLWF:
         masses = np.repeat(self.masses, 3)
         self.disp_wannR = self.wannR / np.sqrt(masses)[None, :, None]
 
+    def get_volume(self):
+        """
+        get the volume of the unit cell.
+        """
+        return np.linalg.det(self.NAC_phonon.atoms.get_cell())
+
     def get_constant_factor_wang(self, q):
         # unit_conversion * 4.0 * np.pi / volume / np.dot(q.T, np.dot(dielectric, q))
-        return self.factor * 4.0 * np.pi / np.dot(q.T, np.dot(self.dielectric, q))
+        return (
+            self.factor
+            * 4.0
+            * np.pi
+            / np.dot(q.T, np.dot(self.dielectric, q))
+            / self.get_volume()
+        )
 
-    def get_dipdip_wang_q(self, qpt):
-        nac_q = self._get_charge_sum(self.natoms, qpt, self.born)
+    def get_Hk_wang_long(self, qpt):
+        if np.linalg.norm(qpt) < 1e-6:
+            return np.zeros_like(self.HR_total[0])
+        nac_q = self._get_charge_sum(qpt)
         dd = nac_q * self.get_constant_factor_wang(qpt)
         mmat = np.sqrt(np.outer(self.masses_lwf, self.masses_lwf))
-        return dd / mmat
+        return self.remove_phase(dd / mmat, qpt)
+        # return dd / mmat
+
+    def split_short_long_wang(self):
+        # Hks_tot = k_to_R(self.kpts, self.Rlist, self.HR_total)
+        self.nkpt = len(self.kpts)
+        print(self.nwann)
+        Hks_short = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
+        for ik, kpt in enumerate(self.kpts):
+            Hk_tot = self.get_Hk_nac_total(kpt)
+            Hk_long = self.get_Hk_wang_long(kpt)
+            Hks_short[ik] = Hk_tot - Hk_long
+        HRs_short = k_to_R(self.kpts, self.Rlist, Hks_short)
+        self.HRs_wang_short = HRs_short
 
     def _get_charge_sum(self, q):
         nac_q = np.zeros((self.nwann, self.nwann), dtype="double", order="C")
@@ -221,17 +262,26 @@ class NACLWF:
     def get_Hk_nac_total(self, kpt):
         return R_to_onek(kpt, self.Rlist, self.HR_total)
 
-    def get_Hk(self, kpt):
+    def get_Hk(self, kpt, method="wang"):
         """
         get the Hamiltonian at k-point.
         """
         if self.nac:
             # return self.get_Hk_nac_total(kpt)
             # return self.get_Hk_nac(kpt)
-            Hk_short = self.get_Hk_short(kpt)
-            Hk_long = self.get_Hk_long(kpt)
-            Hk_tot = Hk_short + Hk_long
-            return Hk_tot
+            if method == "wang":
+                Hk_short = R_to_onek(kpt, self.Rlist, self.HRs_wang_short)
+                # Hk_short = self.get_Hk_nac_total(kpt)
+                Hk_long = self.get_Hk_wang_long(kpt)
+                # Hk_long =0
+                Hk_tot = Hk_short + Hk_long
+                return Hk_tot
+            else:
+                Hk_short = self.get_Hk_short(kpt)
+                Hk_long = self.get_Hk_long(kpt)
+                Hk_tot = Hk_short + Hk_long
+                return Hk_tot
+
         else:
             return self.get_Hk_noNAC(kpt)
         # return self.get_Hk_nac(kpt)
@@ -356,6 +406,11 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             Hwannk_total, self.kpts, self.Rlist, kweights=self.kweights
         )
 
+        wann_centers = get_wannier_centers(
+            wannR, self.Rlist, self.atoms.get_scaled_positions()
+        )
+        print(wann_centers)
+
         # save the lwf model into a NACLWF object
         self.ewf = NACLWF(
             born=self.born,
@@ -368,6 +423,8 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             HR_short=HwannR_short,
             HR_total=HwannR_total,
             NAC_phonon=self.model_NAC,
+            kpts=self.kpts,
+            wann_centers=wann_centers,
         )
 
         # if post_func is not None:
@@ -459,3 +516,17 @@ class PhonopyDownfolderWrapper:
             evals.append(e)
             evecs.append(v)
         return np.array(evals), np.array(evecs)
+
+
+def get_wannier_centers(wannR, Rlist, positions):
+    nR = len(Rlist)
+    nwann = wannR.shape[2]
+    wann_centers = np.zeros((nwann, 3), dtype=float)
+    natom = len(positions)
+    p = np.kron(positions, np.ones((3, 1)))
+    for iR, R in enumerate(Rlist):
+        c = wannR[iR, :, :]
+        # wann_centers += (c.conj() * c).real @ positions + R[None, :]
+        wann_centers += np.einsum("ij, ik-> jk", (c.conj() * c).real, p + R[None, :])
+    print(f"Wannier Centers: {wann_centers}")
+    return wann_centers

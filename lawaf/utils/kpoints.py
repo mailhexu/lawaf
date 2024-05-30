@@ -31,6 +31,52 @@ def build_Rgrid(R):
     return np.array(Rlist)
 
 
+def build_Rgrid_with_degeneracy(R):
+    """
+    Build R-point grid from the number
+    """
+    l1, l2, l3 = R
+    incs = [False, False, False]
+    if l1 % 2 == 0:
+        l1 += 1
+        incs[0] = True
+    if l2 % 2 == 0:
+        l2 += 1
+        incs[1] = True
+    if l3 % 2 == 0:
+        l3 += 1
+        incs[2] = True
+    ind = -1
+    Rlist = np.zeros((l1 * l2 * l3, 3), dtype=int)
+    deg = np.zeros((l1 * l2 * l3), dtype=float)
+    for i in range(0, l1):
+        R1 = i - l1 // 2
+        for j in range(0, l2):
+            R2 = j - l2 // 2
+            for k in range(0, l3):
+                R3 = k - l3 // 2
+                index = i * l2 * l3 + j * l3 + k
+                Rlist[index] = [R1, R2, R3]
+                deg[index] = 1
+                if (i == 0 or i == (l1 - 1)) and incs[0]:
+                    deg[index] /= 2.0
+                if (j == 0 or j == (l2 - 1)) and incs[1]:
+                    deg[index] /= 2.0
+                if (k == 0 or k == (l3 - 1)) and incs[2]:
+                    deg[index] /= 2.0
+    return Rlist, deg
+
+
+def test_build_Rgrid_with_degeneracy():
+    R = [2, 2, 2]
+    Rlist, deg = build_Rgrid_with_degeneracy(R)
+    print(Rlist)
+    print(deg)
+
+
+# test_build_Rgrid_with_degeneracy()
+
+
 def monkhorst_pack(size, gamma=True):
     """Construct a uniform sampling of k-space of given size.
     Modified from ase.dft.kpoints with gamma_center option added"""

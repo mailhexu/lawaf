@@ -141,7 +141,7 @@ class Wannierizer(BasicWannierizer):
     def set_params(self, params):
         pass
 
-    def get_wannier(self, Rlist=None):
+    def get_wannier(self, Rlist=None, Rdeg=None):
         """
         Calculate Wannier functions
         """
@@ -149,7 +149,7 @@ class Wannierizer(BasicWannierizer):
         self.get_Amn()
         self.get_wannk_and_Hk()
         if Rlist is not None:
-            lwf = self.k_to_R(Rlist=Rlist)
+            lwf = self.k_to_R(Rlist=Rlist, Rdeg=Rdeg)
             # lwf.atoms = copy.deepcopy(self.atoms)
         return lwf
 
@@ -214,12 +214,12 @@ class Wannierizer(BasicWannierizer):
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
 
-    def get_wannier_centers(self, wannR, Rlist, positions):
+    def get_wannier_centers(self, wannR, Rlist, Rdeg, positions):
         nR = len(Rlist)
         wann_centers = np.zeros((self.nwann, 3), dtype=float)
         for iR, R in enumerate(Rlist):
             c = wannR[iR, :, :]
-            wann_centers += (c.conj() * c).real @ positions + R[None, :]
+            wann_centers += (c.conj() * c).real @ (positions + R[None, :]) * Rdeg[iR]
             # wann_centers+=np.einsum('ij, ij, jk', c.conj())#(c.conj()*c).T.real@self.positions  + R[None, :]
         # print(f"Wannier Centers: {self.wann_centers}")
         return wann_centers
@@ -232,7 +232,7 @@ class Wannierizer(BasicWannierizer):
         for iwann in range(self.nwann):
             norm = np.trace(wannR[:, :, iwann].conj().T @ wannR[:, :, iwann])
 
-    def k_to_R(self, Rlist):
+    def k_to_R(self, Rlist, Rdeg):
         """
         Calculate Wannier function and Hamiltonian from K space to R space.
         """
@@ -241,8 +241,10 @@ class Wannierizer(BasicWannierizer):
         for iR, R in enumerate(Rlist):
             for ik, k in enumerate(self.kpts):
                 phase = np.exp(-2j * np.pi * np.dot(R, k))
-                HwannR[iR] += self.Hwann_k[ik, :, :] * phase * self.kweights[ik]
-                wannR[iR] += self.wannk[ik, :, :] * phase * self.kweights[ik]
+                HwannR[iR] += (
+                    self.Hwann_k[ik, :, :] * phase * self.kweights[ik] * Rdeg[ik]
+                )
+                wannR[iR] += self.wannk[ik, :, :] * phase * self.kweights[ik] * Rdeg[ik]
         self._assure_normalized(wannR)
         # wann_centers=self.get_wannier_centers(wannR, Rlist, positions)
         return LWF(
@@ -282,7 +284,7 @@ def Amnk_to_Hk(Amn, psi, Hk0, kpts):
     return np.array(Hk_prim)
 
 
-def Hk_to_Hreal(Hk, kpts, kweights, Rpts):
+def Hk_to_Hreal(Hk, kpts, kweights, Rpts, Rdeg):
     nbasis = Hk.shape[1]
     nk = len(kpts)
     nR = len(Rpts)
@@ -290,7 +292,7 @@ def Hk_to_Hreal(Hk, kpts, kweights, Rpts):
         HR = np.zeros((nR, nbasis, nbasis), dtype=complex)
         for ik, k in enumerate(kpts):
             phase = np.exp(-2j * np.pi * np.dot(R, k))
-            HR[iR] += Hk[ik] * phase * kweights[ik]
+            HR[iR] += Hk[ik] * phase * kweights[ik] * Rdeg[ik]
     return HR
 
 

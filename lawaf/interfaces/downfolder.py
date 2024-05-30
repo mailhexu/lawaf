@@ -14,7 +14,7 @@ from lawaf.wannierization import (
 from lawaf.params import WannierParams
 import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
-from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid
+from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid_with_degeneracy
 from lawaf.utils.kpoints import autopath
 
 
@@ -177,10 +177,7 @@ class Lawaf:
 
     def _prepare_Rlist(self):
         self.Rgrid = self.params.kmesh
-        if self.Rgrid is None:
-            self.Rlist = kmesh_to_R(self.params.kmesh)
-        else:
-            self.Rlist = build_Rgrid(self.Rgrid)
+        self.Rlist, self.Rdeg = build_Rgrid_with_degeneracy(self.Rgrid)
 
     def _prepare_eigen(self, has_phase=False):
         evals, evecs = self.model.solve_all(self.kpts)

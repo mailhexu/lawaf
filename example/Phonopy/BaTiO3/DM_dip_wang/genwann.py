@@ -16,10 +16,10 @@ params = dict(
     weight_func="unity",
     # weight_func="Fermi",
     weight_func_params=(-0, 1),
-    kmesh=(2, 2, 2),
+    kmesh=(6, 6, 6),
     gamma=True,
     kshift=(0.000, 0.000, 0.000),
-    enhance_Amn=3,
+    enhance_Amn=0,
 )
 downfolder = NACPhonopyDownfolder(
     phonopy_yaml=fname,
