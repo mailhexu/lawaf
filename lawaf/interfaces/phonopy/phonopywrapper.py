@@ -1,5 +1,9 @@
 import copy
+import os
 from typing import Type, Union
+import pickle
+import atexit
+import lzma
 from phonopy.structure.atoms import PhonopyAtoms
 from phonopy.structure.cells import Primitive
 from scipy.linalg import eigh
@@ -159,24 +163,29 @@ class PhonopyWrapper:
     phonon: Phonopy = None
 
     def __init__(
-        self, phonon=None, phonon_fname="phonopy_params.yaml", mode="ifc", has_nac=False
+        self,
+        phonon=None,
+        phonon_fname="phonopy_params.yaml",
+        mode="ifc",
+        is_nac=False,
+        use_cache=True,
     ):
         if phonon is not None:
             self.phonon = phonon
         else:
-            self.phonon = load(phonon_fname, is_nac=has_nac)
+            self.phonon = load(phonon_fname, is_nac=is_nac)
             print(f"Phonon loaded from file {phonon_fname} ")
-        if has_nac:
-            self.has_nac = True
+        if is_nac:
+            self.is_nac = True
             self.get_nac_params()
-            print("replace_phonon_dynamics_with_myGL")
+            # print("replace_phonon_dynamics_with_myGL")
             replace_phonon_dynamics_with_myGL(self.phonon)
         else:
-            self.has_nac = False
+            self.is_nac = False
 
-        # if self.has_nac:
+        # if self.is_nac:
         #    print(
-        #        f"Phonopy DM replaces with myGL. Has NAC: {self.has_nac} \n"
+        #        f"Phonopy DM replaces with myGL. Has NAC: {self.is_nac} \n"
         #        + f" born charges: {self.born}, dielectric constant: {self.dielectric}"
         #    )
 
@@ -194,25 +203,50 @@ class PhonopyWrapper:
         assert self.mode in ["ifc", "dm"]
         masses = np.kron(self.atoms.get_masses(), [1, 1, 1])
         self.Mmat = np.sqrt(masses[:, None] * masses[None, :])
+        self._use_cache = use_cache
+        self._prepare_cache()
+        atexit.register(self.save_cache)
+
+    def _prepare_cache(self):
+        if self._use_cache:
+            self._cache_file = "./phon_cache/cache.pickle"
+            # make cache directory
+            os.makedirs(os.path.dirname(self._cache_file), exist_ok=True)
+            if os.path.exists(self._cache_file):
+                with lzma.open(self._cache_file, "rb") as f:
+                    self._cache = pickle.load(f)
+            else:
+                self._cache = {}
+
+    def save_cache(self):
+        if self._use_cache:
+            with lzma.open(self._cache_file, "wb") as f:
+                pickle.dump(self._cache, f)
 
     def get_nac_params(self):
         nac_params = self.phonon.get_nac_params()
         self.born = nac_params["born"]
         self.dielectric = nac_params["dielectric"]
         self.factor = nac_params["factor"]
+        return self.born, self.dielectric, self.factor
 
     def _prepare(self):
         self.phonon.symmetrize_force_constants()
         # self.phonon.symmetrize_force_constants_by_space_group()
         pass
 
-    def solve(self, k):
+    def solve(self, k, output_H=False):
         # Hk = self.phonon.get_dynamical_matrix_at_q(k)
         if self.phonon._dynamical_matrix is None:
             msg = "Dynamical matrix has not yet built."
             raise RuntimeError(msg)
 
-        if self.has_nac:
+        key = (f"{k[0]:8.5f},{k[1]:8.5f},{k[2]:8.5f}", output_H)
+        if self._use_cache:
+            if key in self._cache:
+                return self._cache[key]
+
+        if self.is_nac:
             # replace_phonon_dynamics_with_myGL(self.phonon)
             # self.phonon._dynamical_matrix.run(k)
             # return self.phonon._dynamical_matrix.get_dynamical_matrix()
@@ -226,20 +260,24 @@ class PhonopyWrapper:
             Hk = self.phonon.get_dynamical_matrix_at_q(k)
         phase = np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
         Hk *= phase
-        if self.has_nac:
+        if self.is_nac:
             Hshort *= phase
             Hlong *= phase
         if self.mode == "ifc":
             Hk *= self.Mmat
-            if self.has_nac:
+            if self.is_nac:
                 Hshort *= self.Mmat
                 Hlong *= self.Mmat
         evals, evecs = eigh(Hk)
         evecs = align_all_degenerate_eigenvectors(evals, evecs)
-        if self.has_nac:
-            return evals, evecs, Hk, Hshort, Hlong
+        if output_H:
+            res = evals, evecs, Hk, Hshort, Hlong
         else:
-            return evals, evecs
+            res = evals, evecs
+
+        if self._use_cache:
+            self._cache[key] = res
+        return res
 
     def assure_ASR(self, HR, Rlist):
         igamma = np.argmin(np.linalg.norm(Rlist, axis=1))
@@ -278,27 +316,27 @@ class PhonopyWrapper:
         )
         # save_ifc_to_netcdf(fname, HR, Rpts, self.atoms)
 
-    def solve_all(self, kpts):
+    def solve_all(self, kpts, output_H=False):
         evals = []
         evecs = []
         Hks = []
         Hshorts = []
         Hlongs = []
-        if not self.has_nac:
+        if not output_H:
             for ik, k in enumerate(kpts):
                 evalue, evec = self.solve(k)
                 evals.append(evalue)
                 evecs.append(evec)
         else:
             for ik, k in enumerate(kpts):
-                evalue, evec, Hk, Hshort, Hlong = self.solve(k)
+                evalue, evec, Hk, Hshort, Hlong = self.solve(k, output_H=output_H)
                 evals.append(evalue)
                 evecs.append(evec)
                 Hks.append(Hk)
                 Hshorts.append(Hshort)
                 Hlongs.append(Hlong)
-        if self.has_nac:
-            return (
+        if output_H:
+            res = (
                 np.array(evals, dtype=float),
                 np.array(evecs, dtype=complex, order="C"),
                 np.array(Hks, dtype=complex, order="C"),
@@ -306,9 +344,11 @@ class PhonopyWrapper:
                 np.array(Hlongs, dtype=complex, order="C"),
             )
         else:
-            return np.array(evals, dtype=float), np.array(
+            res = np.array(evals, dtype=float), np.array(
                 evecs, dtype=complex, order="C"
             )
+        self.save_cache()
+        return res
 
     @property
     def positions(self):

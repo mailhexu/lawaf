@@ -29,7 +29,7 @@ class WannierParams:
     use_proj: bool = True
     exclude_bands: Tuple[int] = ()
     sort_cols: bool = True
-    pwf_order: int = 1
+    enhance_Amn: int = 0
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -78,6 +78,7 @@ def test_params():
         use_proj=True,
         exclude_bands=(),
         sort_cols=True,
+        enhance_Amn=False,
     )
     print(params.to_dict())
     params.to_yaml("params.yaml")

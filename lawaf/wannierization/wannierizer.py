@@ -196,7 +196,8 @@ class Wannierizer(BasicWannierizer):
         """
         for ik in range(self.nkpt):
             self.Amn[ik, :, :] = np.array(self.get_Amn_one_k(ik), dtype=complex)
-        Amn = enhance_A(self.Amn, self.evals.real)
+        if self.params.enhance_Amn:
+            Amn = enhance_Amn(self.Amn, self.evals.real, order=self.params.enhance_Amn)
         return self.Amn
 
     def get_wannk_and_Hk(self, shift=0.0):
@@ -293,7 +294,7 @@ def Hk_to_Hreal(Hk, kpts, kweights, Rpts):
     return HR
 
 
-def enhance_A(A, evals):
+def enhance_Amn(A, evals, order):
     """
     Enhance the A matrix by adding the eigenvalues to the diagonal.
     The idea is to treat A as an weight and do a statistics of the energy range.
@@ -325,10 +326,10 @@ def enhance_A(A, evals):
     occ = np.interp(evals, Egrid, wdos_tot)
 
     # plt.plot(Egrid, dos_tot)
-    plt.plot(Egrid, wdos_tot)
-    plt.show()
+    # plt.plot(Egrid, wdos_tot)
+    # plt.show()
 
-    occ = occ**2
+    occ = occ**order
     for ik in range(nk):
         A[ik, :, :] *= occ[ik, :, None]
         # print(f"Enhanced A: {A[ik, :, :]}")

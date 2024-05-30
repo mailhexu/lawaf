@@ -6,20 +6,22 @@ import matplotlib.pyplot as plt
 
 fname = "phonopy_params.yaml"
 params = dict(
-    method="scdmk",
+    method="projected",
     nwann=3,
     # selected_basis=[9, 10, 11],
     anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
     use_proj=True,
     weight_func_params=(10, 10),
-    # weight_func="unity",
+    weight_func="unity",
     # weight_func="Fermi",
-    kmesh=(2, 2, 2),
+    kmesh=(4, 4, 4),
     gamma=True,
-    # kshift=(0.000, 0.001, 0.002),
     kshift=(0.000, 0.000, 0.000),
+    enhance_Amn=0,
 )
-downfolder = PhonopyDownfolder(phonopy_yaml=fname, mode="DM", params=params)
+downfolder = NACPhonopyDownfolder(
+    phonopy_yaml=fname, mode="DM", params=params, born_filename="BORN"
+)
 downfolder.set_parameters(**params)
 for i in range(len(downfolder.kpts)):
     print(i, downfolder.kpts[i])
@@ -47,3 +49,4 @@ ax = downfolder.plot_band_fitting(
 )
 plt.savefig("LWF_BTO.pdf")
 plt.show()
+exit()

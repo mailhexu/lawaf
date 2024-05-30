@@ -86,7 +86,7 @@ class ProjectedWannierizer(Wannierizer):
                         psi_a,
                     )
                     * self.occ[iband]
-                ) ** self.params.pwf_order
+                )
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
 
