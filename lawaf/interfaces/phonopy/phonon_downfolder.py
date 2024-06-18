@@ -331,31 +331,26 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         except ImportError:
             raise ImportError("phonopy is needed. Do you have phonopy installed?")
         if phonon is None:
-            phonon = phonopy.load(*argv, **kwargs, is_nac=True)
-        # model = PhonopyWrapper(phonon, mode=mode, is_nac=True)
+            phonon = phonopy.load(*argv, **kwargs, is_nac=False)
         super().__init__(
-            phonon=phonon, mode=mode, params=params, is_nac=True, *argv, **kwargs
+            phonon=phonon, mode=mode, params=params, is_nac=False, *argv, **kwargs
         )
 
         self.model.get_nac_params()
-        self.model_NAC = self.model
+        # self.model_NAC = self.model
 
-        # if phonon_NAC is None:
-        #    phonon_NAC = phonopy.load(*argv, **kwargs)
-        # self.model_NAC = PhonopyWrapper(phonon_NAC, mode=mode, is_nac=True)
+        if phonon_NAC is None:
+            phonon_NAC = phonopy.load(*argv, **kwargs, is_nac=True)
+        self.model_NAC = PhonopyWrapper(phonon_NAC, mode=mode, is_nac=True)
 
-        self.born, self.dielectric, self.factor = self.model.get_nac_params()
-
-        self.born = self.model.born
-        self.dielectric = self.model.dielectric
-        self.factor = self.model.factor
+        self.born, self.dielectric, self.factor = self.model_NAC.get_nac_params()
 
         self.is_nac = True
         self.set_nac_params(
             # self.model_NAC.born, self.model_NAC.dielectric, self.model_NAC.factor
-            self.model.born,
-            self.model.dielectric,
-            self.model.factor,
+            self.model_NAC.born,
+            self.model_NAC.dielectric,
+            self.model_NAC.factor,
         )
 
     def get_Hks_with_nac(self, q):
