@@ -27,6 +27,16 @@ class MagnonWrapper:
         self.atoms = atoms
 
     @classmethod
+    def load_from_TB2J_pickle(cls, path, fname):
+        from TB2J.io_exchange import SpinIO
+
+        exc = SpinIO.load_pickle(path=path, fname=fname)
+        atoms = exc.atoms
+        HR = exc.get_full_Jtensor_for_Rlist(asr=True)
+        Rlist = exc.Rlist
+        return cls(HR=HR, Rlist=Rlist, atoms=atoms)
+
+    @classmethod
     def read_from_path_k(cls, path, kmesh):
         """
         Read from a Hk file and convert to HR
@@ -86,16 +96,22 @@ def test_MagnonWrapper():
 
 def easy_downfold_magnon(
     path,
-    index_metal,
+    index_baisis,
     kmesh=[9, 9, 9],
     weight_func="unity",
     weight_func_params=(0.00, 0.001),
+    TB2J_pickle_fname="TB2J.pickle",
     downfolded_pickle_fname="downfolded_HR.pickle",
     savefig="Downfolded_band.png",
+    Jq=False,
     **kwargs,
 ):
     path = Path(path).expanduser()
-    model = MagnonWrapper.read_from_path_k(path, kmesh)
+
+    if Jq:
+        model = MagnonWrapper.load_from_TB2J_pickle(path, TB2J_pickle_fname)
+    else:
+        model = MagnonWrapper.read_from_path_k(path, kmesh)
     wann = MagnonDownfolder(model)
     # Downfold the band structure.
     params = dict(
@@ -105,7 +121,7 @@ def easy_downfold_magnon(
         nwann=len(index_metal),
         weight_func=weight_func,
         weight_func_params=weight_func_params,
-        selected_basis=index_metal,
+        selected_basis=index_basis,
         # anchors={(0, 0, 0): (-1, -2, -3, -4)},
         # anchors={(0, 0, 0): ()},
         use_proj=True,
