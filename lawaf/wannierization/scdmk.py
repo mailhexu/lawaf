@@ -27,6 +27,7 @@ class ScdmkWannierizer(Wannierizer):
     """
     Build Wannier functions using the SCDMk method.
     """
+
     def set_params(self, params):
         self.psi_anchors = []
         self.cols = []
@@ -40,8 +41,6 @@ class ScdmkWannierizer(Wannierizer):
             self.set_anchors(params.anchors)
         else:
             self.auto_set_anchors(params.anchor_kpt)
-
-
 
     def set_selected_cols(self, cols):
         """
@@ -141,6 +140,8 @@ class ScdmkWannierizer(Wannierizer):
     def get_Amn_psi(self, psik, occ=None, projs=None):
         if self.use_proj:
             projs = np.einsum("iw,wb->b", self.psi_anchors, psik.conj())
+            projs = np.sqrt(np.abs(np.abs(projs)))
+            print(f"projs={projs}")
             if occ is None:
                 psi = psik[self.cols, :] * (projs)[None, :]
             else:

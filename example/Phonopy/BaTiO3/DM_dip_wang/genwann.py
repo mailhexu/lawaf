@@ -6,22 +6,23 @@ import matplotlib.pyplot as plt
 
 fname = "phonopy_params.yaml"
 params = dict(
-    # method="scdmk",
-    method="projected",
+    method="scdmk",
+    # method="projected",
     nwann=3,
     # selected_basis=[9, 10, 11],
     # nwann=15,
     # selected_basis=list(range(15)),
     anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
-    use_proj=False,
-    # weight_func="unity",
-    weight_func="Fermi",
+    use_proj=True,
+    weight_func="unity",
+    # weight_func="Fermi",
     weight_func_params=(-1, 1),
-    kmesh=(2, 2, 2),
+    kmesh=(6, 6, 6),
     gamma=True,
     kshift=(0.000, 0.000, 0.000),
     enhance_Amn=0,
 )
+
 downfolder = NACPhonopyDownfolder(
     phonopy_yaml=fname,
     mode="DM",
