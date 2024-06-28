@@ -141,7 +141,6 @@ class ScdmkWannierizer(Wannierizer):
         if self.use_proj:
             projs = np.einsum("iw,wb->b", self.psi_anchors, psik.conj())
             projs = np.sqrt(np.abs(np.abs(projs)))
-            print(f"projs={projs}")
             if occ is None:
                 psi = psik[self.cols, :] * (projs)[None, :]
             else:

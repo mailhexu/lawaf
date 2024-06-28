@@ -33,18 +33,34 @@ def select_wannierizer(method):
 
 
 class Lawaf:
-    params = {}
-    builder: Union[ProjectedWannierizer, ScdmkWannierizer] = None
-    model = None
-
     def __init__(self, model, params=None):
         """
         Setup the model
         """
+        self._params = {}
         self.model = model
-        self.params = {}
         self.builder = None
         self.Rgrid = None
+        self.params = params
+        self._prepare_data()
+
+    @property
+    def params(self):
+        return self._params
+
+    @params.setter
+    def params(self, params):
+        if isinstance(params, dict):
+            self.set_parameters(**params)
+        elif isinstance(params, WannierParams):
+            self._params = params
+        else:
+            self._params = WannierParams()
+        self.nwann = self.params.nwann
+        self.process_parameters()
+
+    def process_parameters(self):
+        pass
 
     def set_parameters(
         self,
@@ -53,7 +69,7 @@ class Lawaf:
         gamma=True,
         nwann=0,
         weight_func="unity",
-        weight_func_params={0, 0.01},
+        weight_func_params=(0, 0.01),
         selected_basis=None,
         anchors=None,
         anchor_kpt=(0, 0, 0),
@@ -91,7 +107,7 @@ class Lawaf:
         write_hr_txt: write the Hamiltonian into a txt file.
         """
 
-        self.params = WannierParams(
+        self._params = WannierParams(
             method=method,
             kmesh=kmesh,
             gamma=gamma,
@@ -106,10 +122,6 @@ class Lawaf:
             exclude_bands=exclude_bands,
             enhance_Amn=enhance_Amn,
         )
-
-        self.nwann = self.params.nwann
-
-        self._prepare_data()
 
     def _prepare_data(self):
         """
@@ -221,7 +233,7 @@ class Lawaf:
     ):
         self.params.update(params)
         self.atoms = self.model.atoms
-        self.ewf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
+        self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
 
         if not os.path.exists(output_path):
             os.makedirs(output_path)
@@ -235,7 +247,7 @@ class Lawaf:
         # if write_hr_nc is not None:
         #    # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         #    self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
-        return self.ewf
+        return self.lwf
 
     def plot_band_fitting(
         self,
@@ -297,7 +309,7 @@ class Lawaf:
             )
         if plot_downfolded:
             ax = plot_band(
-                self.ewf,
+                self.lwf,
                 kvectors=kvectors,
                 knames=knames,
                 supercell_matrix=supercell_matrix,
@@ -313,9 +325,9 @@ class Lawaf:
                 **kwargs,
             )
         if plot_nonac:
-            self.ewf.set_nac(False)
+            self.lwf.set_nac(False)
             ax = plot_band(
-                self.ewf,
+                self.lwf,
                 kvectors=kvectors,
                 knames=knames,
                 supercell_matrix=supercell_matrix,

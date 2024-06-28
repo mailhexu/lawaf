@@ -22,7 +22,6 @@ class PhononDownfolder(Lawaf):
                 self.atoms = self.model.atoms
             except Exception:
                 self.atoms = None
-        self.params = params
 
 
 class PhonopyDownfolder(PhononDownfolder):
@@ -41,23 +40,26 @@ class PhonopyDownfolder(PhononDownfolder):
             raise ImportError("phonopy is needed. Do you have phonopy installed?")
         if phonon is None:
             phonon = phonopy.load(*argv, **kwargs)
-        self.params = params
         self.mode = mode
         self.factor = 524.16  # to cm-1
-        self.convert_DM_parameters()
         self.is_nac = is_nac
         model = PhonopyWrapper(phonon, mode=mode, is_nac=self.is_nac)
-        super().__init__(model, atoms=model.atoms, params=self.params)
+        super().__init__(model, atoms=model.atoms, params=params)
 
     def convert_DM_parameters(self):
         """
         convert the parameters of the dynamical matrix. Unit from frequency cm-1 to
         eigenvalues in eV.
         """
-        if self.mode == "dm":
-            p = self.params["weight_func_params"]
+        if self.mode.lower() == "dm":
+            p = self.params.weight_func_params
+            print(f"Converted DM parameters from: {p}")
             p = [freqs_to_evals(pe, factor=self.factor) for pe in p]
-            self.params["weight_func_params"] = p
+            self.params.weight_func_params = p
+            print(f"Converted DM parameters to: {p}")
+
+    def process_parameters(self):
+        self.convert_DM_parameters()
 
     def downfold(
         self,
@@ -65,9 +67,8 @@ class PhonopyDownfolder(PhononDownfolder):
         output_path="./",
         write_hr_nc="LWF.nc",
         write_hr_txt="LWF.txt",
-        **params,
     ):
-        self.params.update(params)
+        # self.params.update(params)
         self.atoms = self.model.atoms
         self.ewf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
         if post_func is not None:
@@ -77,16 +78,14 @@ class PhonopyDownfolder(PhononDownfolder):
         try:
             self.save_info(output_path=output_path)
         except Exception as E:
-            print(E)
             pass
         if write_hr_txt is not None:
             self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
         if write_hr_nc is not None:
-            # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
             self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         return self.ewf
 
-    def downfold(self):
+    def downfold(self, output_path="./", write_hr_nc="LWF.nc", write_hr_txt="LWF.txt"):
         self.atoms = self.model.atoms
         self.builder.prepare()
         # compute the Amn matrix from phonons without NAC
@@ -107,9 +106,8 @@ class PhonopyDownfolder(PhononDownfolder):
         )
 
         # save the lwf model into a NACLWF object
-        self.ewf = LWF(
+        self.lwf = LWF(
             factor=self.factor,
-            masses=self.atoms.get_masses(),
             Rlist=self.Rlist,
             Rdeg=self.Rdeg,
             wannR=wannR,
@@ -117,7 +115,23 @@ class PhonopyDownfolder(PhononDownfolder):
             kpts=self.kpts,
             kweights=self.kweights,
             wann_centers=wann_centers,
+            atoms=self.atoms,
         )
+
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        try:
+            self.save_info(output_path=output_path)
+        except Exception as E:
+            pass
+        if write_hr_txt is not None:
+            self.lwf.save_txt(os.path.join(output_path, write_hr_txt))
+        if write_hr_nc is not None:
+            # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+            self.lwf.write_to_netcdf(
+                os.path.join(output_path, write_hr_nc), atoms=self.atoms
+            )
+        return self.lwf
 
 
 class NACPhonopyDownfolder(PhonopyDownfolder):
@@ -218,7 +232,6 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             born=self.born,
             dielectric=self.dielectic,
             factor=self.factor,
-            masses=self.atoms.get_masses(),
             Rlist=self.Rlist,
             Rdeg=self.Rdeg,
             wannR=wannR,
@@ -229,6 +242,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             kpts=self.kpts,
             kweights=self.kweights,
             wann_centers=wann_centers,
+            atoms=self.atoms,
         )
 
         # if post_func is not None:
@@ -304,5 +318,19 @@ def get_wannier_centers(wannR, Rlist, positions, Rdeg):
         wann_centers += (
             np.einsum("ij, ik-> jk", (c.conj() * c).real, p + R[None, :]) * Rdeg[iR]
         )
-    print(f"Wannier Centers: {wann_centers}")
     return wann_centers
+
+
+def get_wannier_masses(masses, wannR, Rlist, Rdeg):
+    """
+    Get the wannier masses from the atomic mases and the Wannier functions.
+    """
+    nR = len(Rlist)
+    nwann = wannR.shape[2]
+    nR, nbasis, nwann = wannR.shape
+    wann_masses = np.zeros(nwann, dtype=float)
+    masses3 = np.kron(masses, np.ones(3))
+    for iR, R in enumerate(Rlist):
+        c = wannR[iR, :, :]
+        wann_masses += np.einsum("ij, i-> j", (c.conj() * c).real, masses) * Rdeg[iR]
+    return wann_masses

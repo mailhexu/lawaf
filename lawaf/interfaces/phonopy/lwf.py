@@ -3,6 +3,7 @@ from scipy.linalg import eigh
 from dataclasses import dataclass
 from lawaf.mathutils.kR_convert import k_to_R, R_to_k, R_to_onek
 from .phonopywrapper import PhonopyWrapper
+from ase import Atoms
 
 
 @dataclass
@@ -13,17 +14,16 @@ class LWF:
         born: Born effective charges. (natoms, 3, 3)
         dielectric: dielectric tensor. (3, 3)
         factor: factor to convert the unit.
-        masses: masses of atoms. (natoms)
         Rlist: list of R-vectors. (nR, 3)
         wannR: Wannier functions in real space
         HR_total: total Hamiltonian in real space
         kpts: k-points
         kweights: weights of k-points
         wann_centers: centers of Wannier functions.
+        wann_masses: masses of Wannier functions.
     """
 
     factor: float = None
-    masses: np.ndarray = None
     Rlist: np.ndarray = None
     Rdeg: np.ndarray = None
     wannR: np.ndarray = None
@@ -31,24 +31,112 @@ class LWF:
     kpts: np.ndarray = None
     kweights: np.ndarray = None
     wann_centers: np.ndarray = None
+    wann_masses: np.ndarray = None
+    atoms: Atoms = None
 
     def __post_init__(self):
-        self.natoms = self.masses.shape[0]
-        self.nwann = self.wannR.shape[2]
-        self.nkpt = self.wannR.shape[0]
+        self.nR, self.nbasis, self.nwann = self.wannR.shape
+        self.natoms = self.nbasis // 3
         self.nR = self.Rlist.shape[0]
         self.check_normalization()
         self.get_masses_wann()
         self.get_disp_wann()
 
-    def write_wannier(self, filename):
+    def write_to_netcdf(self, filename, atoms=None):
         """
-        write the Wannier functions to file.
+        write the LWF to netcdf file.
         """
-        with open(filename, w) as f:
-            for i in range(self.nwann):
-                for j in range(self.nR):
-                    f.write(f"{self.wannR[j, :, i]}\n")
+        import xarray as xr
+
+        print(f"wann_masses: {self.wann_masses}")
+        ds = xr.Dataset(
+            {
+                "factor": self.factor,
+                "Rlist": (["nR", "dim"], self.Rlist),
+                "Rdeg": (["nR"], self.Rdeg),
+                "wannR": (
+                    ["ncplx", "nR", "nbasis", "nwann"],
+                    np.stack([np.real(self.wannR), np.imag(self.wannR)], axis=0),
+                ),
+                "Hwann_R": (
+                    ["ncplx", "nR", "nwann", "nwann"],
+                    np.stack([np.real(self.HR_total), np.imag(self.HR_total)], axis=0),
+                ),
+                "kpts": (["nkpt", "dim"], self.kpts),
+                "kweights": (["nkpt"], self.kweights),
+                "wann_centers": (["nwann", "dim"], self.wann_centers),
+                "wann_masses": (["nwann"], self.wann_masses.real),
+            }
+        )
+        ds.to_netcdf(filename, group="lwf", mode="w")
+
+        if atoms is not None:
+            ds = xr.Dataset(
+                {
+                    "positions": (["natom", "dim"], atoms.get_positions()),
+                    "masses": (["natom"], atoms.get_masses()),
+                    "cell": (["dim", "dim"], atoms.get_cell()),
+                    "atomic_numbers": (["natom"], atoms.get_atomic_numbers()),
+                }
+            )
+        ds.to_netcdf(filename, group="atoms", mode="a")
+
+    @classmethod
+    def load_from_netcdf(cls, filename):
+        """
+        load the LWF from netcdf file.
+        """
+        import xarray as xr
+
+        ds = xr.open_dataset(filename, group="lwf")
+        wannR = ds["wannR"].values[0] + 1j * ds["wannR"].values[1]
+        HR_total = ds["Hwann_R"].values[0] + 1j * ds["Hwann_R"].values[1]
+
+        ds_atoms = xr.open_dataset(filename, group="atoms")
+        atoms = Atoms(
+            positions=ds_atoms["positions"].values,
+            masses=ds_atoms["masses"].values,
+            cell=ds_atoms["cell"].values,
+            atomic_numbers=ds_atoms["atomic_numbers"].values,
+        )
+
+        return cls(
+            factor=ds.attrs["factor"],
+            masses=ds.attrs["masses"],
+            Rlist=ds["Rlist"].values,
+            Rdeg=ds["Rdeg"].values,
+            wannR=wannR,
+            HR_total=HR_total,
+            kpts=ds["kpts"].values,
+            kweights=ds["kweights"].values,
+            wann_centers=ds["wann_centers"].values,
+        )
+
+    def save_txt(self, fname):
+        with open(fname, "w") as myfile:
+            myfile.write(f"Number_of_R: {self.nR}\n")
+            myfile.write(f"Number_of_Wannier_functions: {self.nwann}\n")
+            # myfile.write(f"Cell parameter: {self.cell}\n")
+
+            myfile.write("Wannier functions:  \n" + "=" * 60 + "\n")
+            for iR, R in enumerate(self.Rlist):
+                myfile.write(f"index of R: {iR}.  R = {R}\n")
+                d = self.wannR[iR]
+                for i in range(self.nwann):
+                    for j in range(self.nbasis):
+                        myfile.write(f"i = {i}, j={j} :: WannR(i,j,R)= {d[j,i]:.4f} \n")
+                myfile.write("-" * 60 + "\n")
+
+            myfile.write("Hamiltonian:  \n" + "=" * 60 + "\n")
+            for iR, R in enumerate(self.Rlist):
+                myfile.write(f"index of R: {iR}.  R = {R}\n")
+                d = self.HR_total[iR]
+                for i in range(self.nwann):
+                    for j in range(self.nwann):
+                        myfile.write(
+                            f"R = {R}, i = {i}, j={j} :: H(i,j,R)= {d[i,j]:.4f} \n"
+                        )
+                myfile.write("-" * 60 + "\n")
 
     def remove_phase(self, Hk, k):
         """
@@ -63,12 +151,11 @@ class LWF:
         get the masses of lattice wannier functions.
         m_wann_i = sum_Rj m_j * WannR_Rji
         """
-        masses = np.repeat(self.masses, 3).real
-        self.masses_lwf = (
+        masses = np.repeat(self.atoms.get_masses(), 3)
+        self.wann_masses = (
             np.einsum("j,Rji->i", masses, self.wannR * self.wannR.conj())
             / self.wann_norm
         )
-        print(self.masses_lwf)
 
     def check_normalization(self):
         """
@@ -81,7 +168,7 @@ class LWF:
         """
         get the displacement of the LWF.
         """
-        masses = np.repeat(self.masses, 3)
+        masses = np.repeat(self.atoms.get_masses(), 3)
         self.disp_wannR = self.wannR / np.sqrt(masses)[None, :, None]
 
     def get_volume(self):
@@ -322,7 +409,7 @@ def get_wannier_centers(wannR, Rlist, positions, Rdeg):
         wann_centers += (
             np.einsum("ij, ik-> jk", (c.conj() * c).real, p + R[None, :]) * Rdeg[iR]
         )
-    print(f"Wannier Centers: {wann_centers}")
+    # print(f"Wannier Centers: {wann_centers}")
     return wann_centers
 
 

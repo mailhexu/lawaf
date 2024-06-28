@@ -1,0 +1,4 @@
+*.nc
+*.cif
+*cache*
+phon_cache/*
