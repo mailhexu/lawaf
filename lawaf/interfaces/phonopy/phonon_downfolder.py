@@ -128,9 +128,7 @@ class PhonopyDownfolder(PhononDownfolder):
             self.lwf.save_txt(os.path.join(output_path, write_hr_txt))
         if write_hr_nc is not None:
             # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
-            self.lwf.write_to_netcdf(
-                os.path.join(output_path, write_hr_nc), atoms=self.atoms
-            )
+            self.lwf.write_to_netcdf(os.path.join(output_path, write_hr_nc))
         return self.lwf
 
 

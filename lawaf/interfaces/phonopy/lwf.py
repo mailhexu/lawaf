@@ -1,9 +1,12 @@
-import numpy as np
-from scipy.linalg import eigh
 from dataclasses import dataclass
-from lawaf.mathutils.kR_convert import k_to_R, R_to_k, R_to_onek
-from .phonopywrapper import PhonopyWrapper
+
+import numpy as np
 from ase import Atoms
+from lawaf.mathutils.kR_convert import R_to_k, R_to_onek, k_to_R
+from scipy.linalg import eigh
+
+from .phonopywrapper import PhonopyWrapper
+from .lwf_supercell import write_lwf_cif
 
 
 @dataclass
@@ -15,8 +18,8 @@ class LWF:
         dielectric: dielectric tensor. (3, 3)
         factor: factor to convert the unit.
         Rlist: list of R-vectors. (nR, 3)
-        wannR: Wannier functions in real space
-        HR_total: total Hamiltonian in real space
+        wannR: Wannier functions in real space, (nR, nbasis, nwann)
+        HR_total: total Hamiltonian in real space (nR, nwann, nwann)
         kpts: k-points
         kweights: weights of k-points
         wann_centers: centers of Wannier functions.
@@ -32,6 +35,7 @@ class LWF:
     kweights: np.ndarray = None
     wann_centers: np.ndarray = None
     wann_masses: np.ndarray = None
+    wann_disps: np.ndarray = None
     atoms: Atoms = None
 
     def __post_init__(self):
@@ -42,7 +46,7 @@ class LWF:
         self.get_masses_wann()
         self.get_disp_wann()
 
-    def write_to_netcdf(self, filename, atoms=None):
+    def write_to_netcdf(self, filename):
         """
         write the LWF to netcdf file.
         """
@@ -58,6 +62,10 @@ class LWF:
                     ["ncplx", "nR", "nbasis", "nwann"],
                     np.stack([np.real(self.wannR), np.imag(self.wannR)], axis=0),
                 ),
+                "wann_disps": (
+                    ["nR", "nbasis", "nwann"],
+                    self.wann_disps,
+                ),
                 "Hwann_R": (
                     ["ncplx", "nR", "nwann", "nwann"],
                     np.stack([np.real(self.HR_total), np.imag(self.HR_total)], axis=0),
@@ -70,8 +78,9 @@ class LWF:
         )
         ds.to_netcdf(filename, group="lwf", mode="w")
 
+        atoms = self.atoms
         if atoms is not None:
-            ds = xr.Dataset(
+            ds2 = xr.Dataset(
                 {
                     "positions": (["natom", "dim"], atoms.get_positions()),
                     "masses": (["natom"], atoms.get_masses()),
@@ -79,7 +88,7 @@ class LWF:
                     "atomic_numbers": (["natom"], atoms.get_atomic_numbers()),
                 }
             )
-        ds.to_netcdf(filename, group="atoms", mode="a")
+            ds2.to_netcdf(filename, group="atoms", mode="a")
 
     @classmethod
     def load_from_netcdf(cls, filename):
@@ -138,6 +147,21 @@ class LWF:
                         )
                 myfile.write("-" * 60 + "\n")
 
+    def write_to_cif(
+        self, sc_matrix=None, center=True, amp=1.0, list_lwf=None, prefix="LWF"
+    ):
+        """
+        write the wannier functions to cif file.
+        """
+        write_lwf_cif(
+            lwf=self,
+            sc_matrix=sc_matrix,
+            center=center,
+            amp=amp,
+            list_lwf=list_lwf,
+            prefix=prefix,
+        )
+
     def remove_phase(self, Hk, k):
         """
         remove the phase of the R-vector
@@ -169,7 +193,7 @@ class LWF:
         get the displacement of the LWF.
         """
         masses = np.repeat(self.atoms.get_masses(), 3)
-        self.disp_wannR = self.wannR / np.sqrt(masses)[None, :, None]
+        self.wann_disps = self.wannR.real / np.sqrt(masses)[None, :, None]
 
     def get_volume(self):
         """
