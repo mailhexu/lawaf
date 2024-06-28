@@ -309,7 +309,7 @@ class NACLWF(LWF):
             return np.zeros_like(self.HR_total[0])
         nac_q = self._get_charge_sum(qpt)
         dd = nac_q * self.get_constant_factor_wang(qpt)
-        mmat = np.sqrt(np.outer(self.masses_lwf, self.masses_lwf))
+        mmat = np.sqrt(np.outer(self.wann_masses, self.wann_masses))
         return self.remove_phase(dd / mmat, qpt)
         # return dd / mmat
 

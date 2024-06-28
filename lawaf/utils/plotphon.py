@@ -5,7 +5,7 @@ from pyDFTutils.ase_utils.kpoints import kpath
 from phonopy import load
 
 
-def plot_phonon(path="./", color="blue", unit="cm^-1"):
+def plot_phonon(path="./", color="blue", unit="cm$^-1$"):
     # phonon=load(force_sets_filename="FORCE_SETS", born_filename="./BORN", unitcell_filename="POSCAR-unitcell",supercell_matrix=np.eye(3)*3 )
     phonon = load(phonopy_yaml=os.path.join(path, "phonopy_params.yaml"))
     cell = phonon._primitive.cell
@@ -30,7 +30,7 @@ def plot_phonon(path="./", color="blue", unit="cm^-1"):
     for x in xs_special:
         plt.axvline(x, color="gray", alpha=0.7)
     plt.xticks(xs_special, names)
-    plt.ylabel("Frequency (cm$^{-1}$)")
+    plt.ylabel("Frequency ($cm^{-1}$)")
     plt.show()
 
 

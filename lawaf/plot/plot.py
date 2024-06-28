@@ -32,7 +32,7 @@ def plot_band(
     efermi=None,
     erange=None,
     color="blue",
-    alpha=0.8,
+    alpha=0.4,
     marker="",
     label=None,
     cell=np.eye(3),
