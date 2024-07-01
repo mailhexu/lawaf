@@ -27,6 +27,7 @@ class WannierParams:
     anchor_kpt: Tuple[int] = (0, 0, 0)
     anchor_ibands: Union[None, List[int]] = None
     use_proj: bool = True
+    proj_order: int = 1
     exclude_bands: Tuple[int] = ()
     sort_cols: bool = True
     enhance_Amn: int = 0
@@ -76,6 +77,7 @@ def test_params():
         anchor_kpt=(0, 0, 0),
         anchro_ibands=[0, 1, 2],
         use_proj=True,
+        proj_order=1,
         exclude_bands=(),
         sort_cols=True,
         enhance_Amn=False,

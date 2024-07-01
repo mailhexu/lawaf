@@ -281,7 +281,7 @@ class NACLWF(LWF):
     def set_nac(self, nac=True):
         self.nac = nac
 
-    def get_born_wann(self):
+    def get_born_wann2(self):
         """
         get the Born effective charges in Wannier space.
         """
@@ -290,9 +290,15 @@ class NACLWF(LWF):
         # born = self.born.swapaxes(1,2).reshape( self.natoms * 3, 3)
         born = self.born.reshape(self.natoms * 3, 3)
         self.born_wan = np.einsum(
-            "Rji,jk->ik", self.wannR**2, born
-        )  # /self.wann_norm[None, :]
+            "Rji,jk->ik", self.wannR, born
+        )  # /self.wann_norm[None, :]**2
         print(self.born_wan)
+
+    def get_born_wann(self):
+        born = self.born.reshape(self.natoms * 3, 3)
+        masses = np.repeat(self.atoms.get_masses(), 3)
+        sqrtm = np.sqrt(masses)
+        self.born_wan = np.einsum("Rji,jk->ik", self.wannR, born / sqrtm[:, None])
 
     def get_constant_factor_wang(self, q):
         # unit_conversion * 4.0 * np.pi / volume / np.dot(q.T, np.dot(dielectric, q))
@@ -309,8 +315,9 @@ class NACLWF(LWF):
             return np.zeros_like(self.HR_total[0])
         nac_q = self._get_charge_sum(qpt)
         dd = nac_q * self.get_constant_factor_wang(qpt)
-        mmat = np.sqrt(np.outer(self.wann_masses, self.wann_masses))
-        return self.remove_phase(dd / mmat, qpt)
+        # mmat = np.sqrt(np.outer(self.wann_masses, self.wann_masses))
+        mmat = np.ones((self.nwann, self.nwann))
+        return self.remove_phase(dd / mmat, qpt) * 1.0
         # return dd / mmat
 
     def split_short_long_wang(self):
@@ -328,7 +335,7 @@ class NACLWF(LWF):
     def _get_charge_sum(self, q):
         nac_q = np.zeros((self.nwann, self.nwann), dtype="double", order="C")
         A = np.dot(self.born_wan, q)
-        nac_q = np.outer(A, A)
+        nac_q = np.outer(A.conj(), A)
         # for i in range(num_atom):
         #    for j in range(num_atom):
         #        nac_q[i, j] = np.outer(A[i], A[j])

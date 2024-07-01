@@ -32,6 +32,7 @@ class ScdmkWannierizer(Wannierizer):
         self.psi_anchors = []
         self.cols = []
         self.use_proj = params.use_proj
+        self.proj_order = params.proj_order
         self.projs = np.zeros((self.nkpt, self.nband), dtype=float)
         self.sort_cols = params.sort_cols
 
@@ -123,7 +124,9 @@ class ScdmkWannierizer(Wannierizer):
                     psi_kb = psik[:, iband]
                     for psi_a in self.psi_anchors:
                         p = np.vdot(psi_kb, psi_a)
-                        self.projs[ikpt, iband] += np.real(np.conj(p) * p)
+                        self.projs[ikpt, iband] += np.real(np.conj(p) * p) ** (
+                            self.proj_order
+                        )
         else:
             self.projs[:, :] = 1.0
         return self.projs

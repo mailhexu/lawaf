@@ -75,6 +75,7 @@ class Lawaf:
         anchor_kpt=(0, 0, 0),
         kshift=np.array([1e-7, 2e-8, 3e-9]),
         use_proj=True,
+        proj_order=1,
         exclude_bands=[],
         post_func=None,
         enhance_Amn=0,
@@ -119,6 +120,7 @@ class Lawaf:
             anchor_kpt=anchor_kpt,
             kshift=kshift,
             use_proj=use_proj,
+            proj_order=proj_order,
             exclude_bands=exclude_bands,
             enhance_Amn=enhance_Amn,
         )
