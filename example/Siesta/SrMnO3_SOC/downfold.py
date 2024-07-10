@@ -3,24 +3,20 @@ import numpy as np
 
 
 def main():
-    downfolder = SiestaDownfolder(
-        folder=".", fdf_file="siesta.fdf", format="sparse", nbands=50
-    )
-    downfolder.downfold(
+    params = dict(
         method="scdmk",
         kmesh=[5, 5, 5],
         nwann=4,
-        weight_func="window",
-        mu=-1,
-        sigma=7,
-        use_proj=False,
+        weight_func="Gauss",
+        weight_func_params=(3, 3),
+        use_proj=True,
         selected_basis=None,
         anchors={(0.0, 0.0, 0): [46, 47, 48, 49]},
         exclude_bands=[],
-        write_hr_nc="Downfolded_hr.nc",
-        write_hr_txt="Downfolded_hr.txt",
     )
 
+    downfolder = SiestaDownfolder(fdf_fname="siesta.fdf", params=params)
+    downfolder.downfold()
     downfolder.plot_band_fitting(
         kvectors=np.array(
             [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]

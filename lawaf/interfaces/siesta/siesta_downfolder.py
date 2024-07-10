@@ -1,6 +1,6 @@
 import os
 import json
-import sisl
+from HamiltonIO.siesta import SislParser
 from lawaf.interfaces.downfolder import Lawaf
 from lawaf.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 
@@ -8,6 +8,13 @@ __all__ = ["SiestaDownfolder"]
 
 
 class SislDownfolder(Lawaf):
+    def __init__(self, fdf_fname=None, ispin=None, params=None):
+        parser = SislParser(fdf_fname)
+        model = parser.get_model()
+        super().__init__(model, params=params)
+
+
+class DeprecatedSislDownfolder(Lawaf):
     def __init__(
         self,
         folder=None,
