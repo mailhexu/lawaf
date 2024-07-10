@@ -70,9 +70,9 @@ class PhonopyDownfolder(PhononDownfolder):
     ):
         # self.params.update(params)
         self.atoms = self.model.atoms
-        self.ewf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
+        self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
         if post_func is not None:
-            post_func(self.ewf)
+            post_func(self.lwf)
         if not os.path.exists(output_path):
             os.makedirs(output_path)
         try:
@@ -80,10 +80,10 @@ class PhonopyDownfolder(PhononDownfolder):
         except Exception as E:
             pass
         if write_hr_txt is not None:
-            self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
+            self.lwf.save_txt(os.path.join(output_path, write_hr_txt))
         if write_hr_nc is not None:
-            self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
-        return self.ewf
+            self.lwf.write_nc(os.path.join(output_path, write_hr_nc))
+        return self.lwf
 
     def downfold(self, output_path="./", write_hr_nc="LWF.nc", write_hr_txt="LWF.txt"):
         self.atoms = self.model.atoms
@@ -226,7 +226,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         )
 
         # save the lwf model into a NACLWF object
-        self.ewf = NACLWF(
+        self.lwf = NACLWF(
             born=self.born,
             dielectric=self.dielectic,
             factor=self.factor,
@@ -287,7 +287,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         """
         Interpolate Wannier functions from real space to k-space.
         """
-        wannk = R_to_onek(qpt, self.Rlist, self.ewf.wannR)
+        wannk = R_to_onek(qpt, self.Rlist, self.lwf.wannR)
         return wannk
 
     def get_wannier_nac(self, Rlist=None):
