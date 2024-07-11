@@ -7,12 +7,12 @@ def main():
     params = dict(
         method="scdmk",
         kmesh=(4, 4, 4),
-        nwann=3,
+        nwann=5,
         weight_func="Gauss",
         weight_func_params=(10.0, 3.0),
         selected_basis=None,
         # anchors={(0, 0, 0): (12,13)},
-        anchors={(0, 0, 0): (9, 10, 11)},
+        # anchors={(0, 0, 0): (9, 10, 11)},
         use_proj=False,
     )
 

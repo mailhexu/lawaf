@@ -79,6 +79,7 @@ class Lawaf:
         exclude_bands=[],
         post_func=None,
         enhance_Amn=0,
+        selected_orbdict=None,
     ):
         """
         Downfold the Band structure.
@@ -123,6 +124,7 @@ class Lawaf:
             proj_order=proj_order,
             exclude_bands=exclude_bands,
             enhance_Amn=enhance_Amn,
+            selected_orbdict=selected_orbdict,
         )
 
     def _prepare_data(self):
@@ -144,6 +146,7 @@ class Lawaf:
             kpts=self.kpts,
             kweights=self.kweights,
             params=self.params,
+            Sk=self.Sk,
         )
 
     def _prepare_positions(self):
@@ -194,7 +197,8 @@ class Lawaf:
         self.Rlist, self.Rdeg = build_Rgrid_with_degeneracy(self.Rgrid)
 
     def _prepare_eigen(self, has_phase=False):
-        evals, evecs = self.model.solve_all(self.kpts)
+        # evals, evecs = self.model.solve_all(self.kpts)
+        H, S, evals, evecs = self.model.HS_and_eigen(self.kpts)
         # remove e^ikr from wfn
         self.has_phase = has_phase
         if not has_phase:
@@ -203,6 +207,12 @@ class Lawaf:
             self._remove_phase(evecs)
         self.evals = evals
         self.evecs = evecs
+        if not self.model.is_orthogonal:
+            self.is_orthogonal = False
+            self.Sk = S
+        else:
+            self.is_orthogonal = True
+            self.Sk = None
         return self.evals, self.evecs
 
     def _remove_phase_k(self, wfnk, k, positions):

@@ -7,10 +7,37 @@ from lawaf.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 __all__ = ["SiestaDownfolder"]
 
 
+def filter_orbs(orbs, orbdict):
+    """
+    Filter the orbitals based on the orbdict
+    orbs: the orbital names to be filtered
+    orbdict: a dictionary with the format like {"element": ("3d", "4s")}
+    """
+    selected_indices = []
+    selected_orbs = []
+    for iorb, orb in enumerate(orbs):
+        segments = orb.split("|")
+        for key, val in orbdict.items():
+            if segments[0].startswith(key):
+                for o in val:
+                    if segments[1].startswith(o) and segments[1].endswith("Z1"):
+                        selected_indices.append(iorb)
+                        selected_orbs.append(orb)
+    return selected_indices, selected_orbs
+
+
 class SislDownfolder(Lawaf):
     def __init__(self, fdf_fname=None, ispin=None, params=None):
-        parser = SislParser(fdf_fname)
+        parser = SislParser(fdf_fname, ispin=ispin)
         model = parser.get_model()
+        if params["selected_orbdict"] is not None:
+            # ind, orbs = filter_orbs(model.orbs, {"Fe": ("3d", "4s")})
+            ind, orbs = filter_orbs(model.orbs, params["selected_orbdict"])
+        print(f"Selected indices: {ind}")
+        print(f"Selected orbs: {orbs}")
+        params["selected_basis"] = ind
+        params["nwann"] = len(ind)
+        print(params)
         super().__init__(model, params=params)
 
 

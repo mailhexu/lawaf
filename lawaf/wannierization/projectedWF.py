@@ -35,6 +35,7 @@ class ProjectedWannierizer(Wannierizer):
         assert (
             len(self.projectors) == self.nwann
         ), "The number of projectors != number of wannier functions"
+        self.projectors = np.array(self.projectors)
 
     def set_projectors_with_basis(self, ibasis):
         self.projectors = []
@@ -45,6 +46,7 @@ class ProjectedWannierizer(Wannierizer):
         assert (
             len(self.projectors) == self.nwann
         ), "The number of projectors != number of wannier functions"
+        self.projectors = np.array(self.projectors)
 
     def set_projectors(self, projectors):
         """
@@ -62,11 +64,35 @@ class ProjectedWannierizer(Wannierizer):
         Amn_0 is then orthogonalized using svd.
         """
         A = np.zeros((self.nband, self.nwann), dtype=complex)
-        for iband in range(self.nband):
-            for iproj, psi_a in enumerate(self.projectors):
-                A[iband, iproj] = (
-                    np.vdot(self.get_psi_k(ik)[:, iband], psi_a) * self.occ[ik, iband]
-                )
+        if self.is_orthogonal:
+            # A=np.einsum('ob, wo, b ->bw', self.get_psi_k(ik).conj(), self.projectors, self.occ[ik])
+            A = (
+                self.get_psi_k(ik).conj().T
+                @ self.projectors.T
+                * self.occ[ik][:, np.newaxis]
+            )
+        else:
+            # A = self.get_psi_k(ik).conj().T @ self.projectors * self.occ[ik][:, np.newaxis]
+            # A=np.einsum('ob, wo, b ->bw', self.get_psi_k(ik).conj(), self.projectors, self.occ[ik])
+            # A=np.einsum('ob, ow, b ->bw', self.get_psi_k(ik).conj(), self.projectors, self.occ[ik])
+            A = (
+                self.get_psi_k(ik).conj().T
+                @ self.S[ik]
+                @ self.projectors.T
+                * self.occ[ik][:, np.newaxis]
+            )
+            # A = self.get_psi_k(ik).conj().T @ self.projectors.T * self.occ[ik][:, np.newaxis]
+        # for iband in range(self.nband):
+        #    for iproj, psi_a in enumerate(self.projectors):
+        #        if  self.is_orthogonal:
+        #            A[iband, iproj] = (
+        #                np.vdot(self.get_psi_k(ik)[:, iband], psi_a) * self.occ[ik, iband])
+        #        else:
+        #            A[iband, iproj] = (
+        #                np.vdot(self.get_psi_k(ik)[:, iband]@self.S[ik], psi_a) * self.occ[ik, iband]
+        #                #np.vdot(self.get_psi_k(ik)[:, iband], psi_a) * self.occ[ik, iband]
+        #         )
+
         # using einsum
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT

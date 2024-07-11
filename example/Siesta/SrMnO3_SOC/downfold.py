@@ -4,15 +4,20 @@ import numpy as np
 
 def main():
     params = dict(
-        method="scdmk",
+        method="projected",
         kmesh=[5, 5, 5],
-        nwann=4,
+        # nwann=4,
         weight_func="Gauss",
         weight_func_params=(3, 3),
         use_proj=True,
-        selected_basis=None,
-        anchors={(0.0, 0.0, 0): [46, 47, 48, 49]},
+        # selected_basis=None,
+        # anchors={(0.0, 0.0, 0): [46, 47, 48, 49]},
         exclude_bands=[],
+        # selected_orbdict={"Mn":["3dxy", "3dyz", "3dxz"]}
+        # selected_orbdict={"Mn":["3dx2-y2", "3dz2"]}
+        # selected_orbdict={"Mn":["3d"], "O":["2p"]}
+        selected_orbdict={"Mn": ["3d"]},
+        enhance_Amn=2,
     )
 
     downfolder = SiestaDownfolder(fdf_fname="siesta.fdf", params=params)

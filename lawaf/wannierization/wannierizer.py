@@ -318,10 +318,19 @@ def enhance_Amn(A, evals, order):
         wdosE = np.zeros_like(Egrid)
         dosE = np.zeros_like(Egrid)
         for iband in range(nband):
-            wdosE += wk[iband] * erfc((Egrid - evals[ik, iband]) / dE / 5)
-            dosE += erfc((Egrid - evals[ik, iband]) / dE / 5)
+            f = erfc((Egrid - evals[ik, iband]) / dE)
+            wdosE += wk[iband] * f
+            dosE += f
         dos_tot += dosE
         wdos_tot += wdosE / dosE
+        # per k
+        occ = np.interp(evals, Egrid, wdos_tot)
+        occ = occ**order
+        A[ik, :, :] *= occ[ik, :, None]
+        U, _, VT = svd(A[ik, :, :], full_matrices=False)
+        A[ik, :, :] = U @ VT
+    return A
+
     # wdos_tot /= dos_tot
     # interpolate the dos_tot
     occ = np.interp(evals, Egrid, wdos_tot)

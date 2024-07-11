@@ -31,6 +31,7 @@ class WannierParams:
     exclude_bands: Tuple[int] = ()
     sort_cols: bool = True
     enhance_Amn: int = 0
+    selected_orbdict = None
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
