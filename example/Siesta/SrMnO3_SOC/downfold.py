@@ -15,9 +15,9 @@ def main():
         exclude_bands=[],
         # selected_orbdict={"Mn":["3dxy", "3dyz", "3dxz"]}
         # selected_orbdict={"Mn":["3dx2-y2", "3dz2"]}
-        # selected_orbdict={"Mn":["3d"], "O":["2p"]}
-        selected_orbdict={"Mn": ["3d"]},
-        enhance_Amn=2,
+        selected_orbdict={"Mn": ["3d"], "O": ["2p"]},
+        # selected_orbdict={"Mn": ["3d"]},
+        enhance_Amn=1,
     )
 
     downfolder = SiestaDownfolder(fdf_fname="siesta.fdf", params=params)

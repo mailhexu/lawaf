@@ -205,11 +205,19 @@ class Wannierizer(BasicWannierizer):
         """
         for ik in range(self.nkpt):
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
+            # if self.is_orthogonal:
             h = (
                 self.Amn[ik, :, :].T.conj()
                 @ np.diag(self.get_eval_k(ik) + shift)
                 @ self.Amn[ik, :, :]
             )
+            # else:  # No need.
+            #    h = (
+            #        self.Amn[ik, :, :].T.conj()
+            #        @ np.diag(self.get_eval_k(ik) + shift)
+            #        @ self.S[ik]
+            #        @ self.Amn[ik, :, :]
+            #        )
             self.Hwann_k[ik] = h
         return self.wannk, self.Hwann_k
 
