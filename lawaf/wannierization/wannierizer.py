@@ -330,7 +330,7 @@ def enhance_Amn(A, evals, order):
             wdosE += wk[iband] * f
             dosE += f
         dos_tot += dosE
-        wdos_tot += wdosE / dosE
+        wdos_tot += wdosE / (dosE + 1e-5)
         # per k
         occ = np.interp(evals, Egrid, wdos_tot)
         occ = occ**order

@@ -5,10 +5,10 @@ import numpy as np
 def main():
     params = dict(
         method="projected",
-        kmesh=[5, 5, 5],
+        kmesh=[6, 6, 6],
         # nwann=4,
         weight_func="Gauss",
-        weight_func_params=(3, 3),
+        weight_func_params=(-4, 3),
         use_proj=True,
         # selected_basis=None,
         # anchors={(0.0, 0.0, 0): [46, 47, 48, 49]},
@@ -30,7 +30,7 @@ def main():
         supercell_matrix=None,
         npoints=100,
         efermi=None,
-        erange=[-6, 8],
+        erange=[-10, 8],
         fullband_color="blue",
         downfolded_band_color="green",
         marker="o",

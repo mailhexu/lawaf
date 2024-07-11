@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 from lawaf.plot import plot_band
 from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid_with_degeneracy
 from lawaf.utils.kpoints import autopath
+from lawaf.mathutils.kR_convert import k_to_R
+from lawaf.lwf.ewf import EWF
 
 
 def select_wannierizer(method):
@@ -245,7 +247,11 @@ class Lawaf:
     ):
         self.params.update(params)
         self.atoms = self.model.atoms
-        self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
+        # self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
+        wannk, Hwannk = self.builder.get_wannk_and_Hk()
+        wannR = k_to_R(self.kpts, self.Rlist, wannk)
+        HwannR = k_to_R(self.kpts, self.Rlist, Hwannk)
+        # self.lwf
 
         if not os.path.exists(output_path):
             os.makedirs(output_path)
