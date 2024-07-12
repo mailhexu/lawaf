@@ -1,6 +1,13 @@
-import os
 import json
+import os
+
 from HamiltonIO.siesta import SislParser
+
+try:
+    import sisl
+except ImportError:
+    print("sisl is not installed. Please install it to use this module.")
+
 from lawaf.interfaces.downfolder import Lawaf
 from lawaf.wrapper.sislwrapper import SislHSWrapper, SislWFSXWrapper
 
@@ -30,15 +37,31 @@ class SislDownfolder(Lawaf):
     def __init__(self, fdf_fname=None, ispin=None, params=None):
         parser = SislParser(fdf_fname, ispin=ispin)
         model = parser.get_model()
+        self.select_projectors(model, params)
+        super().__init__(model, params=params)
+
+    def select_projectors(self, model, params):
+        """
+        Select the projectors based on the selected basis
+        """
         if params["selected_orbdict"] is not None:
             # ind, orbs = filter_orbs(model.orbs, {"Fe": ("3d", "4s")})
             ind, orbs = filter_orbs(model.orbs, params["selected_orbdict"])
-        print(f"Selected indices: {ind}")
-        print(f"Selected orbs: {orbs}")
+        print("-" * 80)
+        print(f"Selecting the orbitals {params['selected_orbdict']}")
+        print(f"{len(ind)} orbitals are selected.")
+        print("  No.     Orbital_name    I_orb")
+        for i, (iorb, orb) in enumerate(zip(ind, orbs)):
+            print(f"{i+1:4d} :    {orb:30s}    {iorb:6d}")
+        print("-" * 80)
         params["selected_basis"] = ind
         params["nwann"] = len(ind)
-        print(params)
-        super().__init__(model, params=params)
+        self.wann_names = orbs
+
+    def downfold(self, *args, **kwargs):
+        self.lwf = super().downfold(*args, **kwargs)
+        self.lwf.wann_names = self.wann_names
+        return self.lwf
 
 
 class DeprecatedSislDownfolder(Lawaf):
@@ -90,7 +113,7 @@ class DeprecatedSislDownfolder(Lawaf):
             H = fdf.read_hamiltonian()
             try:
                 self.efermi = fdf.read_fermi_level().data[0]
-            except:
+            except Exception:
                 self.efermi = fdf.read_fermi_level()
             if recover_fermi:
                 self.shift_fermi = self.efermi
@@ -108,7 +131,7 @@ class DeprecatedSislDownfolder(Lawaf):
             spin = sisl.Spin(fdf.get("Spin"))
             try:
                 self.efermi = fdf.read_fermi_level().data[0]
-            except:
+            except Exception:
                 self.efermi = fdf.read_fermi_level()
 
             # Eigen values in WFSX sile are not shifted by default
@@ -164,7 +187,7 @@ class DeprecatedSislDownfolder(Lawaf):
         """
 
         # all_coeffs = DataArray(self.ewf.wannR, dims=('k', 'orb', 'wannier'))
-        wannR = self.ewf.wannR
+        # wannR = self.ewf.wannR
 
         # Use the geometry of the hamiltonian if the user didn't provide one (usual case)
         if geom is None:
@@ -176,14 +199,14 @@ class DeprecatedSislDownfolder(Lawaf):
 
         # Get the coefficients of that we want
         # coeffs = all_coeffs.sel(wannier=i)
-        coeffi = wannR[:, :, i]
+        # coeffi = wannR[:, :, i]
         # if k is None:
         #    coeffs = coeffs.mean('k')
         # else:
         #    coeffs = coeffs.sel(k=k)
 
         # Project the orbitals with the coefficients on the grid
-        wavefunction(coeffs, grid, geometry=geom)
+        # wavefunction(coeffs, grid, geometry=geom)
 
         return grid
 

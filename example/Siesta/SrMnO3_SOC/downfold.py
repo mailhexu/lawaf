@@ -1,11 +1,12 @@
-from lawaf.interfaces import SiestaDownfolder
 import numpy as np
+
+from lawaf.interfaces import SiestaDownfolder
 
 
 def main():
     params = dict(
         method="projected",
-        kmesh=[6, 6, 6],
+        kmesh=[4, 4, 4],
         # nwann=4,
         weight_func="Gauss",
         weight_func_params=(-4, 3),
@@ -21,7 +22,8 @@ def main():
     )
 
     downfolder = SiestaDownfolder(fdf_fname="siesta.fdf", params=params)
-    downfolder.downfold()
+    wann = downfolder.downfold()
+    wann.save_pickle("wannier.pickle")
     downfolder.plot_band_fitting(
         kvectors=np.array(
             [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]
