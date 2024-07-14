@@ -72,7 +72,7 @@ class Lawaf:
         selected_basis=None,
         anchors=None,
         anchor_kpt=(0, 0, 0),
-        kshift=np.array([1e-7, 2e-8, 3e-9]),
+        kshift=np.array([0, 0, 0], dtype=float),
         use_proj=True,
         proj_order=1,
         exclude_bands=[],
@@ -197,7 +197,10 @@ class Lawaf:
 
     def _prepare_eigen(self, has_phase=False):
         # evals, evecs = self.model.solve_all(self.kpts)
-        H, S, evals, evecs = self.model.HS_and_eigen(self.kpts)
+        if self.model.is_orthogonal:
+            evals, evecs = self.model.solve_all(self.kpts)
+        else:
+            H, S, evals, evecs = self.model.HS_and_eigen(self.kpts)
         # remove e^ikr from wfn
         self.has_phase = has_phase
         if not has_phase:

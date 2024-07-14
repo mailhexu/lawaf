@@ -1,10 +1,11 @@
-from dataclasses import dataclass
-from typing import Tuple, Union, List
-import json
-import yaml
-import numpy as np
 import copy
+import json
+from dataclasses import dataclass
+from typing import List, Tuple, Union
+
+import numpy as np
 import toml
+import yaml
 
 
 @dataclass
@@ -15,7 +16,7 @@ class WannierParams:
 
     method = "scdmk"
     kmesh: Tuple[int] = (5, 5, 5)
-    kshift = np.array([1e-7, 3e-6, 5e-9])
+    kshift = np.array([0, 0, 0], dtype=float)
     kpts = None
     kweights = None
     gamma: bool = True

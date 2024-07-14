@@ -12,7 +12,7 @@ def Hk_to_R(Hk, Rlist, kpts, kweights, Rdeg=None):
     if Rdeg is None:
         Rdeg = np.ones(Rlist.shape[0], dtype=float)
     phase = np.exp(-2.0j * np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
-    HR = np.einsum("klm, kr, k, r->rlm", Hk, phase, kweights, rdeg)
+    HR = np.einsum("klm, kr, k, r->rlm", Hk, phase, kweights, Rdeg)
     return HR
 
 
@@ -62,17 +62,16 @@ def R_to_k(kpts, Rlist, MR):
 
     """
     # phase = np.exp(2.0*np.pi*1j*np.tensordot(kpts, Rlist, axes=([1], [1])))
-    phase = np.exp(2.0 * np.pi * 1j * np.einsum("kd, rd-> kr", kpts, Rlist))
+    phase = np.exp(2.0j * np.pi * np.einsum("kd, rd-> kr", kpts, Rlist))
     Mk = np.einsum("rlm, kr -> klm", MR, phase)
     return Mk
 
-    nkpt, n1, n2 = Mk.shape
-    nR = Rlist.shape[0]
-    Mk = np.zeros((nkpt, n1, n2), dtype=complex)
-    for iR, R in enumerate(Rlist):
-        for ik in range(nkpt):
-            Mk[ik] += MR[iR] * np.exp(2.0 * np.pi * 1j * np.dot(kpts[ik], R))
-    return Mk
+    # nkpt, n1, n2 = Mk.shape
+    # Mk = np.zeros((nkpt, n1, n2), dtype=complex)
+    # for iR, R in enumerate(Rlist):
+    #    for ik in range(nkpt):
+    #        Mk[ik] += MR[iR] * np.exp(2.0 * np.pi * 1j * np.dot(kpts[ik], R))
+    # return Mk
 
 
 def R_to_onek(kpt, Rlist, MR):

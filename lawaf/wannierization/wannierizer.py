@@ -1,18 +1,18 @@
 """
 Wannierizer Module: Getting the Unitary matrix Amnk.
 """
-import copy
-import numpy as np
-from scipy.linalg import qr, svd
-from scipy.special import erfc
-from netCDF4 import Dataset
-from ase.dft.kpoints import get_monkhorst_pack_size_and_offset
-from lawaf.lwf.lwf import LWF
-from typing import Callable, Optional, Tuple, Union, List
+
 from dataclasses import dataclass
-from lawaf.params import WannierParams
+from typing import Callable, Optional, Tuple
+
+import numpy as np
+from netCDF4 import Dataset
+from scipy.linalg import svd
+from scipy.special import erfc
+
+from lawaf.lwf.lwf import LWF
 from lawaf.mathutils.occupation_functions import occupation_func
-import matplotlib.pyplot as plt
+from lawaf.params import WannierParams
 
 
 @dataclass
@@ -193,10 +193,14 @@ class Wannierizer(BasicWannierizer):
         """
         Calculate all Amn matrix for all k.
         """
+        print("Calculating Amn matrix. Number of kpoints: ", self.nkpt)
         for ik in range(self.nkpt):
+            print(f"[{ik+1}/{self.nkpt}] k={self.kpts[ik]}")
             self.Amn[ik, :, :] = np.array(self.get_Amn_one_k(ik), dtype=complex)
         if self.params.enhance_Amn:
-            Amn = enhance_Amn(self.Amn, self.evals.real, order=self.params.enhance_Amn)
+            self.Amn = enhance_Amn(
+                self.Amn, self.evals.real, order=self.params.enhance_Amn
+            )
         return self.Amn
 
     def get_wannk_and_Hk(self, shift=0.0):
@@ -222,7 +226,6 @@ class Wannierizer(BasicWannierizer):
         return self.wannk, self.Hwann_k
 
     def get_wannier_centers(self, wannR, Rlist, Rdeg, positions):
-        nR = len(Rlist)
         wann_centers = np.zeros((self.nwann, 3), dtype=float)
         for iR, R in enumerate(Rlist):
             c = wannR[iR, :, :]
@@ -238,6 +241,7 @@ class Wannierizer(BasicWannierizer):
         """
         for iwann in range(self.nwann):
             norm = np.trace(wannR[:, :, iwann].conj().T @ wannR[:, :, iwann])
+        print("Normalization check: ", norm)
 
     def k_to_R(self, Rlist, Rdeg):
         """
@@ -293,7 +297,6 @@ def Amnk_to_Hk(Amn, psi, Hk0, kpts):
 
 def Hk_to_Hreal(Hk, kpts, kweights, Rpts, Rdeg):
     nbasis = Hk.shape[1]
-    nk = len(kpts)
     nR = len(Rpts)
     for iR, R in enumerate(Rpts):
         HR = np.zeros((nR, nbasis, nbasis), dtype=complex)
@@ -332,12 +335,12 @@ def enhance_Amn(A, evals, order):
         dos_tot += dosE
         wdos_tot += wdosE / (dosE + 1e-5)
         # per k
-        occ = np.interp(evals, Egrid, wdos_tot)
-        occ = occ**order
-        A[ik, :, :] *= occ[ik, :, None]
-        U, _, VT = svd(A[ik, :, :], full_matrices=False)
-        A[ik, :, :] = U @ VT
-    return A
+        # occ = np.interp(evals, Egrid, wdos_tot)
+        # occ = occ**order
+        # A[ik, :, :] *= occ[ik, :, None]
+        # U, _, VT = svd(A[ik, :, :], full_matrices=False)
+        # A[ik, :, :] = U @ VT
+    # return A
 
     # wdos_tot /= dos_tot
     # interpolate the dos_tot

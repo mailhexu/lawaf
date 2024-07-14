@@ -6,11 +6,11 @@ from lawaf.interfaces import SiestaDownfolder
 def main():
     params = dict(
         method="projected",
-        kmesh=[4, 4, 4],
+        kmesh=[6, 6, 6],
         # nwann=4,
-        weight_func="Gauss",
-        weight_func_params=(-4, 3),
-        use_proj=True,
+        weight_func="window",
+        weight_func_params=(-8, 6.5, 0.001),
+        use_proj=False,
         # selected_basis=None,
         # anchors={(0.0, 0.0, 0): [46, 47, 48, 49]},
         exclude_bands=[],
@@ -18,7 +18,8 @@ def main():
         # selected_orbdict={"Mn":["3dx2-y2", "3dz2"]}
         selected_orbdict={"Mn": ["3d"], "O": ["2p"]},
         # selected_orbdict={"Mn": ["3d"]},
-        enhance_Amn=1,
+        # nwann=28,
+        enhance_Amn=0,
     )
 
     downfolder = SiestaDownfolder(fdf_fname="siesta.fdf", params=params)
