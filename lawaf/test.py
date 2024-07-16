@@ -1,5 +1,14 @@
 import numpy as np
-from scipy.linalg import eigh, qr, svd
+from scipy.linalg import eigh, fractional_matrix_power, qr, svd
+
+
+def matrix_power(A, n):
+    return fractional_matrix_power(A, n)
+
+
+def lowdin(H, S):
+    Shalf = matrix_power(S, -0.5)
+    H = Shalf @ H @ Shalf
 
 
 def set_random_seed(seed=None):
@@ -39,30 +48,41 @@ def scdm(psiT, n):
     return cols
 
 
-def orth(A):
+def orth(A, S):
     U, _, VT = svd(A, full_matrices=False)
     return U @ VT
+    # Shalf = matrix_power(S, -0.5)
+    # return Shalf@A@Shalf
 
 
 def Hwann(evals, evecs, H, S, n=5, nwann=3):
-    efermi = evals[nwann - 1] + 1e-5
+    if nwann == n:
+        efermi = evals[nwann - 1] + 10
+    else:
+        efermi = (evals[nwann - 1] + evals[nwann]) / 2
     print(f"evals: {evals}")
     print(f"efermi: {efermi}")
     weights = fermi_function(evals, efermi)
     print(f"weights: {weights}")
     psiT = evecs.T.conj()
-    psiT = psiT * weights[:, None]
+    print(f"rho: {evecs@ psiT @S *weights[:, None]}")
+    psiT = psiT @ S * weights[:, None]
     cols = scdm(psiT, nwann)
+    cols = np.sort(cols)
     print(f"cols: {cols}")
     A = psiT[:, cols]
-    A = orth(A)
+    # A = orth(A, S)
     print(f"A: {A}")
+    wann = evecs @ A
+    Swann = wann.T.conj() @ S @ wann
+    print(f"wann: {wann}")
 
     wann = evecs @ A
     Hwann2 = wann.T.conj() @ H @ wann
     Hwann = A.T.conj() @ np.diag(evals) @ A
-    evals_wann, evecs_wann = eigh(Hwann)
-    evals_wann2, evecs_wann2 = eigh(Hwann2)
+    evals_wann, evecs_wann = eigh(Hwann, Swann)
+    evals_wann2, evecs_wann2 = eigh(Hwann2, Swann)
+
     print(evals)
     print(evals_wann)
     print(evals_wann2)
@@ -71,7 +91,7 @@ def Hwann(evals, evecs, H, S, n=5, nwann=3):
 
 def test_Hwann():
     n = 5
-    nwann = 3
+    nwann = 5
     H, S = gen_HS(n, None)
     evals, evecs = eigh(H, S)
     Hwann(evals, evecs, H, S, n=n, nwann=nwann)

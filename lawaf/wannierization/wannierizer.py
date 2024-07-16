@@ -7,7 +7,7 @@ from typing import Callable, Optional, Tuple
 
 import numpy as np
 from netCDF4 import Dataset
-from scipy.linalg import svd
+from scipy.linalg import eigh, svd
 from scipy.special import erfc
 
 from lawaf.lwf.lwf import LWF
@@ -54,6 +54,7 @@ class BasicWannierizer:
         evecs,
         kpts,
         kweights,
+        Hk=None,
         Sk=None,
         kmesh=None,
         k_offset=None,
@@ -71,6 +72,7 @@ class BasicWannierizer:
         self.nwann = params.nwann
         self.kshift = params.kshift
 
+        self.Hk = Hk
         if Sk is None:
             self.is_orthogonal = True
         else:
@@ -105,12 +107,21 @@ class Wannierizer(BasicWannierizer):
         kpts,
         kweights,
         params: WannierParams,
+        Hk=None,
         Sk=None,
         kmesh=None,
         k_offset=None,
     ):
         super().__init__(
-            params, evals, evecs, kpts, kweights, Sk=Sk, kmesh=kmesh, k_offset=k_offset
+            params,
+            evals,
+            evecs,
+            kpts,
+            kweights,
+            Hk=Hk,
+            Sk=Sk,
+            kmesh=kmesh,
+            k_offset=k_offset,
         )
 
         # kpts
@@ -134,6 +145,10 @@ class Wannierizer(BasicWannierizer):
         # self.wannR = np.zeros((self.nR, self.nbasis, self.nwann), dtype=complex)
         self.Hwann_k = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
         # self.HwannR = np.zeros((self.nR, self.nwann, self.nwann), dtype=complex)
+        if not self.params.orthogonal:
+            self.Swann_k = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
+        else:
+            self.Swann_k = None
 
         self.set_params(params)
 
@@ -210,20 +225,26 @@ class Wannierizer(BasicWannierizer):
         for ik in range(self.nkpt):
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
             # if self.is_orthogonal:
+            print(f"Calculating Wannier function for k={self.kpts[ik]}")
             h = (
                 self.Amn[ik, :, :].T.conj()
                 @ np.diag(self.get_eval_k(ik) + shift)
                 @ self.Amn[ik, :, :]
             )
-            # else:  # No need.
-            #    h = (
-            #        self.Amn[ik, :, :].T.conj()
-            #        @ np.diag(self.get_eval_k(ik) + shift)
-            #        @ self.S[ik]
-            #        @ self.Amn[ik, :, :]
-            #        )
-            self.Hwann_k[ik] = h
-        return self.wannk, self.Hwann_k
+
+            if self.is_orthogonal or self.params.orthogonal:
+                self.Hwann_k[ik] = h
+                self.Swann_k = None
+                evals, evecs = eigh(self.Hwann_k[ik])
+            else:
+                self.Hwann_k[ik] = h
+                s = self.wannk[ik].T.conj() @ self.S[ik] @ self.wannk[ik]
+                self.Swann_k[ik] = s
+                # evals, evecs = eigh(self.Hwann_k[ik], self.Swann_k[ik])
+
+            # diff=evals-self.get_eval_k(ik)
+
+        return self.wannk, self.Hwann_k, self.Swann_k
 
     def get_wannier_centers(self, wannR, Rlist, Rdeg, positions):
         wann_centers = np.zeros((self.nwann, 3), dtype=float)

@@ -6,7 +6,7 @@ from lawaf.interfaces import SiestaDownfolder
 def main():
     params = dict(
         method="projected",
-        kmesh=[6, 6, 6],
+        kmesh=[4, 4, 4],
         # nwann=4,
         weight_func="window",
         weight_func_params=(-8, 6.5, 0.001),
@@ -20,6 +20,7 @@ def main():
         # selected_orbdict={"Mn": ["3d"]},
         # nwann=28,
         enhance_Amn=0,
+        orthogonal=False,
     )
 
     downfolder = SiestaDownfolder(fdf_fname="siesta.fdf", params=params)

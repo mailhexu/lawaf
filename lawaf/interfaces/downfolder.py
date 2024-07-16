@@ -11,6 +11,7 @@ from lawaf.params import WannierParams
 from lawaf.plot import plot_band
 from lawaf.utils.kpoints import build_Rgrid_with_degeneracy, monkhorst_pack
 from lawaf.wannierization import (
+    DummyWannierizer,
     MaxProjectedWannierizer,
     ProjectedWannierizer,
     ScdmkWannierizer,
@@ -25,6 +26,8 @@ def select_wannierizer(method):
         w = ProjectedWannierizer
     elif method.lower().startswith("maxprojected"):
         w = MaxProjectedWannierizer
+    elif method.lower().startswith("dummy"):
+        w = DummyWannierizer
     else:
         raise ValueError("Unknown method")
     print(f"Using {w.__name__} method")
@@ -79,6 +82,7 @@ class Lawaf:
         post_func=None,
         enhance_Amn=0,
         selected_orbdict=None,
+        orthogonal=False,
     ):
         """
         Downfold the Band structure.
@@ -124,6 +128,7 @@ class Lawaf:
             exclude_bands=exclude_bands,
             enhance_Amn=enhance_Amn,
             selected_orbdict=selected_orbdict,
+            orthogonal=orthogonal,
         )
 
     def _prepare_data(self):
@@ -145,6 +150,7 @@ class Lawaf:
             kpts=self.kpts,
             kweights=self.kweights,
             params=self.params,
+            Hk=self.Hk,
             Sk=self.Sk,
         )
 
@@ -196,6 +202,8 @@ class Lawaf:
         self.Rlist, self.Rdeg = build_Rgrid_with_degeneracy(self.Rgrid)
 
     def _prepare_eigen(self, has_phase=False):
+        self.Hk = None
+        self.Sk = None
         # evals, evecs = self.model.solve_all(self.kpts)
         if self.model.is_orthogonal:
             evals, evecs = self.model.solve_all(self.kpts)
@@ -207,6 +215,9 @@ class Lawaf:
             self.psi = evecs
         else:
             self._remove_phase(evecs)
+        # TODO: to be removed
+        self.Hk = H
+        self.Sk = S
         self.evals = evals
         self.evecs = evecs
         if not self.model.is_orthogonal:
@@ -247,20 +258,29 @@ class Lawaf:
         self.atoms = self.model.atoms
         # self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
         self.builder.get_Amn()
-        wannk, Hwannk = self.builder.get_wannk_and_Hk()
+        wannk, Hwannk, Swannk = self.builder.get_wannk_and_Hk()
         wannR = k_to_R(
             self.kpts, self.Rlist, wannk, kweights=self.kweights, Rdeg=self.Rdeg
         )
         HwannR = k_to_R(
             self.kpts, self.Rlist, Hwannk, kweights=self.kweights, Rdeg=self.Rdeg
         )
+        if Swannk is not None:
+            SwannR = k_to_R(
+                self.kpts, self.Rlist, Swannk, kweights=self.kweights, Rdeg=self.Rdeg
+            )
+        else:
+            SwannR = None
+
         self.lwf = EWF(
             wannR=wannR,
             HwannR=HwannR,
+            SwannR=SwannR,
             Rlist=self.Rlist,
             Rdeg=self.Rdeg,
             atoms=self.atoms,
             wann_names=None,
+            is_orthogonal=(SwannR is None),
         )
         return self.lwf
 

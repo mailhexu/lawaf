@@ -33,6 +33,7 @@ class WannierParams:
     sort_cols: bool = True
     enhance_Amn: int = 0
     selected_orbdict = None
+    orthogonal = True
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -83,6 +84,7 @@ def test_params():
         exclude_bands=(),
         sort_cols=True,
         enhance_Amn=False,
+        orthogonal=True,
     )
     print(params.to_dict())
     params.to_yaml("params.yaml")

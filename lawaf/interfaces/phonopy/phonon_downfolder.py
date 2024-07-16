@@ -1,14 +1,13 @@
-from dataclasses import dataclass
-import numpy as np
-from scipy.linalg import eigh
 import os
+
+import numpy as np
+
 from lawaf.interfaces.downfolder import Lawaf
-from lawaf.mathutils.evals_freq import freqs_to_evals
-from .phonopywrapper import PhonopyWrapper
-from lawaf.wannierization.wannierizer import Amnk_to_Hk, Hk_to_Hreal
-from lawaf.mathutils.kR_convert import k_to_R, R_to_k, R_to_onek
-from lawaf.mathutils.align_evecs import align_evecs
 from lawaf.interfaces.phonopy.lwf import LWF, NACLWF
+from lawaf.mathutils.evals_freq import freqs_to_evals
+from lawaf.mathutils.kR_convert import R_to_onek, k_to_R
+
+from .phonopywrapper import PhonopyWrapper
 
 
 class PhononDownfolder(Lawaf):
@@ -61,38 +60,38 @@ class PhonopyDownfolder(PhononDownfolder):
     def process_parameters(self):
         self.convert_DM_parameters()
 
-    def downfold(
-        self,
-        post_func=None,
-        output_path="./",
-        write_hr_nc="LWF.nc",
-        write_hr_txt="LWF.txt",
-    ):
-        # self.params.update(params)
-        self.atoms = self.model.atoms
-        self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
-        if post_func is not None:
-            post_func(self.lwf)
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-        try:
-            self.save_info(output_path=output_path)
-        except Exception as E:
-            pass
-        if write_hr_txt is not None:
-            self.lwf.save_txt(os.path.join(output_path, write_hr_txt))
-        if write_hr_nc is not None:
-            self.lwf.write_nc(os.path.join(output_path, write_hr_nc))
-        return self.lwf
+    # def downfold(
+    #    self,
+    #    post_func=None,
+    #    output_path="./",
+    #    write_hr_nc="LWF.nc",
+    #    write_hr_txt="LWF.txt",
+    # ):
+    #    # self.params.update(params)
+    #    self.atoms = self.model.atoms
+    #    self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
+    #    if post_func is not None:
+    #        post_func(self.lwf)
+    #    if not os.path.exists(output_path):
+    #        os.makedirs(output_path)
+    #    try:
+    #        self.save_info(output_path=output_path)
+    #    except Exception:
+    #        pass
+    #    if write_hr_txt is not None:
+    #        self.lwf.save_txt(os.path.join(output_path, write_hr_txt))
+    #    if write_hr_nc is not None:
+    #        self.lwf.write_nc(os.path.join(output_path, write_hr_nc))
+    #    return self.lwf
 
     def downfold(self, output_path="./", write_hr_nc="LWF.nc", write_hr_txt="LWF.txt"):
         self.atoms = self.model.atoms
         self.builder.prepare()
         # compute the Amn matrix from phonons without NAC
-        Amn = self.builder.get_Amn()
+        self.builder.get_Amn()
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
-        wannk, Hwannk = self.builder.get_wannk_and_Hk()
+        wannk, Hwannk, _ = self.builder.get_wannk_and_Hk()
         HwannR = k_to_R(
             self.kpts, self.Rlist, Hwannk, kweights=self.kweights, Rdeg=self.Rdeg
         )
@@ -122,7 +121,7 @@ class PhonopyDownfolder(PhononDownfolder):
             os.makedirs(output_path)
         try:
             self.save_info(output_path=output_path)
-        except Exception as E:
+        except Exception:
             pass
         if write_hr_txt is not None:
             self.lwf.save_txt(os.path.join(output_path, write_hr_txt))
@@ -193,7 +192,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         self.atoms = self.model.atoms
         self.builder.prepare()
         # compute the Amn matrix from phonons without NAC
-        Amn = self.builder.get_Amn()
+        self.builder.get_Amn()
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
         wannk, Hwannk_noNAC = self.builder.get_wannk_and_Hk()
@@ -304,10 +303,10 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
 
 
 def get_wannier_centers(wannR, Rlist, positions, Rdeg):
-    nR = len(Rlist)
+    # nR = len(Rlist)
     nwann = wannR.shape[2]
     wann_centers = np.zeros((nwann, 3), dtype=float)
-    natom = len(positions)
+    # natom = len(positions)
     p = np.kron(positions, np.ones((3, 1)))
     for iR, R in enumerate(Rlist):
         c = wannR[iR, :, :]
@@ -326,7 +325,7 @@ def get_wannier_masses(masses, wannR, Rlist, Rdeg):
     nwann = wannR.shape[2]
     nR, nbasis, nwann = wannR.shape
     wann_masses = np.zeros(nwann, dtype=float)
-    masses3 = np.kron(masses, np.ones(3))
+    # masses3 = np.kron(masses, np.ones(3))
     for iR, R in enumerate(Rlist):
         c = wannR[iR, :, :]
         wann_masses += np.einsum("ij, i-> j", (c.conj() * c).real, masses) * Rdeg[iR]

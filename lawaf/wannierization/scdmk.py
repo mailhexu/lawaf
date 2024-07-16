@@ -35,6 +35,7 @@ class ScdmkWannierizer(Wannierizer):
         self.proj_order = params.proj_order
         self.projs = np.zeros((self.nkpt, self.nband), dtype=float)
         self.sort_cols = params.sort_cols
+        self.orthogonal = params.orthogonal
 
         if params.selected_basis:
             self.set_selected_cols(params.selected_basis)
@@ -167,8 +168,11 @@ class ScdmkWannierizer(Wannierizer):
             else:
                 # psi = psik[self.cols, :]
                 psiT = psiT[:, self.cols]
-        U, _S, VT = svd(psiT, full_matrices=False)
-        Amn_k = U @ VT
+        if self.orthogonal:
+            U, _S, VT = svd(psiT, full_matrices=False)
+            Amn_k = U @ VT
+        else:
+            Amn_k = psiT
         return Amn_k
 
     def prepare(self):

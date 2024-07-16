@@ -1,6 +1,6 @@
 import numpy as np
-from scipy.linalg import qr, svd
-from scipy.special import erfc
+from scipy.linalg import svd
+
 from .wannierizer import Wannierizer
 
 
@@ -77,7 +77,7 @@ class ProjectedWannierizer(Wannierizer):
             # A=np.einsum('ob, ow, b ->bw', self.get_psi_k(ik).conj(), self.projectors, self.occ[ik])
             A = (
                 self.get_psi_k(ik).conj().T
-                @ self.S[ik]
+                # @ self.S[ik]
                 @ self.projectors.T
                 * self.occ[ik][:, np.newaxis]
             )
@@ -136,7 +136,7 @@ class MaxProjectedWannierizer(ProjectedWannierizer):
             imax = np.argmax(np.abs(np.abs(A[:, iproj])))
             imax = iproj
             print(f"MaxProjectedWannierizer: iproj={iproj}, imax={imax}.")
-            tmp = A[imax, iproj]
+            # tmp = A[imax, iproj]
             A[:, iproj] = 0
             A[imax, iproj] = 1
         print(f"MaxProjectedWannierizer: A={A}.")
