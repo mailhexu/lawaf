@@ -4,12 +4,14 @@ Downfold.json
 lwf.nc
 docs/paper
 *.vasp
-*.pdf
-*.png
 *.cif
 *.mcif
 *.nc
 *.pickle
+.pdf
+.png
+
+examples
 
 
 doc/refs/*.pdf
