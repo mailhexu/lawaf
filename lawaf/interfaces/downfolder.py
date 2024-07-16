@@ -1,21 +1,21 @@
-from dataclasses import dataclass
-from typing import Tuple, Union, List
-import os
-import copy
 import json
-from ase import Atoms
-from lawaf.utils.kpoints import monkhorst_pack
+import os
+
+import matplotlib.pyplot as plt
 import numpy as np
+from ase import Atoms
+from HamiltonIO.lawaf import LawafHamiltonian as EWF
+
+from lawaf.mathutils.kR_convert import k_to_R
+from lawaf.params import WannierParams
+from lawaf.plot import plot_band
+from lawaf.utils.kpoints import build_Rgrid_with_degeneracy, monkhorst_pack
 from lawaf.wannierization import (
+    DummyWannierizer,
+    MaxProjectedWannierizer,
     ProjectedWannierizer,
     ScdmkWannierizer,
-    MaxProjectedWannierizer,
 )
-from lawaf.params import WannierParams
-import matplotlib.pyplot as plt
-from lawaf.plot import plot_band
-from lawaf.utils.kpoints import kmesh_to_R, build_Rgrid_with_degeneracy
-from lawaf.utils.kpoints import autopath
 
 
 def select_wannierizer(method):
@@ -26,6 +26,8 @@ def select_wannierizer(method):
         w = ProjectedWannierizer
     elif method.lower().startswith("maxprojected"):
         w = MaxProjectedWannierizer
+    elif method.lower().startswith("dummy"):
+        w = DummyWannierizer
     else:
         raise ValueError("Unknown method")
     print(f"Using {w.__name__} method")
@@ -73,12 +75,14 @@ class Lawaf:
         selected_basis=None,
         anchors=None,
         anchor_kpt=(0, 0, 0),
-        kshift=np.array([1e-7, 2e-8, 3e-9]),
+        kshift=np.array([0, 0, 0], dtype=float),
         use_proj=True,
         proj_order=1,
         exclude_bands=[],
         post_func=None,
         enhance_Amn=0,
+        selected_orbdict=None,
+        orthogonal=False,
     ):
         """
         Downfold the Band structure.
@@ -123,6 +127,8 @@ class Lawaf:
             proj_order=proj_order,
             exclude_bands=exclude_bands,
             enhance_Amn=enhance_Amn,
+            selected_orbdict=selected_orbdict,
+            orthogonal=orthogonal,
         )
 
     def _prepare_data(self):
@@ -144,18 +150,20 @@ class Lawaf:
             kpts=self.kpts,
             kweights=self.kweights,
             params=self.params,
+            Hk=self.Hk,
+            Sk=self.Sk,
         )
 
     def _prepare_positions(self):
-        try:
+        if hasattr(self.model, "atoms"):
             self.atoms = self.model.atoms
-        except:
+        else:
             self.atoms = Atoms(cell=np.eye(3))
-        try:
-            positions = self.model.positions
-        except Exception:
-            positions = None
-        self.positions = positions
+
+        if hasattr(self.model, "positions"):
+            self.positions = self.model.positions
+        else:
+            self.positions = None
 
     def _prepare_kpoints(self):
         """
@@ -194,21 +202,36 @@ class Lawaf:
         self.Rlist, self.Rdeg = build_Rgrid_with_degeneracy(self.Rgrid)
 
     def _prepare_eigen(self, has_phase=False):
-        evals, evecs = self.model.solve_all(self.kpts)
+        self.Hk = None
+        self.Sk = None
+        # evals, evecs = self.model.solve_all(self.kpts)
+        if self.model.is_orthogonal:
+            evals, evecs = self.model.solve_all(self.kpts)
+        else:
+            H, S, evals, evecs = self.model.HS_and_eigen(self.kpts)
         # remove e^ikr from wfn
         self.has_phase = has_phase
         if not has_phase:
             self.psi = evecs
         else:
             self._remove_phase(evecs)
+        # TODO: to be removed
+        self.Hk = H
+        self.Sk = S
         self.evals = evals
         self.evecs = evecs
+        if not self.model.is_orthogonal:
+            self.is_orthogonal = False
+            self.Sk = S
+        else:
+            self.is_orthogonal = True
+            self.Sk = None
         return self.evals, self.evecs
 
     def _remove_phase_k(self, wfnk, k, positions):
         # phase = np.exp(-2j * np.pi * np.einsum('j, kj->k', k, self.positions))
         # return wfnk[:, :] * phase[:, None]
-        nbasis = wfnk.shape[0]
+        # nbasis = wfnk.shape[0]
         psi = np.zeros_like(wfnk)
         for ibasis in range(self.nbasis):
             phase = np.exp(-2j * np.pi * np.dot(k, positions[ibasis, :]))
@@ -229,26 +252,36 @@ class Lawaf:
         self,
         post_func=None,
         output_path="./",
-        write_hr_nc=None,
-        write_hr_txt=None,
         **params,
     ):
         self.params.update(params)
         self.atoms = self.model.atoms
-        self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
+        # self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
+        self.builder.get_Amn()
+        wannk, Hwannk, Swannk = self.builder.get_wannk_and_Hk()
+        wannR = k_to_R(
+            self.kpts, self.Rlist, wannk, kweights=self.kweights, Rdeg=self.Rdeg
+        )
+        HwannR = k_to_R(
+            self.kpts, self.Rlist, Hwannk, kweights=self.kweights, Rdeg=self.Rdeg
+        )
+        if Swannk is not None:
+            SwannR = k_to_R(
+                self.kpts, self.Rlist, Swannk, kweights=self.kweights, Rdeg=self.Rdeg
+            )
+        else:
+            SwannR = None
 
-        if not os.path.exists(output_path):
-            os.makedirs(output_path)
-        try:
-            self.save_info(output_path=output_path)
-        except Exception as E:
-            print(E)
-            pass
-        # if write_hr_txt is not None:
-        #    self.ewf.save_txt(os.path.join(output_path, write_hr_txt))
-        # if write_hr_nc is not None:
-        #    # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
-        #    self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
+        self.lwf = EWF(
+            wannR=wannR,
+            HwannR=HwannR,
+            SwannR=SwannR,
+            Rlist=self.Rlist,
+            Rdeg=self.Rdeg,
+            atoms=self.atoms,
+            wann_names=None,
+            is_orthogonal=(SwannR is None),
+        )
         return self.lwf
 
     def plot_band_fitting(

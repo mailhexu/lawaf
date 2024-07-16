@@ -9,6 +9,7 @@ docs/paper
 *.cif
 *.mcif
 *.nc
+*.pickle
 
 
 doc/refs/*.pdf

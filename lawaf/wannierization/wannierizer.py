@@ -1,18 +1,18 @@
 """
 Wannierizer Module: Getting the Unitary matrix Amnk.
 """
-import copy
-import numpy as np
-from scipy.linalg import qr, svd
-from scipy.special import erfc
-from netCDF4 import Dataset
-from ase.dft.kpoints import get_monkhorst_pack_size_and_offset
-from lawaf.lwf.lwf import LWF
-from typing import Callable, Optional, Tuple, Union, List
+
 from dataclasses import dataclass
-from lawaf.params import WannierParams
+from typing import Callable, Optional, Tuple
+
+import numpy as np
+from netCDF4 import Dataset
+from scipy.linalg import eigh, svd
+from scipy.special import erfc
+
+from lawaf.lwf.lwf import LWF
 from lawaf.mathutils.occupation_functions import occupation_func
-import matplotlib.pyplot as plt
+from lawaf.params import WannierParams
 
 
 @dataclass
@@ -54,6 +54,7 @@ class BasicWannierizer:
         evecs,
         kpts,
         kweights,
+        Hk=None,
         Sk=None,
         kmesh=None,
         k_offset=None,
@@ -71,6 +72,7 @@ class BasicWannierizer:
         self.nwann = params.nwann
         self.kshift = params.kshift
 
+        self.Hk = Hk
         if Sk is None:
             self.is_orthogonal = True
         else:
@@ -105,12 +107,21 @@ class Wannierizer(BasicWannierizer):
         kpts,
         kweights,
         params: WannierParams,
+        Hk=None,
         Sk=None,
         kmesh=None,
         k_offset=None,
     ):
         super().__init__(
-            params, evals, evecs, kpts, kweights, Sk=Sk, kmesh=kmesh, k_offset=k_offset
+            params,
+            evals,
+            evecs,
+            kpts,
+            kweights,
+            Hk=Hk,
+            Sk=Sk,
+            kmesh=kmesh,
+            k_offset=k_offset,
         )
 
         # kpts
@@ -134,6 +145,10 @@ class Wannierizer(BasicWannierizer):
         # self.wannR = np.zeros((self.nR, self.nbasis, self.nwann), dtype=complex)
         self.Hwann_k = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
         # self.HwannR = np.zeros((self.nR, self.nwann, self.nwann), dtype=complex)
+        if not self.params.orthogonal:
+            self.Swann_k = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
+        else:
+            self.Swann_k = None
 
         self.set_params(params)
 
@@ -193,10 +208,14 @@ class Wannierizer(BasicWannierizer):
         """
         Calculate all Amn matrix for all k.
         """
+        print("Calculating Amn matrix. Number of kpoints: ", self.nkpt)
         for ik in range(self.nkpt):
+            print(f"[{ik+1}/{self.nkpt}] k={self.kpts[ik]}")
             self.Amn[ik, :, :] = np.array(self.get_Amn_one_k(ik), dtype=complex)
         if self.params.enhance_Amn:
-            Amn = enhance_Amn(self.Amn, self.evals.real, order=self.params.enhance_Amn)
+            self.Amn = enhance_Amn(
+                self.Amn, self.evals.real, order=self.params.enhance_Amn
+            )
         return self.Amn
 
     def get_wannk_and_Hk(self, shift=0.0):
@@ -205,16 +224,29 @@ class Wannierizer(BasicWannierizer):
         """
         for ik in range(self.nkpt):
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
+            # if self.is_orthogonal:
+            print(f"Calculating Wannier function for k={self.kpts[ik]}")
             h = (
                 self.Amn[ik, :, :].T.conj()
                 @ np.diag(self.get_eval_k(ik) + shift)
                 @ self.Amn[ik, :, :]
             )
-            self.Hwann_k[ik] = h
-        return self.wannk, self.Hwann_k
+
+            if self.is_orthogonal or self.params.orthogonal:
+                self.Hwann_k[ik] = h
+                self.Swann_k = None
+                evals, evecs = eigh(self.Hwann_k[ik])
+            else:
+                self.Hwann_k[ik] = h
+                s = self.wannk[ik].T.conj() @ self.S[ik] @ self.wannk[ik]
+                self.Swann_k[ik] = s
+                # evals, evecs = eigh(self.Hwann_k[ik], self.Swann_k[ik])
+
+            # diff=evals-self.get_eval_k(ik)
+
+        return self.wannk, self.Hwann_k, self.Swann_k
 
     def get_wannier_centers(self, wannR, Rlist, Rdeg, positions):
-        nR = len(Rlist)
         wann_centers = np.zeros((self.nwann, 3), dtype=float)
         for iR, R in enumerate(Rlist):
             c = wannR[iR, :, :]
@@ -230,6 +262,7 @@ class Wannierizer(BasicWannierizer):
         """
         for iwann in range(self.nwann):
             norm = np.trace(wannR[:, :, iwann].conj().T @ wannR[:, :, iwann])
+        print("Normalization check: ", norm)
 
     def k_to_R(self, Rlist, Rdeg):
         """
@@ -285,7 +318,6 @@ def Amnk_to_Hk(Amn, psi, Hk0, kpts):
 
 def Hk_to_Hreal(Hk, kpts, kweights, Rpts, Rdeg):
     nbasis = Hk.shape[1]
-    nk = len(kpts)
     nR = len(Rpts)
     for iR, R in enumerate(Rpts):
         HR = np.zeros((nR, nbasis, nbasis), dtype=complex)
@@ -318,10 +350,19 @@ def enhance_Amn(A, evals, order):
         wdosE = np.zeros_like(Egrid)
         dosE = np.zeros_like(Egrid)
         for iband in range(nband):
-            wdosE += wk[iband] * erfc((Egrid - evals[ik, iband]) / dE / 5)
-            dosE += erfc((Egrid - evals[ik, iband]) / dE / 5)
+            f = erfc((Egrid - evals[ik, iband]) / dE)
+            wdosE += wk[iband] * f
+            dosE += f
         dos_tot += dosE
-        wdos_tot += wdosE / dosE
+        wdos_tot += wdosE / (dosE + 1e-5)
+        # per k
+        # occ = np.interp(evals, Egrid, wdos_tot)
+        # occ = occ**order
+        # A[ik, :, :] *= occ[ik, :, None]
+        # U, _, VT = svd(A[ik, :, :], full_matrices=False)
+        # A[ik, :, :] = U @ VT
+    # return A
+
     # wdos_tot /= dos_tot
     # interpolate the dos_tot
     occ = np.interp(evals, Egrid, wdos_tot)

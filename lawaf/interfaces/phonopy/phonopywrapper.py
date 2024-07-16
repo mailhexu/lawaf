@@ -1,32 +1,35 @@
-import copy
-import os
-from typing import Type, Union
-import pickle
 import atexit
+import copy
 import lzma
+import os
+import pickle
+from typing import Type, Union
+
+import matplotlib.pyplot as plt
+import numpy as np
+from ase import Atoms
+from ase.dft.kpoints import monkhorst_pack
+from phonopy import Phonopy, load
+from phonopy.api_phonopy import symmetrize_borns_and_epsilon
+from phonopy.harmonic.dynamical_matrix import (
+    DynamicalMatrix,
+    DynamicalMatrixGL,
+    DynamicalMatrixWang,
+)
 from phonopy.structure.atoms import PhonopyAtoms
 from phonopy.structure.cells import Primitive
 from scipy.linalg import eigh
-import numpy as np
-from phonopy import load, Phonopy
-from phonopy.api_phonopy import *
-from phonopy.harmonic.dynamical_matrix import (
-    DynamicalMatrix,
-    DynamicalMatrixWang,
-    DynamicalMatrixGL,
-)
-from ase import Atoms
-from ase.dft.kpoints import monkhorst_pack
-from lawaf.utils.kpoints import kmesh_to_R
+
+from lawaf.mathutils.align_evecs import align_all_degenerate_eigenvectors
 
 # from minimulti.ioput.ifc_netcdf import save_ifc_to_netcdf
 from lawaf.plot import plot_band
-from .ifcwrapper import IFC
-import matplotlib.pyplot as plt
+from lawaf.utils.kpoints import kmesh_to_R
 
 # from supercellmap import SupercellMaker
 from lawaf.utils.supercell import SupercellMaker
-from lawaf.mathutils.align_evecs import align_all_degenerate_eigenvectors
+
+from .ifcwrapper import IFC
 
 
 class MyDynamicalMatrixGL(DynamicalMatrixGL):
@@ -207,6 +210,8 @@ class PhonopyWrapper:
         self._prepare_cache()
         atexit.register(self.save_cache)
 
+        self.is_orthogonal = True
+
     def _prepare_cache(self):
         if self._use_cache:
             self._cache_file = "./phon_cache/cache.pickle"
@@ -302,7 +307,7 @@ class PhonopyWrapper:
             Hk *= self.Mmat
             if eval_modify_function is not None:
                 evals, evecs = eigh(Hk)
-                sumne = np.sum(evals[evals < 0])
+                # sumne = np.sum(evals[evals < 0])
                 # if sumne < -1e-18:
                 #    print(k, sumne)
                 evals = eval_modify_function(evals)
@@ -349,8 +354,9 @@ class PhonopyWrapper:
                 np.array(Hlongs, dtype=complex, order="C"),
             )
         else:
-            res = np.array(evals, dtype=float), np.array(
-                evecs, dtype=complex, order="C"
+            res = (
+                np.array(evals, dtype=float),
+                np.array(evecs, dtype=complex, order="C"),
             )
         self.save_cache()
         return res

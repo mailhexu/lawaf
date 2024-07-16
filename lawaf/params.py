@@ -1,10 +1,11 @@
-from dataclasses import dataclass
-from typing import Tuple, Union, List
-import json
-import yaml
-import numpy as np
 import copy
+import json
+from dataclasses import dataclass
+from typing import List, Tuple, Union
+
+import numpy as np
 import toml
+import yaml
 
 
 @dataclass
@@ -15,7 +16,7 @@ class WannierParams:
 
     method = "scdmk"
     kmesh: Tuple[int] = (5, 5, 5)
-    kshift = np.array([1e-7, 3e-6, 5e-9])
+    kshift = np.array([0, 0, 0], dtype=float)
     kpts = None
     kweights = None
     gamma: bool = True
@@ -31,6 +32,8 @@ class WannierParams:
     exclude_bands: Tuple[int] = ()
     sort_cols: bool = True
     enhance_Amn: int = 0
+    selected_orbdict = None
+    orthogonal = True
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
@@ -81,6 +84,7 @@ def test_params():
         exclude_bands=(),
         sort_cols=True,
         enhance_Amn=False,
+        orthogonal=True,
     )
     print(params.to_dict())
     params.to_yaml("params.yaml")

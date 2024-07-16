@@ -35,6 +35,7 @@ class ScdmkWannierizer(Wannierizer):
         self.proj_order = params.proj_order
         self.projs = np.zeros((self.nkpt, self.nband), dtype=float)
         self.sort_cols = params.sort_cols
+        self.orthogonal = params.orthogonal
 
         if params.selected_basis:
             self.set_selected_cols(params.selected_basis)
@@ -108,6 +109,8 @@ class ScdmkWannierizer(Wannierizer):
         ik = self.find_k(kpt)
         psi = self.get_psi_k(ik)[:, :] * self.occ[ik][None, :]
         psi_Dagger = psi.T.conj()
+        # if not self.is_orthogonal:
+        #    psi_Dagger = psi_Dagger @ self.S[ik]
         self.cols = scdm(psi_Dagger, self.nwann)
         if self.sort_cols:
             self.cols = np.sort(self.cols)
@@ -120,6 +123,7 @@ class ScdmkWannierizer(Wannierizer):
             self.projs[:, :] = 0.0
             for ikpt in range(self.nkpt):
                 psik = self.get_psi_k(ikpt)
+                self.projs[ikpt] = psik @ self.psi_anchors
                 for iband in range(self.nband):
                     psi_kb = psik[:, iband]
                     for psi_a in self.psi_anchors:
@@ -138,23 +142,37 @@ class ScdmkWannierizer(Wannierizer):
         psik = self.get_psi_k(ik)
         occ = self.occ[ik]
         projs = self.projs[ik]
-        return self.get_Amn_psi(psik, occ=occ, projs=projs)
+        if self.is_orthogonal:
+            Sk = None
+        else:
+            Sk = self.S[ik]
+        return self.get_Amn_psi(psik, occ=occ, projs=projs, Sk=Sk)
 
-    def get_Amn_psi(self, psik, occ=None, projs=None):
+    def get_Amn_psi(self, psik, occ=None, projs=None, Sk=None):
+        psiT = psik.T.conj()
+        if Sk is not None:
+            psiT = psiT @ Sk
         if self.use_proj:
             projs = np.einsum("iw,wb->b", self.psi_anchors, psik.conj())
             projs = np.sqrt(np.abs(np.abs(projs)))
             if occ is None:
-                psi = psik[self.cols, :] * (projs)[None, :]
+                # psi = psik[self.cols, :] * (projs)[None, :]
+                psiT = psiT[:, self.cols] * (projs)[:, None]
             else:
-                psi = psik[self.cols, :] * (occ * projs)[None, :]
+                # psi = psik[self.cols, :] * (occ * projs)[None, :]
+                psiT = psiT[:, self.cols] * (occ * projs)[:, None]
         else:
             if occ is not None:
-                psi = psik[self.cols, :] * occ[None, :]
+                # psi = psik[self.cols, :] * occ[None, :]
+                psiT = psiT[:, self.cols] * (occ)[:, None]
             else:
-                psi = psik[self.cols, :]
-        U, _S, VT = svd(psi.T.conj(), full_matrices=False)
-        Amn_k = U @ VT
+                # psi = psik[self.cols, :]
+                psiT = psiT[:, self.cols]
+        if self.orthogonal:
+            U, _S, VT = svd(psiT, full_matrices=False)
+            Amn_k = U @ VT
+        else:
+            Amn_k = psiT
         return Amn_k
 
     def prepare(self):
