@@ -8,8 +8,8 @@ docs/paper
 *.mcif
 *.nc
 *.pickle
-.pdf
-.png
+*.pdf
+*.png
 
 examples
 
