@@ -207,6 +207,7 @@ class Lawaf:
         # evals, evecs = self.model.solve_all(self.kpts)
         if self.model.is_orthogonal:
             evals, evecs = self.model.solve_all(self.kpts)
+            H = S = None
         else:
             H, S, evals, evecs = self.model.HS_and_eigen(self.kpts)
         # remove e^ikr from wfn

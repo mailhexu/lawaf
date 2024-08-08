@@ -243,8 +243,10 @@ class Wannierizer(BasicWannierizer):
                 # evals, evecs = eigh(self.Hwann_k[ik], self.Swann_k[ik])
 
             # diff=evals-self.get_eval_k(ik)
-
-        return self.wannk, self.Hwann_k, self.Swann_k
+        if self.is_orthogonal:
+            return self.wannk, self.Hwann_k
+        else:
+            return self.wannk, self.Hwann_k, self.Swann_k
 
     def get_wannier_centers(self, wannR, Rlist, Rdeg, positions):
         wann_centers = np.zeros((self.nwann, 3), dtype=float)

@@ -95,6 +95,7 @@ class ScdmkWannierizer(Wannierizer):
                 self.add_anchors(self.get_psi_k(ik), ibands)
             else:
                 self.add_anchors(self.wfn_anchor[k], ibands)
+        self.psi_anchors = np.array(self.psi_anchors)
         self.cols = self.cols[: self.nwann]
         print(f"Using the anchor points, these cols are selected: {self.cols}")
         assert (
@@ -123,7 +124,7 @@ class ScdmkWannierizer(Wannierizer):
             self.projs[:, :] = 0.0
             for ikpt in range(self.nkpt):
                 psik = self.get_psi_k(ikpt)
-                self.projs[ikpt] = psik @ self.psi_anchors
+                # self.projs[ikpt] = psik.T.conj() @ (self.psi_anchors.T)
                 for iband in range(self.nband):
                     psi_kb = psik[:, iband]
                     for psi_a in self.psi_anchors:

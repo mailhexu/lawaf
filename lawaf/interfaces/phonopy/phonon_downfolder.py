@@ -3,11 +3,13 @@ import os
 import numpy as np
 
 from lawaf.interfaces.downfolder import Lawaf
-from lawaf.interfaces.phonopy.lwf import LWF, NACLWF
 from lawaf.mathutils.evals_freq import freqs_to_evals
 from lawaf.mathutils.kR_convert import R_to_onek, k_to_R
 
+from .lwf import LWF, NACLWF
 from .phonopywrapper import PhonopyWrapper
+
+__all__ = ["PhononDownfolder", "PhonopyDownfolder", "NACPhonopyDownfolder"]
 
 
 class PhononDownfolder(Lawaf):

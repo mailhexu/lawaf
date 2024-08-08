@@ -31,6 +31,8 @@ from lawaf.utils.supercell import SupercellMaker
 
 from .ifcwrapper import IFC
 
+__all__ = ["PhonopyWrapper", "replace_phonon_dynamics_with_myGL"]
+
 
 class MyDynamicalMatrixGL(DynamicalMatrixGL):
     def __init__(

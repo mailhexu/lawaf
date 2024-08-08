@@ -1,3 +1,3 @@
-from .phonon_downfolder import PhonopyDownfolder, NACPhonopyDownfolder
+# from .phonon_downfolder import PhonopyDownfolder, NACPhonopyDownfolder
 
-__all__ = ["PhonopyDownfolder", "NACPhonopyDownfolder"]
+# __all__ = ["PhonopyDownfolder", "NACPhonopyDownfolder"]

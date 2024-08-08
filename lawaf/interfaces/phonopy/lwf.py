@@ -2,10 +2,11 @@ from dataclasses import dataclass
 
 import numpy as np
 from ase import Atoms
-from lawaf.mathutils.kR_convert import R_to_k, R_to_onek, k_to_R
 from scipy.linalg import eigh
 
-from .phonopywrapper import PhonopyWrapper
+from lawaf.mathutils.kR_convert import R_to_onek, k_to_R
+
+# from .phonopywrapper import PhonopyWrapper
 from .lwf_supercell import write_lwf_cif
 
 
@@ -119,6 +120,7 @@ class LWF:
             kpts=ds["kpts"].values,
             kweights=ds["kweights"].values,
             wann_centers=ds["wann_centers"].values,
+            atoms=atoms,
         )
 
     def save_txt(self, fname):
@@ -253,17 +255,38 @@ class NACLWF(LWF):
         wann_centers: centers of Wannier functions.
     """
 
-    born: np.ndarray = None
-    dielectric: np.ndarray = None
-    wannR: np.ndarray = None
-    HR_noNAC: np.ndarray = None
-    HR_short: np.ndarray = None
-    HR_total: np.ndarray = None
-    NAC_phonon: PhonopyWrapper = None
-    nac: bool = True
-    kpts: np.ndarray = None
-    kweights: np.ndarray = None
-    wann_centers: np.ndarray = None
+    def __init__(
+        self,
+        born=None,
+        dielectric=None,
+        factor=None,
+        Rlist=None,
+        Rdeg=None,
+        wannR=None,
+        HR_noNAC=None,
+        HR_short=None,
+        HR_total=None,
+        NAC_phonon=None,
+        kpts=None,
+        kweights=None,
+        wann_centers=None,
+        atoms=None,
+    ):
+        self.born = born
+        self.dielectric = dielectric
+        self.factor = factor
+        self.Rlist = Rlist
+        self.Rdeg = Rdeg
+        self.wannR = wannR
+        self.HR_noNAC = HR_noNAC
+        self.HR_short = HR_short
+        self.HR_total = HR_total
+        self.NAC_phonon = NAC_phonon
+        self.nac = True
+        self.kpts = kpts
+        self.kweights = kweights
+        self.wann_centers = wann_centers
+        self.atoms = atoms
 
     def __post_init__(self):
         self.natoms = self.born.shape[0]
@@ -315,10 +338,8 @@ class NACLWF(LWF):
             return np.zeros_like(self.HR_total[0])
         nac_q = self._get_charge_sum(qpt)
         dd = nac_q * self.get_constant_factor_wang(qpt)
-        # mmat = np.sqrt(np.outer(self.wann_masses, self.wann_masses))
         mmat = np.ones((self.nwann, self.nwann))
         return self.remove_phase(dd / mmat, qpt) * 1.0
-        # return dd / mmat
 
     def split_short_long_wang(self):
         self.nkpt = len(self.kpts)
@@ -333,12 +354,14 @@ class NACLWF(LWF):
         self.HRs_wang_short = HRs_short
 
     def _get_charge_sum(self, q):
+        """
+        get the charge sum.
+        The equation:
+        NAC= Z*q
+        """
         nac_q = np.zeros((self.nwann, self.nwann), dtype="double", order="C")
         A = np.dot(self.born_wan, q)
         nac_q = np.outer(A.conj(), A)
-        # for i in range(num_atom):
-        #    for j in range(num_atom):
-        #        nac_q[i, j] = np.outer(A[i], A[j])
         return nac_q
 
     def get_Hk_short(self, kpt):
@@ -429,10 +452,10 @@ class NACLWF(LWF):
 
 
 def get_wannier_centers(wannR, Rlist, positions, Rdeg):
-    nR = len(Rlist)
+    # nR = len(Rlist)
     nwann = wannR.shape[2]
     wann_centers = np.zeros((nwann, 3), dtype=float)
-    natom = len(positions)
+    # natom = len(positions)
     p = np.kron(positions, np.ones((3, 1)))
     for iR, R in enumerate(Rlist):
         c = wannR[iR, :, :]
@@ -446,7 +469,7 @@ def get_wannier_centers(wannR, Rlist, positions, Rdeg):
 
 class PhonopyDownfolderWrapper:
     downfolder = None
-    solver: PhonopyWrapper = None
+    solver = None
 
     def __init__(self, downfolder):
         self.downfolder = downfolder.builder
