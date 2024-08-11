@@ -1,9 +1,9 @@
-import numpy as np
 import os
-from phonopy import load
-from ase.io import write
-from lawaf import NACPhonopyDownfolder, PhonopyDownfolder
+
 import matplotlib.pyplot as plt
+import numpy as np
+
+from lawaf import NACPhonopyDownfolder
 
 
 def run(name, **kwargs):
@@ -38,7 +38,7 @@ def run(name, **kwargs):
     for i in range(len(downfolder.kpts)):
         print(i, downfolder.kpts[i])
     downfolder.downfold()
-    ax = downfolder.plot_band_fitting(
+    downfolder.plot_band_fitting(
         kvectors=np.array(
             [
                 [0.0, 0.0, 0.0],
@@ -71,7 +71,7 @@ def run_scdmk():
         nwann=3,
         anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
         use_proj=True,
-        proj_order=2,
+        proj_order=1,
     )
 
 

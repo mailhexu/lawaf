@@ -1,8 +1,7 @@
-import numpy as np
-from phonopy import load
-from ase.io import write
-from lawaf import NACPhonopyDownfolder, PhonopyDownfolder
 import matplotlib.pyplot as plt
+import numpy as np
+
+from lawaf import NACPhonopyDownfolder
 
 fname = "phonopy_params.yaml"
 params = dict(
@@ -13,11 +12,13 @@ params = dict(
     # nwann=15,
     # selected_basis=list(range(15)),
     anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
+    # anchors={(0.0, 0.0, 0.0): list(range(15))},
     use_proj=True,
+    proj_order=1,
     weight_func="unity",
     # weight_func="Fermi",
     weight_func_params=(-1, 1),
-    kmesh=(6, 6, 6),
+    kmesh=(2, 2, 2),
     gamma=True,
     kshift=(0.000, 0.000, 0.000),
     enhance_Amn=0,
@@ -34,7 +35,7 @@ downfolder.set_parameters(**params)
 for i in range(len(downfolder.kpts)):
     print(i, downfolder.kpts[i])
 downfolder.downfold()
-ax = downfolder.plot_band_fitting(
+downfolder.plot_band_fitting(
     kvectors=np.array(
         [
             [0.0, 0.0, 0.0],

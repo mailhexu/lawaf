@@ -287,6 +287,7 @@ class NACLWF(LWF):
         self.kweights = kweights
         self.wann_centers = wann_centers
         self.atoms = atoms
+        self.__post_init__()
 
     def __post_init__(self):
         self.natoms = self.born.shape[0]
@@ -322,6 +323,7 @@ class NACLWF(LWF):
         masses = np.repeat(self.atoms.get_masses(), 3)
         sqrtm = np.sqrt(masses)
         self.born_wan = np.einsum("Rji,jk->ik", self.wannR, born / sqrtm[:, None])
+        self.born_wan = np.abs(self.born_wan)
 
     def get_constant_factor_wang(self, q):
         # unit_conversion * 4.0 * np.pi / volume / np.dot(q.T, np.dot(dielectric, q))
@@ -339,7 +341,9 @@ class NACLWF(LWF):
         nac_q = self._get_charge_sum(qpt)
         dd = nac_q * self.get_constant_factor_wang(qpt)
         mmat = np.ones((self.nwann, self.nwann))
-        return self.remove_phase(dd / mmat, qpt) * 1.0
+        return self.remove_phase(dd / mmat, qpt) * 1
+        return self.remove_phase(dd / mmat, qpt) * (1 - np.sum(qpt**2) ** 2)
+        # return dd
 
     def split_short_long_wang(self):
         self.nkpt = len(self.kpts)
@@ -348,10 +352,10 @@ class NACLWF(LWF):
             Hk_tot = self.get_Hk_nac_total(kpt)
             Hk_long = self.get_Hk_wang_long(kpt)
             Hks_short[ik] = Hk_tot - Hk_long
-        HRs_short = k_to_R(
+        HR_short = k_to_R(
             self.kpts, self.Rlist, Hks_short, kweights=self.kweights, Rdeg=self.Rdeg
         )
-        self.HRs_wang_short = HRs_short
+        self.HR_short = HR_short
 
     def _get_charge_sum(self, q):
         """
@@ -359,7 +363,7 @@ class NACLWF(LWF):
         The equation:
         NAC= Z*q
         """
-        nac_q = np.zeros((self.nwann, self.nwann), dtype="double", order="C")
+        nac_q = np.zeros((self.nwann, self.nwann), dtype=float, order="C")
         A = np.dot(self.born_wan, q)
         nac_q = np.outer(A.conj(), A)
         return nac_q
@@ -411,7 +415,7 @@ class NACLWF(LWF):
             # return self.get_Hk_nac_total(kpt)
             # return self.get_Hk_nac(kpt)
             if method == "wang":
-                Hk_short = R_to_onek(kpt, self.Rlist, self.HRs_wang_short)
+                Hk_short = R_to_onek(kpt, self.Rlist, self.HR_short)
                 # Hk_short = self.get_Hk_nac_total(kpt)
                 Hk_long = self.get_Hk_wang_long(kpt)
                 # Hk_long =0

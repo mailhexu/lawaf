@@ -9,7 +9,7 @@ from HamiltonIO.lawaf import LawafHamiltonian as EWF
 from lawaf.mathutils.kR_convert import k_to_R
 from lawaf.params import WannierParams
 from lawaf.plot import plot_band
-from lawaf.utils.kpoints import build_Rgrid_with_degeneracy, monkhorst_pack
+from lawaf.utils.kpoints import build_Rgrid, monkhorst_pack
 from lawaf.wannierization import (
     DummyWannierizer,
     MaxProjectedWannierizer,
@@ -199,7 +199,7 @@ class Lawaf:
 
     def _prepare_Rlist(self):
         self.Rgrid = self.params.kmesh
-        self.Rlist, self.Rdeg = build_Rgrid_with_degeneracy(self.Rgrid)
+        self.Rlist, self.Rdeg = build_Rgrid(self.Rgrid, degeneracy=True)
 
     def _prepare_eigen(self, has_phase=False):
         self.Hk = None
@@ -284,6 +284,82 @@ class Lawaf:
             is_orthogonal=(SwannR is None),
         )
         return self.lwf
+
+    def plot_full_band(
+        self,
+        kvectors=None,
+        knames=None,
+        supercell_matrix=None,
+        npoints=100,
+        efermi=None,
+        erange=None,
+        fullband_color="blue",
+        downfolded_band_color="green",
+        marker="o",
+        ax=None,
+        savefig="Downfolded_band.png",
+        cell=np.eye(3),
+        plot_original=True,
+        plot_downfolded=True,
+        plot_nonac=False,
+        show=True,
+        fix_LOTO=False,
+        **kwargs,
+    ):
+        ax = plot_band(
+            self.model,
+            kvectors=kvectors,
+            knames=knames,
+            supercell_matrix=supercell_matrix,
+            npoints=npoints,
+            color=fullband_color,
+            alpha=0.8,
+            marker="",
+            erange=erange,
+            efermi=efermi,
+            cell=cell,
+            ax=ax,
+            fix_LOTO=fix_LOTO,
+            **kwargs,
+        )
+        return ax
+
+    def plot_wannier_band(
+        self,
+        kvectors=None,
+        knames=None,
+        supercell_matrix=None,
+        npoints=100,
+        efermi=None,
+        erange=None,
+        downfolded_band_color="green",
+        marker="o",
+        ax=None,
+        savefig="Downfolded_band.png",
+        cell=np.eye(3),
+        plot_original=True,
+        plot_downfolded=True,
+        plot_nonac=False,
+        show=True,
+        fix_LOTO=False,
+        **kwargs,
+    ):
+        ax = plot_band(
+            self.lwf,
+            kvectors=kvectors,
+            knames=knames,
+            supercell_matrix=supercell_matrix,
+            npoints=npoints,
+            efermi=efermi,
+            color=downfolded_band_color,
+            alpha=0.3,
+            marker=marker,
+            erange=erange,
+            cell=cell,
+            ax=ax,
+            fix_LOTO=fix_LOTO,
+            **kwargs,
+        )
 
     def plot_band_fitting(
         self,

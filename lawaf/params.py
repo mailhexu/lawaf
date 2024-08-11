@@ -43,6 +43,9 @@ class WannierParams:
         for key, value in pdict.items():
             setattr(self, key, value)
 
+    def set(self, key, value):
+        setattr(self, key, value)
+
     def to_dict(self):
         mdict = copy.deepcopy(self.__dict__)
         for key, value in mdict.items():

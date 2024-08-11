@@ -44,6 +44,9 @@ class ScdmkWannierizer(Wannierizer):
         else:
             self.auto_set_anchors(params.anchor_kpt)
 
+        print(f"Number of selected columns: {len(self.cols)}")
+        print(f"Selected columns: {self.cols}")
+
     def set_selected_cols(self, cols):
         """
         Munually set selected Columns.
@@ -118,7 +121,7 @@ class ScdmkWannierizer(Wannierizer):
         print(f"The eigenvalues at anchor k: {self.get_eval_k(ik)}")
         print(f"anchor_kpt={kpt}. Selected columns: {self.cols}.")
 
-    def _get_projection_to_anchors(self):
+    def _get_projection_to_anchors2(self):
         # anchor point wavefunctions with phase removed
         if self.use_proj and len(self.psi_anchors) > 0:
             self.projs[:, :] = 0.0
@@ -132,6 +135,24 @@ class ScdmkWannierizer(Wannierizer):
                         self.projs[ikpt, iband] += np.real(np.conj(p) * p) ** (
                             self.proj_order
                         )
+        else:
+            self.projs[:, :] = 1.0
+        return self.projs
+
+    def _get_projection_to_anchors(self):
+        # anchor point wavefunctions with phase removed
+        if self.use_proj and len(self.psi_anchors) > 0:
+            self.projs[:, :] = 0.0
+            # k: kpt, o: orbital, b: band
+            self.projs_per_anchor = np.einsum(
+                "kob,no->knb", self.evecs.conj(), self.psi_anchors
+            )
+            self.projs = np.einsum(
+                "knb->kb",
+                (self.projs_per_anchor * self.projs_per_anchor.conj())
+                ** self.proj_order,
+            )
+            print(f"Projs: {self.projs}")
         else:
             self.projs[:, :] = 1.0
         return self.projs
@@ -154,8 +175,10 @@ class ScdmkWannierizer(Wannierizer):
         if Sk is not None:
             psiT = psiT @ Sk
         if self.use_proj:
-            projs = np.einsum("iw,wb->b", self.psi_anchors, psik.conj())
-            projs = np.sqrt(np.abs(np.abs(projs)))
+            # projs = np.einsum("iw,wb->b", self.psi_anchors, psik.conj())
+            # projs = np.sqrt(np.abs(np.abs(projs)))
+            projs = np.einsum("iw,wb->ib", self.psi_anchors, psik.conj())
+            projs = np.einsum("ib-> b", np.abs(np.abs(projs)) ** self.proj_order)
             if occ is None:
                 # psi = psik[self.cols, :] * (projs)[None, :]
                 psiT = psiT[:, self.cols] * (projs)[:, None]
@@ -169,7 +192,7 @@ class ScdmkWannierizer(Wannierizer):
             else:
                 # psi = psik[self.cols, :]
                 psiT = psiT[:, self.cols]
-        if self.orthogonal:
+        if self.orthogonal or True:
             U, _S, VT = svd(psiT, full_matrices=False)
             Amn_k = U @ VT
         else:

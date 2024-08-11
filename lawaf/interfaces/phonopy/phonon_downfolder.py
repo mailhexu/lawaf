@@ -93,7 +93,7 @@ class PhonopyDownfolder(PhononDownfolder):
         self.builder.get_Amn()
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
-        wannk, Hwannk, _ = self.builder.get_wannk_and_Hk()
+        wannk, Hwannk = self.builder.get_wannk_and_Hk()
         HwannR = k_to_R(
             self.kpts, self.Rlist, Hwannk, kweights=self.kweights, Rdeg=self.Rdeg
         )
@@ -105,6 +105,9 @@ class PhonopyDownfolder(PhononDownfolder):
         wann_centers = get_wannier_centers(
             wannR, self.Rlist, self.atoms.get_scaled_positions(), Rdeg=self.Rdeg
         )
+        print("wannier_centers: ")
+        for i in range(self.nwann):
+            print(f"{i}: {wann_centers[i]=}")
 
         # save the lwf model into a NACLWF object
         self.lwf = LWF(
@@ -224,6 +227,10 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         wann_centers = get_wannier_centers(
             wannR, self.Rlist, self.atoms.get_scaled_positions(), Rdeg=self.Rdeg
         )
+        # wann_centers *= 0.0
+        print("wannier_centers: ")
+        for i in range(self.nwann):
+            print(f"{i}: {wann_centers[i]=}")
 
         # save the lwf model into a NACLWF object
         self.lwf = NACLWF(
@@ -307,7 +314,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
 def get_wannier_centers(wannR, Rlist, positions, Rdeg):
     # nR = len(Rlist)
     nwann = wannR.shape[2]
-    wann_centers = np.zeros((nwann, 3), dtype=float)
+    wann_centers = np.zeros((nwann, 3), dtype=complex)
     # natom = len(positions)
     p = np.kron(positions, np.ones((3, 1)))
     for iR, R in enumerate(Rlist):

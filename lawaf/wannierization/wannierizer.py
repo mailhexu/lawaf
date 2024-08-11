@@ -213,6 +213,7 @@ class Wannierizer(BasicWannierizer):
             print(f"[{ik+1}/{self.nkpt}] k={self.kpts[ik]}")
             self.Amn[ik, :, :] = np.array(self.get_Amn_one_k(ik), dtype=complex)
         if self.params.enhance_Amn:
+            print("Enhancing Amn matrix.")
             self.Amn = enhance_Amn(
                 self.Amn, self.evals.real, order=self.params.enhance_Amn
             )

@@ -17,7 +17,17 @@ def kmesh_to_R(kmesh):
     return np.array(Rlist)
 
 
-def build_Rgrid(R):
+def build_Rgrid(R, degeneracy=False):
+    """
+    Build R-point grid from the number
+    """
+    if degeneracy:
+        return build_Rgrid_with_degeneracy(R)
+    else:
+        return build_Rgrid_without_degeneracy(R)
+
+
+def build_Rgrid_without_degeneracy(R):
     """
     Build R-point grid from the number
     """
@@ -28,7 +38,7 @@ def build_Rgrid(R):
         for R2 in range(-l2 // 2 + 1, l2 // 2 + 1)
         for R3 in range(-l3 // 2 + 1, l3 // 2 + 1)
     ]
-    return np.array(Rlist)
+    return np.array(Rlist), np.ones(len(Rlist), dtype=float)
 
 
 def build_Rgrid_with_degeneracy(R):
@@ -46,7 +56,7 @@ def build_Rgrid_with_degeneracy(R):
     if l3 % 2 == 0:
         l3 += 1
         incs[2] = True
-    ind = -1
+    # ind = -1
     Rlist = np.zeros((l1 * l2 * l3, 3), dtype=int)
     deg = np.zeros((l1 * l2 * l3), dtype=float)
     for i in range(0, l1):
