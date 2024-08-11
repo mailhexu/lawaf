@@ -109,17 +109,15 @@ class ParamsGui:
             with ui.tabs().classes("w-full") as tabs:
                 scdmk_tab = ui.tab("SCDM-k")
                 PWF_tab = ui.tab("PWF")
-                ui.tab("SCDM-k")
-                ui.tab("Projected")
-                with ui.tab_panels(
-                    tabs,
-                    value=scdmk_tab,
-                    on_change=lambda x: self.params.set("method", x.value),
-                ):  # as method_panels:
-                    with ui.tab_panel(scdmk_tab):
-                        self.scdmk_tab()
-                    with ui.tab_panel(PWF_tab):
-                        self.PWF_tab()
+            with ui.tab_panels(
+                tabs,
+                value=scdmk_tab,
+                on_change=lambda x: self.params.set("method", x.value),
+            ):  # as method_panels:
+                with ui.tab_panel(scdmk_tab):
+                    self.scdmk_tab()
+                with ui.tab_panel(PWF_tab):
+                    self.PWF_tab()
 
         # ui.select(["scdmk", "projected"], label="Method", value=self.params.method,
         #          on_change=lambda x: self.params.set("method", x.value))
