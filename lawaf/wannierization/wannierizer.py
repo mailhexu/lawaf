@@ -127,9 +127,12 @@ class Wannierizer(BasicWannierizer):
         # kpts
         self.weight_func = self.params.weight_func
         if isinstance(self.params.weight_func, str):
-            self.weight_func = occupation_func(
-                self.params.weight_func, *(self.params.weight_func_params)
-            )
+            if self.params.weight_func == "unity":
+                self.weight_func = occupation_func(self.params.weight_func)
+            else:
+                self.weight_func = occupation_func(
+                    self.params.weight_func, *(self.params.weight_func_params)
+                )
 
         # Rgrid
         # self.Rgrid = Rgrid

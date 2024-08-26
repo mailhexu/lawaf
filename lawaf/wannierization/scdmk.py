@@ -92,6 +92,7 @@ class ScdmkWannierizer(Wannierizer):
         """
         if anchors is None:
             return
+        self.psi_anchors = []
         for k, ibands in anchors.items():
             if self.wfn_anchor is None:
                 ik = self.find_k(k)

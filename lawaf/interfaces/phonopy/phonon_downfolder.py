@@ -54,10 +54,11 @@ class PhonopyDownfolder(PhononDownfolder):
         """
         if self.mode.lower() == "dm":
             p = self.params.weight_func_params
-            print(f"Converted DM parameters from: {p}")
-            p = [freqs_to_evals(pe, factor=self.factor) for pe in p]
-            self.params.weight_func_params = p
-            print(f"Converted DM parameters to: {p}")
+            if p is not None:
+                print(f"Converted DM parameters from: {p}")
+                p = [freqs_to_evals(pe, factor=self.factor) for pe in p]
+                self.params.weight_func_params = p
+                print(f"Converted DM parameters to: {p}")
 
     def process_parameters(self):
         self.convert_DM_parameters()
@@ -87,6 +88,7 @@ class PhonopyDownfolder(PhononDownfolder):
     #    return self.lwf
 
     def downfold(self, output_path="./", write_hr_nc="LWF.nc", write_hr_txt="LWF.txt"):
+        self._prepare_data()
         self.atoms = self.model.atoms
         self.builder.prepare()
         # compute the Amn matrix from phonons without NAC
@@ -194,6 +196,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         write_hr_txt="LWF.txt",
         **params,
     ):
+        self._prepare_data()
         self.atoms = self.model.atoms
         self.builder.prepare()
         # compute the Amn matrix from phonons without NAC
@@ -314,7 +317,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
 def get_wannier_centers(wannR, Rlist, positions, Rdeg):
     # nR = len(Rlist)
     nwann = wannR.shape[2]
-    wann_centers = np.zeros((nwann, 3), dtype=complex)
+    wann_centers = np.zeros((nwann, 3), dtype=float)
     # natom = len(positions)
     p = np.kron(positions, np.ones((3, 1)))
     for iR, R in enumerate(Rlist):

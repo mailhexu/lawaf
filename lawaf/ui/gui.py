@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 from nicegui import ui
 
@@ -29,18 +31,23 @@ from lawaf.params import WannierParams
 
 
 class ParamsGui:
-    def __init__(self):
+    def __init__(self, port=None):
         # default parameters
         self.params = WannierParams()
+        self.port = port
+
+    def run(self):
         self.create_ui()
 
     def create_ui(self):
-        ui.add_css("""
+        ui.add_css(
+            """
         :root {
         --nicegui-default-padding: 0.1rem;
         --nicegui-default-gap: 0.5rem;
         }
-        """)
+        """
+        )
         ui.label("LaWaF")
         self.params.method = "scdmk"
         # number of wannier functions
@@ -49,7 +56,7 @@ class ParamsGui:
             self.figure_card()
         ## projection order
         # ui.number("Projection order", value=self.params.proj_order, on_change=lambda x: self.params.set("proj_order", int(x.value)))
-        ui.run(port=456)
+        ui.run(port=self.port)
 
     def plot_band(self, ax, pl):
         x = np.linspace(0.1, 10, 100)
@@ -58,11 +65,16 @@ class ParamsGui:
         ax.scatter(x, y)
         pl.update()
 
+    def wannierize(self, ax, pl):
+        ax.clear()
+        ax.scatter([1, 1], [2, 3])
+        pl.update()
+
     def figure_card(self):
         with ui.card():
             with ui.row():
                 ui.button("Plot band", on_click=lambda: self.plot_band(ax, pl=pl))
-                ui.button("Wannierize", on_click=lambda: ui.notify("Wannierizing"))
+                ui.button("Wannierize", on_click=lambda: self.wannierize(ax, pl=pl))
                 ui.button(
                     "Save figure",
                     on_click=lambda: ui.notify(f"self.params={self.params}"),
@@ -98,7 +110,7 @@ class ParamsGui:
             with ui.row():
                 ui.label("K-mesh")
                 ui.input(
-                    " 5,5,5",
+                    " 2,2,2",
                     on_change=lambda x: self.params.set(
                         "kmesh", [int(i) for i in x.value.split(",")]
                     ),
@@ -124,43 +136,55 @@ class ParamsGui:
         # with ui.card():
 
     def PWF_tab(self):
-        pass
+        with ui.row():
+            ui.label("projector type")
+            proj_type = ui.toggle(
+                ["atomic", "mode"],
+                value="mode",
+                on_change=lambda x: self.params.set("proj_type", x.value),
+            )
+
+        with ui.column().bind_visibility_from(
+            proj_type, "value", backward=lambda x: x == "mode"
+        ):
+            with ui.row():
+                ui.label("mode kpoint")
+                ui.input(
+                    "0.0,0.0,0.0",
+                    on_change=lambda x: self.params.set(
+                        "anchor_kpt", [float(i) for i in x.value.split(",")]
+                    ),
+                )
+            # anchor bands
+            with ui.row():
+                ui.label("mode band index")
+                ui.input(
+                    "0,1,2",
+                    on_change=lambda x: (
+                        self.params.set(
+                            "anchor_ibands", [int(i) for i in x.value.split(",")]
+                        ),
+                        ui.notify(f"self.params={self.params}"),
+                    ),
+                )
+
+        with ui.column().bind_visibility_from(
+            proj_type, "value", backward=lambda x: x == "atomic"
+        ):
+            with ui.row():
+                ui.label("atomic index")
+                ui.input(
+                    "0,1,2",
+                    on_change=lambda x: self.params.set(
+                        "selected_basis", [int(i) for i in x.value.split(",")]
+                    ),
+                )
 
     def scdmk_tab(self):
-        ui.label("SCDM-k")
         # ui.select(["unity", "Gaussian", "Fermi", "range"], label="Weight function", value=self.params.weight_func,
         #          on_change=lambda x: self.params.set("weight_func", x.value))
 
         # anchor kpoints
-        with ui.row():
-            ui.label("Anchor kpoint")
-            ui.input(
-                "0.0,0.0,0.0",
-                on_change=lambda x: self.params.set(
-                    "anchor_kpt", [float(i) for i in x.value.split(",")]
-                ),
-            )
-
-        # anchor bands
-        with ui.row():
-            ui.label("Anchor bands")
-            ui.input(
-                "0,1,2",
-                on_change=lambda x: self.params.set(
-                    "anchor_ibands", [int(i) for i in x.value.split(",")]
-                ),
-            )
-
-        # selected basis
-        with ui.row():
-            ui.label("Selected basis")
-            ui.input(
-                "0,1,2",
-                on_change=lambda x: self.params.set(
-                    "selected_basis", [int(i) for i in x.value.split(",")]
-                ),
-            )
-
         # use projection
         ui.checkbox(
             "Use projection",
@@ -168,11 +192,47 @@ class ParamsGui:
             value=self.params.use_proj,
         )
 
+        scdmk_mode = ui.toggle(["manaul", "auto", "columns"], value="manaul")
+        with ui.column().bind_visibility_from(
+            scdmk_mode, "value", backward=lambda x: x == "manaul"
+        ):
+            with ui.row().bind_visibility_from(
+                scdmk_mode, "value", backward=lambda x: x == "manaul"
+            ):
+                ui.label("Anchor kpoint")
+                ui.input(
+                    "0.0,0.0,0.0",
+                    on_change=lambda x: self.params.set(
+                        "anchor_kpt", [float(i) for i in x.value.split(",")]
+                    ),
+                )
+            # anchor bands
+            with ui.row():
+                ui.label("Anchor band indices")
+                ui.input(
+                    "0,1,2",
+                    on_change=lambda x: (
+                        self.params.set(
+                            "anchor_ibands", [int(i) for i in x.value.split(",")]
+                        ),
+                        ui.notify(f"self.params={self.params}"),
+                    ),
+                )
 
-class WannierGUI(ParamsGui):
-    def __init__(self):
-        super().__init__()
+        with ui.column().bind_visibility_from(
+            scdmk_mode, "value", backward=lambda x: x == "columns"
+        ):
+            # selected basis
+            with ui.row():
+                ui.label("Selected columns")
+                ui.input(
+                    "0,1,2",
+                    on_change=lambda x: self.params.set(
+                        "selected_basis", [int(i) for i in x.value.split(",")]
+                    ),
+                )
 
 
 if __name__ in ["__main__", "__mp_main__"]:
-    pg = ParamsGui()
+    pg = ParamsGui(port=int(sys.argv[1]) if len(sys.argv) > 1 else None)
+    pg.run()

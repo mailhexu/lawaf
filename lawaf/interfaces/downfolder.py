@@ -44,7 +44,6 @@ class Lawaf:
         self.builder = None
         self.Rgrid = None
         self.params = params
-        self._prepare_data()
 
     @property
     def params(self):
@@ -256,6 +255,8 @@ class Lawaf:
         **params,
     ):
         self.params.update(params)
+        self._prepare_data()
+        # self.params.update(params)
         self.atoms = self.model.atoms
         # self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
         self.builder.get_Amn()
