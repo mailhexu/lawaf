@@ -1,22 +1,24 @@
 import os
 import numpy as np
 import copy
-from scipy.linalg import eigh, eigvalsh
+from scipy.linalg import eigh
 from scipy.sparse import csr_matrix
 from scipy.io import netcdf_file
 from collections import defaultdict
+
+# from tbmodels import Model
 from ase.io import read
 from ase.atoms import Atoms
-#from TB2J.utils import auto_assign_basis_name
-from functools import lru_cache
-from lawaf.wrapper.w90_parser import parse_ham, parse_xyz, parse_win
-from lawaf.wrapper.utils import auto_assign_basis_name
+from TB2J.utils import auto_assign_basis_name
+from TB2J.wannier import parse_ham, parse_xyz
 
 
-class AbstractTB():
-    def __init__(self, R2kfactor, nspin, norb, orb_order=1):
+class AbstractTB:
+    def __init__(self, R2kfactor, nspin, norb):
         #: :math:`\alpha` used in :math:`H(k)=\sum_R  H(R) \exp( \alpha k \cdot R)`,
         #: Should be :math:`2\pi i` or :math:`-2\pi i`
+        self.is_siesta = False
+        self.is_orthogonal = True
         self.R2kfactor = R2kfactor
 
         #: number of spin. 1 for collinear, 2 for spinor.
@@ -37,8 +39,6 @@ class AbstractTB():
         #: The order of the spinor basis.
         #: 1: orb1_up, orb2_up,  ... orb1_down, orb2_down,...
         #: 2: orb1_up, orb1_down, orb2_up, orb2_down,...
-        self.orb_order = orb_order
-        self.has_nac = False
 
     def get_hamR(self, R):
         """
@@ -52,9 +52,12 @@ class AbstractTB():
         """
         raise NotImplementedError()
 
+    def HSE(self, kpt):
+        raise NotImplementedError()
+
     def HS_and_eigen(self, kpts):
         """
-        get Hamiltonian, overlap matrices, eigenvalues, eigen vectors for all kpoints. 
+        get Hamiltonian, overlap matrices, eigenvalues, eigen vectors for all kpoints.
 
         :param:
 
@@ -70,27 +73,18 @@ class AbstractTB():
         """
         raise NotImplementedError()
 
-    def solve_all(self, kpts):
-        evals = []
-        evecs = []
-        for ik, k in enumerate(kpts):
-            evalue, evec = self.solve(k)
-            evals.append(evalue)
-            evecs.append(evec)
-        return np.array(evals, dtype=float), np.array(evecs,
-                                                      dtype=complex,
-                                                      order='C')
-
 
 class MyTB(AbstractTB):
-    def __init__(self,
-                 nbasis,
-                 data=None,
-                 positions=None,
-                 sparse=False,
-                 ndim=3,
-                 nspin=1,
-                 double_site_energy=2.0):
+    def __init__(
+        self,
+        nbasis,
+        data=None,
+        positions=None,
+        sparse=False,
+        ndim=3,
+        nspin=1,
+        double_site_energy=2.0,
+    ):
         """
         :param nbasis: number of basis.
         :param data: a dictionary of {R: matrix}. R is a tuple, matrix is a nbasis*nbasis matrix.
@@ -99,11 +93,11 @@ class MyTB(AbstractTB):
         :param ndim: number of dimensions.
         :param nspin: number of spins.
         """
+
         if data is not None:
             self.data = data
         else:
-            self.data = defaultdict(lambda: np.zeros(
-                (nbasis, nbasis), dtype=complex))
+            self.data = defaultdict(lambda: np.zeros((nbasis, nbasis), dtype=complex))
         self._nbasis = nbasis
         self._nspin = nspin
         self._norb = nbasis // nspin
@@ -120,7 +114,8 @@ class MyTB(AbstractTB):
         self.atoms = None
         self.R2kfactor = 2.0j * np.pi
         self.k2Rfactor = -2.0j * np.pi
-        self.has_nac=False
+        self.is_siesta = False
+        self.is_orthogonal = True
 
     def set_atoms(self, atoms):
         self.atoms = atoms
@@ -170,45 +165,73 @@ class MyTB(AbstractTB):
         return data
 
     @staticmethod
-    def read_from_wannier_dir(path, prefix):
+    def read_from_wannier_dir(path, prefix, posfile="POSCAR", nls=True, groupby="spin"):
         """
-        read tight binding model from a wannier function directory. 
+        read tight binding model from a wannier function directory.
         :param path: path
         :param prefix: prefix to the wannier files, often wannier90, or wannier90_up, or wannier90_dn for vasp.
         """
-        #tbmodel = Model.from_wannier_folder(
+        # tbmodel = Model.from_wannier_folder(
         #    folder=path, prefix=prefix)
-        #m = MyTB.from_tbmodel(tbmodel)
-        nbasis, data = parse_ham(fname=os.path.join(path, prefix + '_hr.dat'))
-        try:
-            xcart, _, _ = parse_xyz(fname=os.path.join(path, prefix +
-                                                   '_centres.xyz'))
-        except:
-            xcart=np.zeros((nbasis,3), dtype=float)
-        atoms = parse_win(fname=os.path.join(path, prefix + '.win'))
-        cell=atoms.get_cell()
-        #atoms = read(os.path.join(path, posfile))
+        # m = MyTB.from_tbmodel(tbmodel)
+        nbasis, data = parse_ham(fname=os.path.join(path, prefix + "_hr.dat"))
+        xcart, _, _ = parse_xyz(fname=os.path.join(path, prefix + "_centres.xyz"))
+        atoms = read(os.path.join(path, posfile))
+        cell = atoms.get_cell()
         xred = cell.scaled_positions(xcart)
+        if groupby == "orbital":
+            norb = nbasis // 2
+            xtmp = np.copy(xred)
+            xred[:norb] = xtmp[::2]
+            xred[norb:] = xtmp[1::2]
+            for key, val in data.items():
+                dtmp = copy.deepcopy(val)
+                data[key][:norb, :norb] = dtmp[::2, ::2]
+                data[key][:norb, norb:] = dtmp[::2, 1::2]
+                data[key][norb:, :norb] = dtmp[1::2, ::2]
+                data[key][norb:, norb:] = dtmp[1::2, 1::2]
         ind, positions = auto_assign_basis_name(xred, atoms)
         m = MyTB(nbasis=nbasis, data=data, positions=xred)
         nm = m.shift_position(positions)
         nm.set_atoms(atoms)
         return nm
 
+    @staticmethod
+    def load_lawaf(path, prefix, posfile="POSCAR", nls=True, groupby="spin"):
+        from lawaf.scdm.lwf import LWF
+
+        lwf = LWF.load_nc(fname=os.path.join(path, f"{prefix}.nc"))
+        nbasis = lwf.nwann
+        nspin = 1
+        positions = lwf.wann_centers
+        ndim = lwf.ndim
+        H_mnR = defaultdict(lambda: np.zeros((nbasis, nbasis), dtype=complex))
+
+        for iR, R in enumerate(lwf.Rlist):
+            val = lwf.HwannR[iR]
+            if np.linalg.norm(R) < 0.001:
+                H_mnR[R] = val
+                H_mnR[R] -= np.diag(np.diag(val) / 2.0)
+            else:
+                H_mnR[R] = lwf.HwannR[iR]
+        m = MyTB(nbasis, data=H_mnR, nspin=nspin, ndim=ndim, positions=positions)
+        m.atoms = read(posfile)
+        return m
+
     def gen_ham(self, k, convention=2):
         """
         generate hamiltonian matrix at k point.
         H_k( i, j)=\sum_R H_R(i, j)^phase.
-        There are two conventions,         
+        There are two conventions,
         first:
         phase =e^{ik(R+rj-ri)}. often better used for berry phase.
         second:
         phase= e^{ikR}. We use the first convention here.
 
         :param k: kpoint
-        :param convention: 1 or 2. 
+        :param convention: 1 or 2.
         """
-        Hk = np.zeros((self.nbasis, self.nbasis), dtype='complex')
+        Hk = np.zeros((self.nbasis, self.nbasis), dtype="complex")
         if convention == 2:
             for R, mat in self.data.items():
                 phase = np.exp(self.R2kfactor * np.dot(k, R))
@@ -227,9 +250,15 @@ class MyTB(AbstractTB):
         Hk = self.gen_ham(k, convention=convention)
         return eigh(Hk)
 
+    def HSE_k(self, kpt, convention=2):
+        H = self.gen_ham(tuple(kpt), convention=convention)
+        S = None
+        evals, evecs = eigh(H)
+        return H, S, evals, evecs
+
     def HS_and_eigen(self, kpts, convention=2):
         """
-        calculate eigens for all kpoints. 
+        calculate eigens for all kpoints.
         :param kpts: list of k points.
         """
         nk = len(kpts)
@@ -237,19 +266,21 @@ class MyTB(AbstractTB):
         evals = np.zeros((nk, self.nbasis), dtype=float)
         evecs = np.zeros((nk, self.nbasis, self.nbasis), dtype=complex)
         for ik, k in enumerate(kpts):
-            hams[ik] = self.gen_ham(tuple(k), convention=convention)
-            evals[ik], evecs[ik] = eigh(hams[ik])
+            hams[ik], S, evals[ik], evecs[ik] = self.HSE_k(
+                tuple(k), convention=convention
+            )
         return hams, None, evals, evecs
 
     def prepare_phase_rjri(self):
         """
         The matrix P: P(i, j) = r(j)-r(i)
         """
-        self.rjminusri = np.zeros((self.nbasis, self.nbasis, self.ndim),
-                                  dtype=float)
-        for i in range(self.nbasis):
-            for j in range(self.nbasis):
-                self.rjminusri[i, j] = self.xred[j] - self.xred[i]
+        # self.rjminusri = np.zeros((self.nbasis, self.nbasis, self.ndim),
+        #                          dtype=float)
+        # for i in range(self.nbasis):
+        #    for j in range(self.nbasis):
+        #        self.rjminusri[i, j] = self.xred[j] - self.xred[i]
+        self.rjminusri = self.xred[None, :, :] - self.xred[:, None, :]
 
     def to_sparse(self):
         for key, val in self.data:
@@ -312,7 +343,7 @@ class MyTB(AbstractTB):
 
     def _to_positive_R(self):
         """
-        make all the R positive. 
+        make all the R positive.
         t(i, j, R) = t(j, i, -R).conj() if R is negative.
         """
         new_MyTB = MyTB(self.nbasis, sparse=self.sparse)
@@ -324,11 +355,11 @@ class MyTB(AbstractTB):
     def shift_position(self, rpos):
         """
         shift the positions of basis set to near reference positions.
-        E.g. reduced position 0.8, with refernce 0.0 will goto -0.2. 
-        This can move the wannier functions to near the ions. 
+        E.g. reduced position 0.8, with refernce 0.0 will goto -0.2.
+        This can move the wannier functions to near the ions.
         """
         pos = self.positions
-        shift = np.zeros((self.nbasis, self.ndim), dtype='int')
+        shift = np.zeros((self.nbasis, self.ndim), dtype="int")
         shift[:, :] = np.round(pos - rpos)
         newpos = copy.deepcopy(pos)
         for i in range(self.nbasis):
@@ -357,33 +388,28 @@ class MyTB(AbstractTB):
         Save model into a netcdf file.
         :param fname: filename.
         """
-        #from netCDF4 import Dataset
+        # from netCDF4 import Dataset
         # root = Dataset(fname, 'w', format="NETCDF4")
-        root = netcdf_file(fname, mode='w')
+        root = netcdf_file(fname, mode="w")
         root.createDimension("nR", self.nR)
         root.createDimension("ndim", self.ndim)
         root.createDimension("nbasis", self.nbasis)
         root.createDimension("nspin", self.nspin)
         root.createDimension("natom", len(self.atoms))
-        R = root.createVariable("R", 'i4', ("nR", "ndim"))
-        data_real = root.createVariable("data_real", 'f8',
-                                        ("nR", "nbasis", "nbasis"))
-        data_imag = root.createVariable("data_imag", 'f8',
-                                        ("nR", "nbasis", "nbasis"))
-        positions = root.createVariable("positions", 'f8', ("nbasis", "ndim"))
+        R = root.createVariable("R", "i4", ("nR", "ndim"))
+        data_real = root.createVariable("data_real", "f8", ("nR", "nbasis", "nbasis"))
+        data_imag = root.createVariable("data_imag", "f8", ("nR", "nbasis", "nbasis"))
+        positions = root.createVariable("positions", "f8", ("nbasis", "ndim"))
 
         if self.atoms is not None:
-            atom_numbers = root.createVariable("atom_numbers", 'i4',
-                                               ("natom", ))
-            atom_xred = root.createVariable("atom_xred", 'f8',
-                                            ("natom", "ndim"))
-            atom_cell = root.createVariable("atom_cell", 'f8',
-                                            ("ndim", "ndim"))
+            atom_numbers = root.createVariable("atom_numbers", "i4", ("natom",))
+            atom_xred = root.createVariable("atom_xred", "f8", ("natom", "ndim"))
+            atom_cell = root.createVariable("atom_cell", "f8", ("ndim", "ndim"))
 
-        atom_cell.unit = 'Angstrom'
+        atom_cell.unit = "Angstrom"
         positions.unit = "1"
-        data_real.unit = 'eV'
-        data_imag.unit = 'eV'
+        data_real.unit = "eV"
+        data_imag.unit = "eV"
 
         R[:] = np.array(self.Rlist)
         d = np.array(tuple(self.data.values()))
@@ -393,7 +419,7 @@ class MyTB(AbstractTB):
 
         if self.atoms is not None:
             atom_numbers[:] = np.array(self.atoms.get_atomic_numbers())
-            atom_xred[:] = np.array(self.atoms.get_scaled_positions())
+            atom_xred[:] = np.array(self.atoms.get_scaled_positions(wrap=False))
             atom_cell[:] = np.array(self.atoms.get_cell())
         root.close()
 
@@ -404,23 +430,21 @@ class MyTB(AbstractTB):
         :param fname: netcdf filename.
         :Returns: tight binding model.
         """
-        #from netCDF4 import Dataset
-        root = netcdf_file(fname, 'r', mmap=False)
-        nbasis = root.dimensions['nbasis']
-        nspin = root.dimensions['nspin']
-        ndim = root.dimensions['ndim']
-        natom = root.dimensions['natom']
-        Rlist = root.variables['R'][:]
-        mdata_real = root.variables['data_real'][:]
-        mdata_imag = root.variables['data_imag'][:]
-        positions = root.variables['positions'][:]
+        # from netCDF4 import Dataset
+        root = netcdf_file(fname, "r", mmap=False)
+        nbasis = root.dimensions["nbasis"]
+        nspin = root.dimensions["nspin"]
+        ndim = root.dimensions["ndim"]
+        natom = root.dimensions["natom"]
+        Rlist = root.variables["R"][:]
+        mdata_real = root.variables["data_real"][:]
+        mdata_imag = root.variables["data_imag"][:]
+        positions = root.variables["positions"][:]
 
-        atom_numbers = root.variables['atom_numbers'][:]
-        atom_xred = root.variables['atom_xred'][:]
-        atom_cell = root.variables['atom_cell'][:]
-        atoms = Atoms(numbers=atom_numbers,
-                      scaled_positions=atom_xred,
-                      cell=atom_cell)
+        atom_numbers = root.variables["atom_numbers"][:]
+        atom_xred = root.variables["atom_xred"][:]
+        atom_cell = root.variables["atom_cell"][:]
+        atoms = Atoms(numbers=atom_numbers, scaled_positions=atom_xred, cell=atom_cell)
         m = MyTB(nbasis, nspin=nspin, ndim=ndim, positions=positions)
         m.atoms = copy.deepcopy(atoms)
         root.close()
@@ -446,6 +470,7 @@ class MyTB(AbstractTB):
         """
 
         from tbmodels import Model
+
         m = Model.from_hdf5_file(fname)
         ret = MyTB(nbasis=m.size)
         for R, v in m.hop.items():
@@ -469,11 +494,11 @@ class MyTB(AbstractTB):
                 ret.data[R][::2, ::2] = mat
                 ret.data[R][1::2, 1::2] = mat
             elif order == 2:
-                ret.data[R][:self.norb, :self.norb] = mat
-                ret.data[R][self.norb:, self.norb:] = mat
+                ret.data[R][: self.norb, : self.norb] = mat
+                ret.data[R][self.norb :, self.norb :] = mat
         return ret
 
-    #def plot_band(self, kpts, color='green', show=False):
+    # def plot_band(self, kpts, color='green', show=False):
     #    evals, evecs = self.solve_all(kpts)
     #    for i in range(self.nbasis):
     #        plt.plot(evals[:, i], color=color)
@@ -484,22 +509,22 @@ class MyTB(AbstractTB):
         # make sure all R are 3d.
         for R in self.data.keys():
             if len(R) != self.ndim:
-                raise ValueError("Dimension of R should be ndim %s" %
-                                 (self.ndim))
+                raise ValueError("Dimension of R should be ndim %s" % (self.ndim))
 
 
 def merge_tbmodels_spin(tbmodel_up, tbmodel_dn):
     """
     Merge a spin up and spin down model to one spinor model.
     """
-    tbmodel = MyTB(nbasis=tbmodel_up.nbasis * 2,
-                   data=None,
-                   positions=np.vstack(
-                       [tbmodel_up.positions, tbmodel_dn.positions]),
-                   sparse=False,
-                   ndim=tbmodel_up.ndim,
-                   nspin=2,
-                   double_site_energy=2.0)
+    tbmodel = MyTB(
+        nbasis=tbmodel_up.nbasis * 2,
+        data=None,
+        positions=np.vstack([tbmodel_up.positions, tbmodel_dn.positions]),
+        sparse=False,
+        ndim=tbmodel_up.ndim,
+        nspin=2,
+        double_site_energy=2.0,
+    )
     norb = tbmodel.norb
     for R in tbmodel_up.data:
         tbmodel.data[R][:norb, :norb] = tbmodel_up.data[R][:, :]

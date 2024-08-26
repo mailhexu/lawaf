@@ -3,9 +3,9 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to BandDownfolder's documentation!
+Welcome to LaWaF's documentation!
 ==================================================
-BandDownfolder is a python package to build Wannier functions of electron/lattice/magnon/etc.
+LaWaF is a python package to build Wannier functions of electron/lattice/magnon/etc.
 The features include:
  * Building electron Wannier function from Siesta Kohn-Sham Hamiltonian
  * Building lattice Wannier function from interatomic force constant in Anaddb and Phonopy
@@ -13,7 +13,7 @@ The features include:
  * Interfaced with Multibinit lattice Wannier function dynamics.
  
 
- The source code can be found at `https://github.com/mailhexu/banddownfolder <https://github.com/mailhexu/banddownfolder>`_.
+ The source code can be found at `https://github.com/mailhexu/lawaf <https://github.com/mailhexu/lawaf>`_.
 
 
 .. toctree::

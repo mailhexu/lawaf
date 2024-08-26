@@ -3,4 +3,4 @@ phonon.pdf
 POSCAR.vasp
 Downfold.json
 LWF.nc
-phon_cache/
+phon_cache

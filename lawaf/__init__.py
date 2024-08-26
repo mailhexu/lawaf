@@ -1,3 +1,4 @@
-from lawaf.scdm.downfolder import W90Downfolder, SislDownfolder, PhonopyDownfolder, Lawaf
-from lawaf.scdm.lwf import LWF
+from lawaf.interfaces import W90Downfolder, SiestaDownfolder, PhonopyDownfolder, NACPhonopyDownfolder
+from lawaf.lwf.lwf import LWF
 
+__all__ = [W90Downfolder, SiestaDownfolder, PhonopyDownfolder, NACPhonopyDownfolder, LWF]

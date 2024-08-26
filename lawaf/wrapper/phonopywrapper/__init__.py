@@ -1,1 +1,0 @@
-from .phonopywrapper import PhonopyWrapper

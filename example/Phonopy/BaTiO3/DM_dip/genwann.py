@@ -1,65 +1,87 @@
-import numpy as np
-from phonopy import load
-from ase.io import write
-from lawaf.scdm import PhonopyDownfolder
-from lawaf.plot import plot_band
-from lawaf.wrapper.phonondownfolderwrapper import PhonopyDownfolderWrapper
+import os
+
 import matplotlib.pyplot as plt
+import numpy as np
 
-fname = 'phonopy_params.yaml'
-#phonon=load(fname, is_nac=True)
-#print(phonon.nac_params)
-#exit()
-downfolder=PhonopyDownfolder(phonopy_yaml=fname, mode="DM", has_nac=True)
-#phonon=load(force_sets_filename="FORCE_SETS", born_filename="./BORN", unitcell_filename="POSCAR-unitcell",supercell_matrix=np.eye(3)*3 )
-#downfolder=PhonopyDownfolder(force_sets_filename="FORCE_SETS", 
-#          #born_filename="./BORN", 
-#          unitcell_filename="POSCAR-unitcell",supercell_matrix=np.eye(3)*3, mode="DM")
-lwf=downfolder.downfold(method='scdmk',nwann=3, #selected_basis=[2,5], 
-                    anchors={(.0,.0,.0):(0,1, 2)},
-                    use_proj=True, mu=-200, sigma=300.4, weight_func='Gauss', kmesh=(2, 2, 2) )
-
-# For testing 
-# FIXME: remove this
-m=PhonopyDownfolderWrapper(downfolder)
-
-ax = plot_band(
-    m, 
-    kvectors=np.array([[0. , 0. , 0. ],
-           [0.5, 0.0, 0. ],
-           [0.5, 0.5, 0.0],
-           [0.5 , 0.5 , 0.5 ],
-           [0.5, 0.0, 0.0],
-           [0.0,0.0,0],
-           [0.5,0.5,0.5]                           
-           ]), npoints=80,
-    knames=['$\\Gamma$', 'X','M', 'R', 'X', '$\\Gamma$', "R"],
-    efermi=0,
-    color="green",
-    alpha=0.5,
-    marker=".",
-    fix_LOTO=True,
-    unit_factor=15.6*33.6,
-    ylabel="Frequency (cm^-1)",
-    evals_to_freq=True,
-
-)
+from lawaf import NACPhonopyDownfolder
 
 
-print(lwf.get_wannier_born())
-write('POSCAR.vasp', downfolder.model.atoms, vasp5=True)
-ax=downfolder.plot_band_fitting(ax=ax, kvectors=np.array([[0. , 0. , 0. ],
-           [0.5, 0.0, 0. ],
-           [0.5, 0.5, 0.0],
-           [0.5 , 0.5 , 0.5 ],
-           [0.5, 0.0, 0.0],
-           [0.0,0.0,0],
-           [0.5,0.5,0.5]                           
-           ]),
-           npoints=80,
-    knames=['$\\Gamma$', 'X','M', 'R', 'X', '$\\Gamma$', "R"], plot_original=True, plot_downfolded=False, show=False, fix_LOTO=True ,
-     unit_factor=15.6*33.6,
-    ylabel="Frequency (cm^-1)",
-    evals_to_freq=True, )
-plt.savefig('phonon.pdf')
-plt.show()
+def run(name, **kwargs):
+    fname = "phonopy_params.yaml"
+    params = dict(
+        # method="scdmk",
+        method="projected",
+        nwann=3,
+        # selected_basis=[9, 10, 11],
+        # nwann=15,
+        # selected_basis=list(range(15)),
+        anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
+        use_proj=True,
+        proj_order=8,
+        weight_func="unity",
+        # weight_func="Fermi",
+        weight_func_params=(-0, 1),
+        kmesh=(2, 2, 2),
+        gamma=True,
+        kshift=(0.000, 0.000, 0.000),
+        enhance_Amn=0,
+    )
+    params.update(kwargs)
+    downfolder = NACPhonopyDownfolder(
+        phonopy_yaml=fname,
+        mode="DM",
+        params=params,
+        nac_params={"method": "wang"},
+        born_filename="BORN",
+    )
+    downfolder.set_parameters(**params)
+    downfolder.downfold()
+    downfolder.plot_band_fitting(
+        kvectors=np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [0.5, 0.0, 0.0],
+                [0.5, 0.5, 0.0],
+                [0.5, 0.5, 0.5],
+                [0.5, 0.0, 0.0],
+                [0.0, 0.0, 0],
+                [0.5, 0.5, 0.5],
+            ]
+        ),
+        npoints=100,
+        unit_factor=15.6 * 33.6,
+        ylabel="Frequency (cm^-1)",
+        evals_to_freq=True,
+        knames=["$\\Gamma$", "X", "M", "R", "X", "$\\Gamma$", "R"],
+        show=False,
+        fix_LOTO=True,
+        # plot_nonac=True,
+    )
+    os.makedirs("result", exist_ok=True)
+    plt.savefig(f"result/{name}.pdf")
+    plt.show()
+
+
+def run_scdmk():
+    run(
+        "scdmk_proj_loto",
+        method="scdmk",
+        nwann=3,
+        anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
+        use_proj=True,
+        proj_order=1,
+    )
+
+
+def run_pwf():
+    run(
+        "pwf_proj_loto",
+        method="projected",
+        nwann=3,
+        anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
+    )
+
+
+if __name__ == "__main__":
+    run_scdmk()
+    run_pwf()

@@ -1,6 +1,10 @@
+<<<<<<< HEAD
 LWF.txt
 phonon.pdf
 POSCAR.vasp
 Downfold.json
 LWF.nc
-phon_cache/
+*.nc
+*.cif
+*cache*
+phon_cache/*

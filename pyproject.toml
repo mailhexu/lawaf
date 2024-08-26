@@ -1,0 +1,40 @@
+[project]
+name = "lawaf"
+version = "0.2.1"
+description = "A library for constructing Lattice and other Wannier functions "
+authors = [
+    {name = "Xu He", email = "mailhexu@gmail.com"},
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "BSD-2"}
+dependencies = [
+    "numpy>=1.21.0",
+    "scipy>=1.7.0",
+    "sisl>=0.9.0",
+    "HamiltonIO>=0.1.2",
+    "matplotlib>=3.4.0",
+    "ase>=3.19",
+    "phonopy>=2.11.0",
+    "toml",
+]
+	
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pdm]
+distribution = true
+
+[project.optional-dependencies]
+test=[
+    "pytest>=6.2.0",
+]
+
+dev=[
+    "pytest>=6.2.0",
+    "black>=21.6b0",
+    "pre-commit>=2.13.0",
+    "sphinx>=4.1.2",
+]

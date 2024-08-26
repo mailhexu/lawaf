@@ -16,4 +16,3 @@
   * A tutorial on how to use banddownfolding to downfold Wannier90 Hamiltonian.
 
 
-
