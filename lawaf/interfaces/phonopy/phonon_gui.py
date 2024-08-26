@@ -7,7 +7,7 @@ from lawaf.interfaces.phonopy.phonon_downfolder import (
     PhonopyDownfolder,
 )
 from lawaf.ui.gui import ParamsGui
-
+from lawaf.utils.port import get_unused_port
 
 class PhononGui(ParamsGui):
     def __init__(
@@ -54,7 +54,6 @@ class PhononGui(ParamsGui):
 
         pl.update()
 
-
 def run_phonopy_gui():
     parser = argparse.ArgumentParser()
     parser.add_argument("--phonopy_yaml", "-f", default="phonopy_params.yaml")
@@ -62,8 +61,11 @@ def run_phonopy_gui():
     parser.add_argument("--born_filename", "-b", default=None)
     parser.add_argument("--port", "-p", type=int, default=None)
     args = parser.parse_args()
+    # if port is not given, use a non-blocking port
+    if args.port is None:
+        args.port = get_unused_port()
     ui = PhononGui(
-        phonopy_yaml=args.phonopy_yaml, mode=args.mode, born_filename=args.born_filename
+        phonopy_yaml=args.phonopy_yaml, mode=args.mode, born_filename=args.born_filename, port=args.port
     )
     ui.run()
 
