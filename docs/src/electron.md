@@ -1,6 +1,5 @@
-# Tutorial 
+### Electron Wannier function
 
-### Usage:
 
 #### Downfolding from Wannier90 Hamiltonian
 Below is an example of how to use downfold an tight-binding Hamiltonian from Wannier90 output. 

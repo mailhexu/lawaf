@@ -20,16 +20,16 @@ from lawaf.wannierization import (
 
 def select_wannierizer(method):
     # select the Wannierizer based on the method.
-    if method.lower().startswith("scdmk"):
+    if method.lower().startswith("scdm"):
         w = ScdmkWannierizer
-    elif method.lower().startswith("projected"):
+    elif method.lower().startswith("projected") or method.lower().startswith("pwf"):
         w = ProjectedWannierizer
     elif method.lower().startswith("maxprojected"):
         w = MaxProjectedWannierizer
     elif method.lower().startswith("dummy"):
         w = DummyWannierizer
     else:
-        raise ValueError("Unknown method")
+        raise ValueError(f"Unknown method: {method}")
     print(f"Using {w.__name__} method")
     return w
 

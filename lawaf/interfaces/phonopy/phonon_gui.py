@@ -23,34 +23,44 @@ class PhononGui(ParamsGui):
         **kwargs,
     ):
         super().__init__(port=port)
-        if born_filename is None:
+        self.mode = mode
+        self.born_filename = born_filename
+        self.phonopy_yaml = phonopy_yaml
+        self.reset()
+
+    def reset(self):
+        if self.born_filename is None:
             self.downfolder = PhonopyDownfolder(
-                params=params,
-                mode=mode,
-                phonopy_yaml=phonopy_yaml,
+                params=self.params,
+                mode=self.mode,
+                phonopy_yaml=self.phonopy_yaml,
             )
         else:
             self.downfolder = NACPhonopyDownfolder(
-                mode=mode,
-                params=params,
+                mode=self.mode,
+                params=self.params,
                 nac_params={"method": "wang"},
-                phonopy_yaml=phonopy_yaml,
-                born_filename=born_filename,
+                phonopy_yaml=self.phonopy_yaml,
+                born_filename=self.born_filename,
             )
+
+
 
     def plot_band(self, ax, pl):
         ax.clear()
-        self.downfolder.plot_full_band(ax=ax, unit_factor=15.6 * 33.6, fix_LOTO=True)
+        self.downfolder.plot_full_band(ax=ax, unit_factor=15.6 * 33.6, fix_LOTO=True, evals_to_freq=True,
+            ylabel="Frequency (cm$^{-1}$)")
         pl.update()
 
     def wannierize(self, ax, pl):
         ui.notify("Wannierize")
         ui.notify(f"self.params={self.params}")
         ax.clear()
+        self.reset()
         self.downfolder.params = self.params
         self.downfolder.downfold()
-        self.downfolder.plot_full_band(ax=ax, fix_LOTO=True, unit_factor=15.6 * 33.6)
-        self.downfolder.plot_wannier_band(ax=ax, unit_factor=15.6 * 33.6, fix_LOTO=True)
+        self.downfolder.plot_full_band(ax=ax, fix_LOTO=True, unit_factor=15.6 * 33.6, evals_to_freq=True,ylabel="Frequency (cm$^{-1}$)")
+        self.downfolder.plot_wannier_band(ax=ax, unit_factor=15.6 * 33.6, fix_LOTO=True, evals_to_freq=True,ylabel="Frequency (cm$^{-1}$)")
 
         pl.update()
 

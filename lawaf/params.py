@@ -78,6 +78,13 @@ class WannierParams:
         with open(filename, "w") as f:
             toml.dump(self.to_dict(), f)
 
+    @classmethod
+    def from_toml(cls, filename):
+        with open(filename, "r") as f:
+            data = toml.load(f)
+        return cls(**data)
+
+
 
 def test_params():
     params = WannierParams(
@@ -102,6 +109,9 @@ def test_params():
     params.to_yaml("params.yaml")
     params.to_json("params.json")
     params.to_toml("params.toml")
+
+    params=WannierParams.from_toml("params.toml")
+    print(params.to_dict())
 
 
 if __name__ == "__main__":

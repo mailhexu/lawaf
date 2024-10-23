@@ -16,16 +16,26 @@ The features include:
  The source code can be found at `https://github.com/mailhexu/lawaf <https://github.com/mailhexu/lawaf>`_.
 
 
+LaWaF is a project initialized at the University of Liege. 
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+   src/overview.md
    src/install.md
-   src/tutor.md
+   src/quickstart.md
+   src/tutor.rst
    src/ReleaseNotes.rst
 ..
    src/references.md
    src/Contributors.rst
+
+Here is the logo of Uliege: 
+ 
+.. image:: _static/uliegelogo.png
+   :width: 200px
+   :align: center
 
 
 Indices and tables

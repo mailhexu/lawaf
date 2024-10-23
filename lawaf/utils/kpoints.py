@@ -101,7 +101,7 @@ def monkhorst_pack(size, gamma=True):
     return mkpts
 
 
-def group_band_path(bp, eps=1e-8, shift=0.15):
+def group_band_path(bp, eps=1e-8, shift=0.35):
     xs, Xs, knames = bp.get_linear_kpoint_axis()
     kpts = bp.kpts
 

@@ -82,18 +82,8 @@ class ProjectedWannierizer(Wannierizer):
                 * self.occ[ik][:, np.newaxis]
             )
             # A = self.get_psi_k(ik).conj().T @ self.projectors.T * self.occ[ik][:, np.newaxis]
-        # for iband in range(self.nband):
-        #    for iproj, psi_a in enumerate(self.projectors):
-        #        if  self.is_orthogonal:
-        #            A[iband, iproj] = (
-        #                np.vdot(self.get_psi_k(ik)[:, iband], psi_a) * self.occ[ik, iband])
-        #        else:
-        #            A[iband, iproj] = (
-        #                np.vdot(self.get_psi_k(ik)[:, iband]@self.S[ik], psi_a) * self.occ[ik, iband]
-        #                #np.vdot(self.get_psi_k(ik)[:, iband], psi_a) * self.occ[ik, iband]
-        #         )
-
         # using einsum
+        A = (A.conj() * A) **2 * A
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
         # return A
