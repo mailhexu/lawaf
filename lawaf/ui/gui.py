@@ -1,5 +1,6 @@
 import sys
 
+from lawaf.utils.port import get_unused_port
 import numpy as np
 from nicegui import ui
 
@@ -34,7 +35,7 @@ class ParamsGui:
     def __init__(self, port=None):
         # default parameters
         self.params = WannierParams()
-        self.port = port
+        self.port = get_unused_port(default=port)
 
     def run(self):
         self.create_ui()

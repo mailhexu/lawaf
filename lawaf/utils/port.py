@@ -1,9 +1,11 @@
 import socket
 
-def get_unused_port():
+def get_unused_port(default=8000):
     """
     Get an unused port number
     """
+    if default is not None and not is_port_in_use(default) :
+        return default
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind(("localhost", 0))
     port = s.getsockname()[1]
@@ -16,6 +18,7 @@ def is_port_in_use(port):
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(("localhost", port)) == 0
+
 
 def test_is_port_in_use():
     """
