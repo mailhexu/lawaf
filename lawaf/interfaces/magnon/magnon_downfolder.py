@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from lawaf.utils.kpoints import monkhorst_pack, build_Rgrid
 from lawaf.mathutils.kR_convert import k_to_R, R_to_k
 from lawaf.interfaces.downfolder import Lawaf
-
+from lawaf.mathutils.align_evecs import align_all_degenerate_eigenvectors
 
 @dataclass
 class MagnonWrapper:
@@ -17,6 +17,7 @@ class MagnonWrapper:
     nR: int = 0
     nbasis: int = 0
     atoms = None
+    is_orthogonal = True
 
     def __init__(self, HR=None, Rlist=None, atoms=None):
         """ """
@@ -34,6 +35,7 @@ class MagnonWrapper:
         atoms = exc.atoms
         HR = exc.get_full_Jtensor_for_Rlist(asr=True)
         Rlist = exc.Rlist
+        Rlist = np.array(Rlist)
         return cls(HR=HR, Rlist=Rlist, atoms=atoms)
 
     @classmethod
@@ -44,7 +46,8 @@ class MagnonWrapper:
         p = Path(path)
         Hk = np.load(p / "H_matrix.npy")
         kpts = monkhorst_pack(kmesh)
-        Rlist = build_Rgrid(kmesh)
+        Rlist, Rweights = build_Rgrid(kmesh)
+        print(Rlist)
         HR = k_to_R(kpts=kpts, Rlist=Rlist, Mk=Hk, kweights=None)
         with open(p / "TB2J.pickle", "rb") as f:
             tb2j = pickle.load(f)
@@ -71,11 +74,21 @@ class MagnonWrapper:
         """
         solve the model at all kpts
         """
+        self.Rlist = np.array(self.Rlist)
+        print(kpts.shape)
+        print(self.Rlist.shape)
+        print(self.HR.shape)
         Hks = R_to_k(kpts, self.Rlist, self.HR)
         evals = np.zeros((len(kpts), self.nbasis), dtype=float)
         evecs = np.zeros((len(kpts), self.nbasis, self.nbasis), dtype=complex)
         for ik, Hk in enumerate(Hks):
             evals[ik], evecs[ik] = np.linalg.eigh(Hk)
+            #evecs[ik] = align_all_degenerate_eigenvectors(evals[ik], evecs[ik], tol=1e-8)
+            try:
+                evals[ik],evecs[ik] = align_all_degenerate_eigenvectors(evals[ik], evecs[ik], tol=1e-8)
+            except:
+                pass
+
         return evals, evecs
 
 
@@ -96,7 +109,7 @@ def test_MagnonWrapper():
 
 def easy_downfold_magnon(
     path,
-    index_baisis,
+    index_basis,
     kmesh=[9, 9, 9],
     weight_func="unity",
     weight_func_params=(0.00, 0.001),
@@ -118,7 +131,7 @@ def easy_downfold_magnon(
         method="projected",
         # method="maxprojected",
         kmesh=kmesh,
-        nwann=len(index_metal),
+        nwann=len(index_basis),
         weight_func=weight_func,
         weight_func_params=weight_func_params,
         selected_basis=index_basis,
@@ -131,7 +144,7 @@ def easy_downfold_magnon(
     wann.set_parameters(**params)
     print("begin downfold")
     ewf = wann.downfold()
-    ewf.save_hr_pickle(downfolded_pickle_fname)
+    #ewf.save_hr_pickle(downfolded_pickle_fname)
 
     # Plot the band structure.
     wann.plot_band_fitting(

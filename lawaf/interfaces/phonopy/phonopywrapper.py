@@ -276,7 +276,7 @@ class PhonopyWrapper:
                 Hshort *= self.Mmat
                 Hlong *= self.Mmat
         evals, evecs = eigh(Hk)
-        evecs = align_all_degenerate_eigenvectors(evals, evecs)
+        evals, evecs = align_all_degenerate_eigenvectors(evals, evecs)
         if output_H:
             res = evals, evecs, Hk, Hshort, Hlong
         else:

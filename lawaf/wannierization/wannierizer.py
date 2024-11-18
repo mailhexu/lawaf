@@ -248,7 +248,7 @@ class Wannierizer(BasicWannierizer):
 
             # diff=evals-self.get_eval_k(ik)
         if self.is_orthogonal:
-            return self.wannk, self.Hwann_k
+            return self.wannk, self.Hwann_k, None
         else:
             return self.wannk, self.Hwann_k, self.Swann_k
 

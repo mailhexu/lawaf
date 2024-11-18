@@ -28,6 +28,7 @@ def align_evecs(evecs, H=None, axis1=[1, 0, 0], axis2=[0, 1, 0], axis3=[0, 0, 1]
     """
     v_axis = np.array([axis1, axis2, axis3], dtype=float).T
     natom3, ndeg = evecs.shape
+    print(f"natom3: {natom3}, ndeg: {ndeg}")
     natom = natom3 // 3
     v = np.tile(v_axis, (natom, 1))
     v /= np.linalg.norm(v, axis=0)[np.newaxis, :]
@@ -74,6 +75,7 @@ def detect_degeneracy(evals, tol=1e-6):
 
 def align_all_degenerate_eigenvectors(evals, evecs, H=None, tol=1e-4):
     aligned_evecs = copy.deepcopy(evecs)
+    aligned_evals = copy.deepcopy(evals)
     degenerate_with_previous = False
     ind_degenerate = []
     for i, ev in enumerate(evals):
@@ -90,14 +92,15 @@ def align_all_degenerate_eigenvectors(evals, evecs, H=None, tol=1e-4):
                 pass
             else:
                 evecs_degenerate = evecs[:, ind_degenerate]
+                evals_degenerate = evals[ind_degenerate]
                 # print("aligning degenerate eigenvectors: ", ind_degenerate)
                 # print("evecs_degenerate: ", evecs_degenerate)
                 aligned_evecs[:, ind_degenerate] = align_evecs(evecs_degenerate, H=H)
+                aligned_evals[ind_degenerate] = np.average(evals_degenerate)
                 # print("aligned_evecs: ", aligned_evecs[:, ind_degenerate])
             degenerate_with_previous = False
             ind_degenerate = []
-
-    return aligned_evecs
+    return aligned_evals, aligned_evecs
 
 
 def test_align_evecs():

@@ -28,6 +28,7 @@ def k_to_R(kpts, Rlist, Mk, kweights=None, Rdeg=None):
         MR: matrix of shape [nR, n1, n2], the matrix in R-space.
 
     """
+    Rlist = np.array(Rlist)
     if Rdeg is None:
         Rdeg = np.ones(Rlist.shape[0], dtype=float)
     nkpt, n1, n2 = Mk.shape
@@ -69,7 +70,8 @@ def R_to_k(kpts, Rlist, MR):
     # Mk = np.einsum("rlm, kr -> klm", MR, phase)
     # return Mk
 
-    nkpt, n1, n2 = MR.shape
+    nR, n1, n2 = MR.shape
+    nkpt = kpts.shape[0]
     Mk = np.zeros((nkpt, n1, n2), dtype=complex)
     for iR, R in enumerate(Rlist):
         for ik in range(nkpt):

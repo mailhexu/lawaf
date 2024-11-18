@@ -13,7 +13,8 @@ from lawaf.utils.kpoints import build_Rgrid_with_degeneracy
 
 
 def othogonalize(Amn):
-    U, S, VT = svd(Amn)
+    #Amn[ 60:, :] = 0
+    U, S, VT = svd(Amn, full_matrices=False)
     return U @ VT
 
 
@@ -30,7 +31,7 @@ def Amn_to_hamk(Amn, kpts, eig, orthogonize=False):
 
 
 class HamBuilder:
-    def __init__(self, Amn, kpts, eig, kweights=None):
+    def __init__(self, Amn, kpts, eig, kweights=None, **kwargs):
         self.Amn = Amn
         self.kpts = kpts
         self.eig = eig
@@ -113,6 +114,7 @@ def load_w90_files(prefix="t14o_DS2_w90", **kwargs):
     winfile = prefix + ".win"
     with open(amnfile, "r") as f:
         amn = wio.read_amn(f)
+        print(np.abs(amn[0, :, 0]))
     with open(eigfile, "r") as f:
         eig = wio.read_eig(f)
     with open(winfile, "r") as f:
