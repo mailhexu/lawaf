@@ -211,12 +211,12 @@ class Wannierizer(BasicWannierizer):
         """
         Calculate all Amn matrix for all k.
         """
-        print("Calculating Amn matrix. Number of kpoints: ", self.nkpt)
+        # print("Calculating Amn matrix. Number of kpoints: ", self.nkpt)
         for ik in range(self.nkpt):
-            print(f"[{ik+1}/{self.nkpt}] k={self.kpts[ik]}")
+            # print(f"[{ik+1}/{self.nkpt}] k={self.kpts[ik]}")
             self.Amn[ik, :, :] = np.array(self.get_Amn_one_k(ik), dtype=complex)
         if self.params.enhance_Amn:
-            print("Enhancing Amn matrix.")
+            print(f"Enhancing Amn matrix. order={self.params.enhance_Amn} .")
             self.Amn = enhance_Amn(
                 self.Amn, self.evals.real, order=self.params.enhance_Amn
             )
@@ -229,7 +229,7 @@ class Wannierizer(BasicWannierizer):
         for ik in range(self.nkpt):
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
             # if self.is_orthogonal:
-            print(f"Calculating Wannier function for k={self.kpts[ik]}")
+            # print(f"Calculating Wannier function for k={self.kpts[ik]}")
             h = (
                 self.Amn[ik, :, :].T.conj()
                 @ np.diag(self.get_eval_k(ik) + shift)

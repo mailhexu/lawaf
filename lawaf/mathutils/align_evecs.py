@@ -1,8 +1,9 @@
-import numpy as np
-from numpy.linalg import svd, eigh
-from scipy.spatial.transform import Rotation
-from scipy.optimize import minimize
 import copy
+
+import numpy as np
+from numpy.linalg import eigh
+from scipy.optimize import minimize
+from scipy.spatial.transform import Rotation
 
 
 def rotation_matrix_3(theta1, theta2, theta3):
@@ -28,7 +29,6 @@ def align_evecs(evecs, H=None, axis1=[1, 0, 0], axis2=[0, 1, 0], axis3=[0, 0, 1]
     """
     v_axis = np.array([axis1, axis2, axis3], dtype=float).T
     natom3, ndeg = evecs.shape
-    print(f"natom3: {natom3}, ndeg: {ndeg}")
     natom = natom3 // 3
     v = np.tile(v_axis, (natom, 1))
     v /= np.linalg.norm(v, axis=0)[np.newaxis, :]
@@ -109,7 +109,7 @@ def test_align_evecs():
     H = d[0]
     evals, evecs = eigh(H)
     print(evals)
-    aligned_evecs = align_all_degenerate_eigenvectors(evals, evecs, H=H)
+    _aligned_evecs = align_all_degenerate_eigenvectors(evals, evecs, H=H)
     tevecs = evecs[:, 1:3]
     tevals = evals[1:3]
     print(tevals)

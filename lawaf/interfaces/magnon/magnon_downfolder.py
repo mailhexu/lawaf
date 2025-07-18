@@ -1,14 +1,16 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path
 import pickle
 from dataclasses import dataclass
+from pathlib import Path
 
-# from lawaf.hamitonian import
-from lawaf.utils.kpoints import monkhorst_pack, build_Rgrid
-from lawaf.mathutils.kR_convert import k_to_R, R_to_k
+import numpy as np
+
 from lawaf.interfaces.downfolder import Lawaf
 from lawaf.mathutils.align_evecs import align_all_degenerate_eigenvectors
+from lawaf.mathutils.kR_convert import R_to_k, k_to_R
+
+# from lawaf.hamitonian import
+from lawaf.utils.kpoints import build_Rgrid, monkhorst_pack
+
 
 @dataclass
 class MagnonWrapper:
@@ -47,7 +49,6 @@ class MagnonWrapper:
         Hk = np.load(p / "H_matrix.npy")
         kpts = monkhorst_pack(kmesh)
         Rlist, Rweights = build_Rgrid(kmesh)
-        print(Rlist)
         HR = k_to_R(kpts=kpts, Rlist=Rlist, Mk=Hk, kweights=None)
         with open(p / "TB2J.pickle", "rb") as f:
             tb2j = pickle.load(f)
@@ -75,19 +76,18 @@ class MagnonWrapper:
         solve the model at all kpts
         """
         self.Rlist = np.array(self.Rlist)
-        print(kpts.shape)
-        print(self.Rlist.shape)
-        print(self.HR.shape)
         Hks = R_to_k(kpts, self.Rlist, self.HR)
         evals = np.zeros((len(kpts), self.nbasis), dtype=float)
         evecs = np.zeros((len(kpts), self.nbasis, self.nbasis), dtype=complex)
         for ik, Hk in enumerate(Hks):
             evals[ik], evecs[ik] = np.linalg.eigh(Hk)
-            #evecs[ik] = align_all_degenerate_eigenvectors(evals[ik], evecs[ik], tol=1e-8)
+            # evecs[ik] = align_all_degenerate_eigenvectors(evals[ik], evecs[ik], tol=1e-8)
             try:
-                evals[ik],evecs[ik] = align_all_degenerate_eigenvectors(evals[ik], evecs[ik], tol=1e-8)
-            except:
-                pass
+                evals[ik], evecs[ik] = align_all_degenerate_eigenvectors(
+                    evals[ik], evecs[ik], tol=1e-8
+                )
+            except Exception as e:
+                print(f"Error aligning eigenvectors at k-point {ik}: {e}")
 
         return evals, evecs
 
@@ -99,12 +99,6 @@ class MagnonDownfolder(Lawaf):
         prefix,   # The prefix of Wannier90 outputs. e.g. wannier90_up
         """
         self.model = model
-
-
-def test_MagnonWrapper():
-    path = Path("~/projects/magnon_downfold/examples/CoF2/ligands").expanduser()
-    kmesh = [9, 9, 9]
-    model = MagnonWrapper.read_from_path_k(path, kmesh)
 
 
 def easy_downfold_magnon(
@@ -143,8 +137,8 @@ def easy_downfold_magnon(
 
     wann.set_parameters(**params)
     print("begin downfold")
-    ewf = wann.downfold()
-    #ewf.save_hr_pickle(downfolded_pickle_fname)
+    _ewf = wann.downfold()
+    # ewf.save_hr_pickle(downfolded_pickle_fname)
 
     # Plot the band structure.
     wann.plot_band_fitting(
