@@ -1,13 +1,14 @@
-from banddownfolder.scdm.lwf import LWF
+import copy
+
 import numpy as np
-from minimulti.utils.supercell import SupercellMaker
-from pyDFTutils.ase_utils import vesta_view
-from netCDF4 import Dataset
+from ase import Atoms
 from ase.io import write
 from ase.units import Bohr
-import copy
+from netCDF4 import Dataset
 from scipy.sparse import coo_matrix
-from ase import Atoms
+
+from lawaf.interfaces.phonopy.lwf import LWF
+from lawaf.utils.supercell import SupercellMaker
 
 
 def lwf_to_atoms(mylwf: LWF, scmaker, amplist, thr=0.01):

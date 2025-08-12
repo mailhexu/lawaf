@@ -1,16 +1,14 @@
-import numpy as np
-from netCDF4 import Dataset
-from ase.io import read, write
-from scipy.sparse import dok_matrix, csr_matrix, save_npz, load_npz
-from ase.units import Bohr
-from ase import Atoms
 import copy
 import os
-from minimulti.utils.supercell import SupercellMaker
-from pyDFTutils.ase_utils import vesta_view
 
+import numpy as np
+from ase.io import read
+from scipy.sparse import csr_matrix, dok_matrix, load_npz, save_npz
+
+# from pyDFTutils.ase_utils import vesta_view
 # from lawaf.interface.phonon.lwf import LWF
 from lawaf.plot.mcif import write_mcif
+from lawaf.utils.supercell import SupercellMaker
 
 
 def build_lwf_lattice_mapping_matrix(mylwf, scmaker):

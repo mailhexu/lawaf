@@ -1,12 +1,15 @@
-import os
 import json
-import numpy as np
-from lawaf.scdm.lwf import LWF
-from minimulti.electron.basis2 import BasisSet, Basis
-from lawaf.utils.symbol import symbol_number
-from minimulti.electron.Hamiltonian import atoms_model
-from ase.atoms import Atoms
+import os
+
 import matplotlib.pyplot as plt
+import numpy as np
+from ase.atoms import Atoms
+
+from lawaf.scdm.lwf import LWF
+from lawaf.utils.symbol import symbol_number
+
+# from minimulti.electron.Hamiltonian import atoms_model
+# from minimulti.electron.basis2 import BasisSet, Basis
 
 
 def read_basis(fname):
@@ -105,5 +108,5 @@ def run_model(model: atoms_model, alpha, U, J, plot=False):
         plt.close()
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     run_model()

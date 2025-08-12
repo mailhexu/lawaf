@@ -1,15 +1,16 @@
 import copy
 import pickle
-import numpy as np
-from scipy.linalg import eigh
-from netCDF4 import Dataset
-from ase import Atoms
+from dataclasses import dataclass
+from typing import Union
 
 # from lawaf.scdm.eigen_modifer import HamModifier, force_ASR_kspace
 import matplotlib.pyplot as plt
+import numpy as np
+from ase import Atoms
+from netCDF4 import Dataset
+from scipy.linalg import eigh
+
 from lawaf.plot import plot_band
-from dataclasses import dataclass
-from typing import Union
 
 
 @dataclass
@@ -456,7 +457,7 @@ class LWF(GenericWF):
         )
 
     def make_supercell(self, sc_maker=None, sc_matrix=None):
-        from minimulti.utils.supercell import SupercellMaker
+        from lawaf.utils.supercell import SupercellMaker
 
         if sc_maker is None:
             sc_maker = SupercellMaker(sc_matrix)

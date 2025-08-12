@@ -21,13 +21,14 @@ class MagnonWrapper:
     atoms = None
     is_orthogonal = True
 
-    def __init__(self, HR=None, Rlist=None, atoms=None):
+    def __init__(self, HR=None, Rlist=None, atoms=None, align_evecs=True):
         """ """
         self.HR = np.array(HR)
         self.Rlist = Rlist
         if HR is not None:
             self.nR, self.nbasis, _ = HR.shape
         self.atoms = atoms
+        self.align_evecs = align_evecs
 
     @classmethod
     def load_from_TB2J_pickle(cls, path, fname):
@@ -76,18 +77,25 @@ class MagnonWrapper:
         solve the model at all kpts
         """
         self.Rlist = np.array(self.Rlist)
+        # check if there is NaN in HR
+        if np.isnan(self.HR).any():
+            raise ValueError("HR contains NaN values. Check the input data.")
         Hks = R_to_k(kpts, self.Rlist, self.HR)
+        # check if there is NaN in Hks
+        if np.isnan(Hks).any():
+            raise ValueError("Hks contains NaN values. Check the input data.")
+
         evals = np.zeros((len(kpts), self.nbasis), dtype=float)
         evecs = np.zeros((len(kpts), self.nbasis, self.nbasis), dtype=complex)
         for ik, Hk in enumerate(Hks):
             evals[ik], evecs[ik] = np.linalg.eigh(Hk)
-            # evecs[ik] = align_all_degenerate_eigenvectors(evals[ik], evecs[ik], tol=1e-8)
-            try:
-                evals[ik], evecs[ik] = align_all_degenerate_eigenvectors(
-                    evals[ik], evecs[ik], tol=1e-8
-                )
-            except Exception as e:
-                print(f"Error aligning eigenvectors at k-point {ik}: {e}")
+            if self.align_evecs:
+                try:
+                    evals[ik], evecs[ik] = align_all_degenerate_eigenvectors(
+                        evals[ik], evecs[ik], tol=1e-8
+                    )
+                except Exception as e:
+                    print(f"Error aligning eigenvectors at k-point {ik}: {e}")
 
         return evals, evecs
 

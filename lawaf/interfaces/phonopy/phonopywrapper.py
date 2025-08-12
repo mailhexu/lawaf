@@ -488,7 +488,7 @@ def save_ifc_and_show_phonon(
     ifc = IFC(phon.atoms, Rpts, HR)
     ifc.save_to_netcdf("ifc_scaled.nc")
     ifc.plot_band(ax=ax, color="red", kvectors=kvectors, knames=knames)
-    plt.ylabel("FC (eV/$\AA^2$) ")
+    plt.ylabel(r"FC (eV/$\AA^2$) ")
     plt.show()
 
 

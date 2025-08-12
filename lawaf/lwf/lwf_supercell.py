@@ -1,15 +1,18 @@
-from lawaf.lwf.lwf import LWF
-from lawaf.plot.mcif import write_mcif
-import numpy as np
-from minimulti.utils.supercell import SupercellMaker
-from pyDFTutils.ase_utils import vesta_view
-from netCDF4 import Dataset
-from ase.io import read, write
-from scipy.sparse import dok_matrix, csr_matrix, save_npz, load_npz
-from ase.units import Bohr
-from ase import Atoms
 import copy
 import os
+
+import numpy as np
+from ase import Atoms
+from ase.io import read, write
+from ase.units import Bohr
+
+# from pyDFTutils.ase_utils import vesta_view
+from netCDF4 import Dataset
+from scipy.sparse import csr_matrix, dok_matrix, load_npz, save_npz
+
+from lawaf.lwf.lwf import LWF
+from lawaf.plot.mcif import write_mcif
+from lawaf.utils.supercell import SupercellMaker
 
 
 def write_atoms_to_netcdf(fname, atoms: Atoms):
