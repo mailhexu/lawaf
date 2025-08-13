@@ -1,6 +1,6 @@
 [project]
 name = "lawaf"
-version = "0.2.3"
+version = "0.2.4"
 description = "A library for constructing Lattice and other Wannier functions "
 authors = [
     {name = "Xu He", email = "mailhexu@gmail.com"},
