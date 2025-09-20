@@ -32,8 +32,8 @@ downfolder = NACPhonopyDownfolder(
     born_filename="BORN",
 )
 downfolder.set_parameters(**params)
-for i in range(len(downfolder.kpts)):
-    print(i, downfolder.kpts[i])
+##for i in range(len(downfolder.kpts)):
+#    print(i, downfolder.kpts[i])
 downfolder.downfold()
 downfolder.plot_band_fitting(
     kvectors=np.array(

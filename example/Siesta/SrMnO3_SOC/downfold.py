@@ -6,10 +6,10 @@ from lawaf.interfaces import SiestaDownfolder
 def main():
     params = dict(
         method="projected",
-        kmesh=[4, 4, 4],
+        kmesh=[2, 2, 2],
         # nwann=4,
         weight_func="window",
-        weight_func_params=(-8, 6.5, 0.001),
+        weight_func_params=(-8, 6.5, 0.101),
         use_proj=False,
         # selected_basis=None,
         # anchors={(0.0, 0.0, 0): [46, 47, 48, 49]},
@@ -20,7 +20,7 @@ def main():
         # selected_orbdict={"Mn": ["3d"]},
         # nwann=28,
         enhance_Amn=0,
-        orthogonal=False,
+        orthogonal=True,
     )
 
     downfolder = SiestaDownfolder(fdf_fname="siesta.fdf", params=params)
@@ -30,7 +30,7 @@ def main():
         kvectors=np.array(
             [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]
         ),
-        knames=["$\Gamma$", "X", "M", "$\Gamma$", "R"],
+        knames=[r"$\Gamma$", "X", "M", r"$\Gamma$", "R"],
         supercell_matrix=None,
         npoints=100,
         efermi=None,

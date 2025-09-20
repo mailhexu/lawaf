@@ -95,7 +95,7 @@ class PhonopyDownfolder(PhononDownfolder):
         self.builder.get_Amn()
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
-        wannk, Hwannk = self.builder.get_wannk_and_Hk()
+        wannk, Hwannk, _ = self.builder.get_wannk_and_Hk()
         HwannR = k_to_R(
             self.kpts, self.Rlist, Hwannk, kweights=self.kweights, Rdeg=self.Rdeg
         )
@@ -203,7 +203,7 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         self.builder.get_Amn()
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
-        wannk, Hwannk_noNAC = self.builder.get_wannk_and_Hk()
+        wannk, Hwannk_noNAC, _ = self.builder.get_wannk_and_Hk()
         HwannR_noNAC = k_to_R(
             self.kpts, self.Rlist, Hwannk_noNAC, kweights=self.kweights, Rdeg=self.Rdeg
         )
