@@ -83,7 +83,7 @@ class ProjectedWannierizer(Wannierizer):
             )
             # A = self.get_psi_k(ik).conj().T @ self.projectors.T * self.occ[ik][:, np.newaxis]
         # using einsum
-        A = (A.conj() * A) **2 * A
+        A = (A.conj() * A) **-0.1 * A
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
         # return A
