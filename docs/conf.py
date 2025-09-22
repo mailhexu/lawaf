@@ -62,3 +62,11 @@ html_theme_options = {
     "logo_only": True,
     "display_version": False,
 }
+
+# Add Google AdSense script
+html_js_files = [
+    (
+        "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8851214975301200",
+        {"async": "async", "crossorigin": "anonymous"},
+    ),
+]
