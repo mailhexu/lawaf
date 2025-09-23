@@ -43,6 +43,9 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+# Include ads.txt in the built documentation
+html_extra_path = ["_extra"]
+
 
 master_doc = "index"
 
