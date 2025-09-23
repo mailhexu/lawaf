@@ -43,8 +43,8 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-# Include ads.txt in the built documentation
-html_extra_path = ["_extra"]
+# No extra files needed
+# html_extra_path = ["_extra"]
 
 
 master_doc = "index"
@@ -65,11 +65,10 @@ html_theme_options = {
     "logo_only": True,
     "display_version": False,
 }
+# html_css_files = [
+#     'custom.css',
+# ]
 
-# Add Google AdSense script
-html_js_files = [
-    (
-        "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8851214975301200",
-        {"async": "async", "crossorigin": "anonymous"},
-    ),
-]
+# Read the Docs uses its own ethical advertising system (EthicalAds) instead of Google AdSense
+# No additional configuration needed for ads - Read the Docs handles this automatically
+html_js_files = []
