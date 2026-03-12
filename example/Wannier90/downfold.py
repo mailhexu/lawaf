@@ -1,5 +1,6 @@
-from lawaf import W90Downfolder
 import numpy as np
+
+from lawaf import W90Downfolder
 
 
 def main():
@@ -14,6 +15,7 @@ def main():
         # anchors={(0, 0, 0): (12,13)},
         # anchors={(0, 0, 0): (9, 10, 11)},
         use_proj=False,
+        orthogonal=False,
     )
 
     model = W90Downfolder(
@@ -28,7 +30,7 @@ def main():
         kvectors=np.array(
             [[0, 0, 0], [0.5, 0, 0], [0.5, 0.5, 0], [0, 0, 0], [0.5, 0.5, 0.5]]
         ),
-        knames=["$\Gamma$", "X", "M", "$\Gamma$", "R"],
+        knames=[r"$\Gamma$", "X", "M", r"$\Gamma$", "R"],
         supercell_matrix=None,
         npoints=100,
         efermi=None,

@@ -43,6 +43,9 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+# No extra files needed
+# html_extra_path = ["_extra"]
+
 
 master_doc = "index"
 
@@ -62,3 +65,10 @@ html_theme_options = {
     "logo_only": True,
     "display_version": False,
 }
+# html_css_files = [
+#     'custom.css',
+# ]
+
+# Read the Docs uses its own ethical advertising system (EthicalAds) instead of Google AdSense
+# No additional configuration needed for ads - Read the Docs handles this automatically
+html_js_files = []

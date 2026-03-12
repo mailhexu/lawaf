@@ -1,0 +1,13 @@
+{%- extends "localtoc.html" %}
+
+{%- block extralinks %}
+  {{ super() }}
+  <div class="sidebar-logo-addition">
+    <p style="text-align: center; margin-top: 20px; margin-bottom: 5px;">
+      LaWaF is a project initialized at the University of Liege.
+    </p>
+    <p style="text-align: center;">
+      <img src="{{ pathto('_static/uliegelogo.png', 1) }}" alt="Uliege Logo" style="width: 150px;">
+    </p>
+  </div>
+{%- endblock %}

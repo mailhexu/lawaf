@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import copy
+
 import numpy as np
-from phonopy import load
 from ase.atoms import Atoms
 from ase.io import read
-from spglib import spglib
-from pyDFTutils.ase_utils.geometry import force_near_0
+from phonopy import load
+
+# from pyDFTutils.ase_utils.geometry import force_near_0
 
 
 def gen(mod, amp):
@@ -28,7 +29,7 @@ def gen(mod, amp):
         for mode in modes:
             positions += np.real(mode)
         datoms.set_positions(positions)
-        spg = spglib.get_spacegroup(datoms, symprec=0.001)
+        # spg = spglib.get_spacegroup(datoms, symprec=0.001)
         # write(f"POSCAR_{i}.vasp", datoms, vasp5=True)
         # print(datoms.cell)
         # print(f"{spg}")
@@ -64,7 +65,7 @@ def combine(alpha, cell=False):
 
     spos = (1 - alpha) * spos_R + alpha * spos_M1
     atoms = Atoms(symbols, cell=cell, scaled_positions=spos)
-    spg = spglib.get_spacegroup(atoms, symprec=0.001)
+    # spg = spglib.get_spacegroup(atoms, symprec=0.001)
     return atoms
 
 
