@@ -123,6 +123,6 @@ def run_all_pwf_atom_projector():
     pass
 
 
-# run_all_scdmk()
-run_all_pwf()
+run_all_scdmk()
+#run_all_pwf()
 # run_all_pwf_atom_projector()

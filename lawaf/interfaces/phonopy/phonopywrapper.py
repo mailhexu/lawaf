@@ -44,7 +44,6 @@ class MyDynamicalMatrixGL(DynamicalMatrixGL):
         num_G_points=None,
         with_full_terms=False,
         decimals=None,
-        symprec=0.00001,
         log_level=0,
         use_openmp=False,
     ):
@@ -117,7 +116,6 @@ def my_get_dynamical_matrix(
     nac_params=None,
     frequency_scale_factor=None,
     decimals=None,
-    symprec=1e-5,
     log_level=0,
     use_openmp=False,
 ):
@@ -156,7 +154,6 @@ def my_get_dynamical_matrix(
             primitive,
             _fc2,
             decimals=decimals,
-            symprec=symprec,
             log_level=log_level,
             use_openmp=use_openmp,
         )
@@ -195,11 +192,11 @@ class PhonopyWrapper:
         #    )
 
         self._prepare()
-        prim = self.phonon.get_primitive()
+        prim = self.phonon.primitive
         self.atoms = Atoms(
-            prim.get_chemical_symbols(),
-            positions=prim.get_positions(),
-            cell=prim.get_cell(),
+            prim.symbols,
+            positions=prim.positions,
+            cell=prim.cell,
         )
         self.natom = len(self.atoms)
         self._positions = np.repeat(self.atoms.get_scaled_positions(), 3, axis=0)
@@ -231,7 +228,7 @@ class PhonopyWrapper:
                 pickle.dump(self._cache, f)
 
     def get_nac_params(self):
-        nac_params = self.phonon.get_nac_params()
+        nac_params = self.phonon.nac_params
         self.born = nac_params["born"]
         self.dielectric = nac_params["dielectric"]
         self.factor = nac_params["factor"]
@@ -450,7 +447,6 @@ def replace_phonon_dynamics_with_myGL(phonon):
         nac_params,
         phonon._frequency_scale_factor,
         phonon._dynamical_matrix_decimals,
-        symprec=phonon._symprec,
         log_level=phonon._log_level,
         use_openmp=False,  # phonon.use_openmp(),
     )
