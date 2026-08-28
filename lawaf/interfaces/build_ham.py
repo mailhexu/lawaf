@@ -45,7 +45,7 @@ class HamBuilder:
         if Rmesh is not None:
             Rlist, Rdeg = build_Rgrid_with_degeneracy(Rmesh)
         Hk = Amn_to_hamk(self.Amn, self.kpts, self.eig, orthogonize=orthogonize)
-        HR = k_to_R(self.kpts, Rlist, Hk, kweights=self.kweights, Rdeg=Rdeg)
+        HR = k_to_R(self.kpts, Rlist, Hk, kweights=self.kweights)
         return EWF(
             wannR=None,
             HwannR=HR,

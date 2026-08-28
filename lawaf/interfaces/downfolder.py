@@ -82,6 +82,7 @@ class Lawaf:
         enhance_Amn=0,
         selected_orbdict=None,
         orthogonal=False,
+        use_ws_distance=None,
     ):
         """
         Downfold the Band structure.
@@ -129,6 +130,9 @@ class Lawaf:
             selected_orbdict=selected_orbdict,
             orthogonal=orthogonal,
         )
+        if use_ws_distance is not None:
+            self._params.use_ws_distance = use_ws_distance
+
 
     def _prepare_data(self):
         """
@@ -261,18 +265,38 @@ class Lawaf:
         # self.lwf = self.builder.get_wannier(Rlist=self.Rlist, Rdeg=self.Rdeg)
         self.builder.get_Amn()
         wannk, Hwannk, Swannk = self.builder.get_wannk_and_Hk()
-        wannR = k_to_R(
-            self.kpts, self.Rlist, wannk, kweights=self.kweights, Rdeg=self.Rdeg
-        )
-        HwannR = k_to_R(
-            self.kpts, self.Rlist, Hwannk, kweights=self.kweights, Rdeg=self.Rdeg
-        )
+        wannR = k_to_R(self.kpts, self.Rlist, wannk, kweights=self.kweights)
+        HwannR = k_to_R(self.kpts, self.Rlist, Hwannk, kweights=self.kweights)
         if Swannk is not None:
-            SwannR = k_to_R(
-                self.kpts, self.Rlist, Swannk, kweights=self.kweights, Rdeg=self.Rdeg
-            )
+            SwannR = k_to_R(self.kpts, self.Rlist, Swannk, kweights=self.kweights)
         else:
             SwannR = None
+
+        _ws_ok = (getattr(self.params, "gamma", True)
+                  and (lambda ks: np.allclose(np.zeros(3) if ks is None
+                                            else np.asarray(ks, dtype=float),
+                                           0.0, atol=1e-8))(
+            getattr(self.params, "kshift", None)))
+        if getattr(self.params, "use_ws_distance", False) and _ws_ok:
+            from lawaf.mathutils.ws_distance import (apply_ws_distance_tensors,
+                                                     fold_R_to_mesh)
+
+            cell = np.array(self.atoms.get_cell())
+            tensors = [HwannR] + ([SwannR] if SwannR is not None else []) + [wannR]
+            tensors_f, Rlist_f = fold_R_to_mesh(
+                self.Rlist, tensors, self.params.kmesh, Rdeg=self.Rdeg)
+            # electron basis functions have no positional centers; zeros give
+            # the symmetric-image convention (identity for odd meshes)
+            centers_list = [np.zeros((T.shape[2], 3)) for T in tensors_f[:-1]] + [
+                np.zeros((wannR.shape[1], 3))]
+            res, Rlist_ws, Rdeg_ws = apply_ws_distance_tensors(
+                tensors_f, Rlist_f, centers_list, cell, self.params.kmesh,
+                centers_j_list=[np.zeros((self.params.nwann, 3))] * len(tensors_f))
+            HwannR = res[0]
+            if SwannR is not None:
+                SwannR = res[1]
+            wannR = res[-1]
+            self.Rlist, self.Rdeg = Rlist_ws, Rdeg_ws
 
         self.lwf = EWF(
             wannR=wannR,

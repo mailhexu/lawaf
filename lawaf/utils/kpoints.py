@@ -17,11 +17,24 @@ def kmesh_to_R(kmesh):
     return np.array(Rlist)
 
 
-def build_Rgrid(R, degeneracy=False):
+def build_Rgrid(R, degeneracy=None, wigner_seitz=None):
     """
-    Build R-point grid from the number
+    Build R-point grid for a k-mesh.
+
+    Parameters
+    ----------
+    R : (3,) k-mesh divisions.
+    wigner_seitz : bool, optional
+        True: symmetric Wigner-Seitz grid (an even mesh N maps to the
+        (N+1)-wide centered grid; aliased boundary images carry Rdeg = 1/2
+        per boundary axis). Alias: ``degeneracy``.
+    degeneracy : bool, optional
+        Legacy alias for ``wigner_seitz``; ``wigner_seitz`` wins if both
+        are given. Default False (lopsided {0..N-1} grid for even meshes).
     """
-    if degeneracy:
+    if wigner_seitz is None:
+        wigner_seitz = bool(degeneracy)
+    if wigner_seitz:
         return build_Rgrid_with_degeneracy(R)
     else:
         return build_Rgrid_without_degeneracy(R)

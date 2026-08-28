@@ -1,5 +1,25 @@
 ### Electron Wannier function
 
+#### The k <-> R transformation
+
+lawaf stores downfolded models on an R-grid and interpolates back to
+arbitrary k with a plain Fourier sum. Two conventions exist:
+
+* **Grid mode** (`use_ws_distance=False`, legacy): the R grid is the
+  Monkhorst-Pack cell `[-N/2, N/2]^3`; equivalent R vectors each carry the
+  full DFT coefficient together with a degeneracy weight `Rdeg`, which is
+  applied at every R-sum.
+* **Wigner-Seitz mode** (`use_ws_distance=True`, default): for each pair
+  (i, j) and mesh vector R, the matrix element is scattered to the closest
+  supercell image `R + n*N` with weight `1/ndeg` — exactly wannier90's
+  `ws_distance` treatment. The resulting `Rdeg` is all ones, so every
+  plain-sum consumer (band interpolation, supercell folding) is
+  wannier90-correct without further changes.
+
+Both modes reconstruct the same Hamiltonian at the mesh k-points; the
+Wigner-Seitz mode additionally gives the correct phase averaging at
+arbitrary k, especially for even meshes and basis sets with off-center
+Wannier functions.
 
 #### Downfolding from Wannier90 Hamiltonian
 Below is an example of how to use downfold an tight-binding Hamiltonian from Wannier90 output. 
@@ -9,28 +29,28 @@ We need to write a python script (e.g. downfold.py) to call the Downfolder. I'll
 The W90 Hamiltonian is the spin down part for an SrMn$O_3$. The orginal wannier functions consist the O $2p$ and Mn $3d$ orbitals. We want to downfold the Hamiltonian to a two band Mn $e_g$ model.  
 
 ```python
-from banddownfolder import W90Downfolder
+from lawaf.interfaces import W90Downfolder
 import numpy as np
 
 
 def main():
     # Read From Wannier90 output
     # The w90 output
-    model = W90Downfolder(folder='./SMO_Wannier/',
+    model = W90Downfolder(folder='./SMO_wannier/',
                           prefix='abinito_w90_down')
 
     # Downfold the band structure.
-    model.downfold(method='scdmk',
-                   kmesh=(3, 3, 3),
-                   nwann=2,
-                   weight_func='Gauss',
-                   mu=10.0,
-                   sigma=3.0,
-                   selected_basis=None,
-                   anchors={(0, 0, 0): (12, 13)},
-                   anchor_kpt = None,
-                   use_proj=True,
-                   exclude_bands=[],
+    params = dict(method='scdmk',
+                  kmesh=(3, 3, 3),
+                  nwann=2,
+                  weight_func='Gauss',
+                  weight_func_params=(10.0, 3.0),   # (mu, sigma)
+                  selected_basis=None,
+                  anchors={(0, 0, 0): (12, 13)},
+                  anchor_kpt=None,
+                  use_proj=True,
+                  exclude_bands=[])
+    model.downfold(**params,
                    write_hr_nc='Downfolded_hr.nc',
                    write_hr_txt='Downfolded_hr.txt')
 
@@ -39,16 +59,8 @@ def main():
                                                [0.5, 0.5, 0], [0, 0, 0],
                                                [.5, .5, .5]]),
                             knames=['$\Gamma$', 'X', 'M', '$\Gamma$', 'R'],
-                            supercell_matrix=None,
                             npoints=100,
-                            efermi=None,
-                            erange=None,
-                            fullband_color='blue',
-                            downfolded_band_color='green',
-                            marker='o',
-                            ax=None,
-                            savefig='Downfolded_band.png',
-                            show=True)
+                            savefig='Downfolded_band.png')
 
 
 if __name__ == "__main__":
@@ -63,7 +75,7 @@ After running the script, we get the output of Wannier functions (in Downfolded_
 * Now we dig into the example script, we first import the module W90Downfolder:
 
   ```python
-  from banddownfolder.downfolder import W90Downfolder
+  from lawaf.interfaces import W90Downfolder
   import numpy as np
   ```
 
@@ -133,8 +145,8 @@ Note that the three methods cannot be used in the simutaneously. Therefore, the 
          - Gauss: A gaussian centered at mu, and has the half width of sigma.
          - Fermi: A fermi function. The Fermi energy is mu, and the smearing is sigma.
          - window: A window function in the range of (mu, sigma)
-        mu: see above
-        sigma: see above
+        weight_func_params: the parameters of the weight function. For Gauss and Fermi this is (mu, sigma);
+                 for window it is the energy range (Emin, Emax).
         selected_basis, A list of the indexes of the Wannier functions as initial guess. The number should be equal to nwann.
         anchors: Anchor points. The index of band at one k-point. e.g.(0, 0, 0): (6, 7, 8)
         anchor_kpt: used for auto selecting of anchors. Only the kpoint. e.g. (0,0,0)
@@ -226,7 +238,7 @@ pip install sisl
 We write a python script similar to the example above. The difference is that we read the siesta output instead of Wannier, by specifying the path and the name of the fdf file. A extra parameter spin can be specified. For non-polarized and spin-orbit calculation, it should be set to None. For collinear spin calculation, spin=0 or 1 gives the up and down channel of the band structure. 
 
 ```
-downfolder = SislDownfolder(folder='.', fdf_file='siesta.fdf', spin=None)
+downfolder = SiestaDownfolder(fdf_fname='siesta.fdf', params=params)
 ```
 
 In this example, spin-orbit coupling is activated in the siesta calculation. We build the Mn 4 $e_g$ band with spinor wavefunctions.  We can select four anchor points. 

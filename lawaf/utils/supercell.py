@@ -255,33 +255,56 @@ class SupercellMaker(object):
                 ret_dict[(sc_i, sc_j, tuple(sc_part))] = val
         return ret_dict
 
-    def sc_Rlist_HR(self, Rlist, HR, n_basis):
+    def sc_Rlist_HR(self, Rlist, HR, n_basis, accumulate=False):
         """
-        terms: H[R][i,j] = val
-        ========================
-        terms: either list of [i, j, R, val] or  dict{(i,j, R): val}
-        pos: reduced positions in the unit cell.
-        Returns:
-        =======================
+        Fold a unit-cell (Rlist, HR) pair into the supercell.
+
+        accumulate=False (legacy): each (R, sc_vec) appends one block with
+        ``=``; R vectors colliding on the same supercell R keep only the
+        last block. accumulate=True: blocks sharing a supercell R are
+        summed (``+=``), which is required for WS-materialized R lists
+        where several primitive images map to the same supercell vector.
+        Returns (sc_Rlist, sc_HR); with accumulate=True the R list is
+        unique and sorted.
         """
-        sc_Rlist = []
-        sc_HR = []
-        for c, cur_sc_vec in enumerate(self.sc_vec):  # go over all super-cell vectors
-            # for i , j, ind_R, val in
+        if not accumulate:
+            sc_Rlist = []
+            sc_HR = []
+            for c, cur_sc_vec in enumerate(self.sc_vec):
+                for iR, R in enumerate(Rlist):
+                    H = HR[iR]
+                    sc_part, pair_ind = self._sc_R_to_pair_ind(tuple(R + cur_sc_vec))
+                    sc_Rlist.append(sc_part)
+                    sc_val = np.zeros(
+                        (n_basis * self.ncell, n_basis * self.ncell),
+                        dtype=HR.dtype,
+                    )
+                    for i in range(n_basis):
+                        for j in range(n_basis):
+                            sc_i = i + c * n_basis
+                            sc_j = j + pair_ind * n_basis
+                            sc_val[sc_i, sc_j] = H[i, j]
+                    sc_HR.append(sc_val)
+            return np.array(sc_Rlist, dtype=int), np.array(sc_HR)
+
+        sc_dict = OrderedDict()
+        for c, cur_sc_vec in enumerate(self.sc_vec):
             for iR, R in enumerate(Rlist):
                 H = HR[iR]
                 sc_part, pair_ind = self._sc_R_to_pair_ind(tuple(R + cur_sc_vec))
-                sc_Rlist.append(sc_part)
-                sc_val = np.zeros(
-                    (n_basis * self.ncell, n_basis * self.ncell), dtype=HR.dtype
-                )
-                for i in range(n_basis):
-                    for j in range(n_basis):
-                        sc_i = i + c * n_basis
-                        sc_j = j + pair_ind * n_basis
-                        sc_val[sc_i, sc_j] = H[i, j]
-                sc_HR.append(sc_val)
-        return np.array(sc_Rlist, dtype=int), np.array(sc_HR)
+                key = tuple(sc_part)
+                if key not in sc_dict:
+                    sc_dict[key] = np.zeros(
+                        (n_basis * self.ncell, n_basis * self.ncell),
+                        dtype=HR.dtype,
+                    )
+                sc_val = sc_dict[key]
+                ii = c * n_basis
+                jj = pair_ind * n_basis
+                sc_val[ii : ii + n_basis, jj : jj + n_basis] += H
+        sc_Rlist = np.array(sorted(sc_dict.keys()), dtype=int)
+        sc_HR = np.array([sc_dict[tuple(R)] for R in sc_Rlist])
+        return sc_Rlist, sc_HR
 
     def sc_RHdict(self, RHdict, n_basis):
         """
@@ -294,15 +317,17 @@ class SupercellMaker(object):
         """
         sc_RHdict = defaultdict(
             lambda: np.zeros(
-                (n_basis * self.ncell, n_basis * self.ncell), dtype=H.dtype
+                (n_basis * self.ncell, n_basis * self.ncell),
+                dtype=next(iter(RHdict.values())).dtype
+                if RHdict else float,
             )
         )
-        for c, cur_sc_vec in enumerate(self.sc_vec):  # go over all super-cell vectors
+        for c, cur_sc_vec in enumerate(self.sc_vec):
             for R, H in RHdict.items():
                 sc_part, pair_ind = self._sc_R_to_pair_ind(tuple(R + cur_sc_vec))
                 ii = c * n_basis
                 jj = pair_ind * n_basis
-                sc_RHdict[R][ii : ii + n_basis, jj : jj + n_basis] += H
+                sc_RHdict[tuple(sc_part)][ii : ii + n_basis, jj : jj + n_basis] += H
         return sc_RHdict
 
     def sc_atoms(self, atoms):

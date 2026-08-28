@@ -1,20 +1,9 @@
 import numpy as np
 from ase.dft.kpoints import monkhorst_pack
 from scipy.linalg import eigh
+
+from lawaf.mathutils.kR_convert import HR_to_k, Hk_to_R
 from lawaf.utils.kpoints import kmesh_to_R
-
-
-def HR_to_k(HR, Rlist, kpts):
-    # Hk[k,:,:] = sum_R (H[R] exp(i2pi k.R))
-    phase = np.exp(2.0j * np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
-    Hk = np.einsum("rlm, kr -> klm", HR, phase)
-    return Hk
-
-
-def Hk_to_R(Hk, Rlist, kpts, kweights):
-    phase = np.exp(-2.0j * np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
-    HR = np.einsum("klm, kr, k->rlm", Hk, phase, kweights)
-    return HR
 
 
 def modify_one_kpoint(evals, evecs, func):

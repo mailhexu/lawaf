@@ -26,7 +26,7 @@ LaWaF is a project initialized at the University of Liege.
    src/install.md
    src/quickstart.md
    src/tutor.rst
-   src/ReleaseNotes.rst
+   src/ReleaseNotes.md
 ..
    src/references.md
    src/Contributors.rst

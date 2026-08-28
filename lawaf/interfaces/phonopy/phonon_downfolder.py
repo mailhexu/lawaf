@@ -5,11 +5,54 @@ import numpy as np
 from lawaf.interfaces.downfolder import Lawaf
 from lawaf.mathutils.evals_freq import freqs_to_evals
 from lawaf.mathutils.kR_convert import R_to_onek, k_to_R
-
+from lawaf.mathutils.ws_distance import apply_ws_distance_tensors, fold_R_to_mesh
 from .lwf import LWF, NACLWF
 from .phonopywrapper import PhonopyWrapper
 
 __all__ = ["PhononDownfolder", "PhonopyDownfolder", "NACPhonopyDownfolder"]
+
+
+def _ws_mesh_ok(downfolder):
+    """WS materialization assumes all degenerate images share the phase at
+    mesh k, which only holds for Gamma-centered (unshifted) meshes."""
+    ks = getattr(downfolder.params, "kshift", None)
+    kshift = np.zeros(3) if ks is None else np.asarray(ks, dtype=float)
+    gamma = getattr(downfolder.params, "gamma", True)
+    if not gamma:
+        # half-shifted Monkhorst-Pack: k . N is half-integer -> phase -1
+        return False
+    return np.allclose(kshift, 0.0, atol=1e-8)
+
+
+def _ws_materialize(downfolder, tensors, wann_centers):
+    """Apply W90 Wigner-Seitz materialization to named R-space tensors.
+
+    Tensors are classified by ROLE, not shape: only the key "wannR"
+    (nbasis x nwann amplitudes) uses the atomic positions repeated per
+    Cartesian direction as row centers; all other (Hamiltonian-like)
+    tensors use the Wannier centers on both sides. This stays correct for
+    full-band models where nbasis == nwann. All tensors are scattered onto
+    one common union R grid; downfolder.Rlist/Rdeg are replaced.
+    """
+    positions = downfolder.atoms.get_scaled_positions()
+    cell = np.array(downfolder.atoms.get_cell())
+    centers_list = []
+    centers_j_list = []
+    for name, T in tensors.items():
+        if name == "wannR":
+            centers_list.append(np.repeat(positions, 3, axis=0)[: T.shape[1]])
+            centers_j_list.append(wann_centers)
+        else:
+            centers_list.append(wann_centers)
+            centers_j_list.append(wann_centers)
+    tensors_folded, Rlist_folded = fold_R_to_mesh(
+        downfolder.Rlist, list(tensors.values()), downfolder.params.kmesh,
+        Rdeg=downfolder.Rdeg)
+    res, Rlist_ws, Rdeg_ws = apply_ws_distance_tensors(
+        tensors_folded, Rlist_folded, centers_list, cell,
+        downfolder.params.kmesh, centers_j_list=centers_j_list)
+    return dict(zip(tensors, res)), Rlist_ws, Rdeg_ws
+
 
 
 class PhononDownfolder(Lawaf):
@@ -96,13 +139,9 @@ class PhonopyDownfolder(PhononDownfolder):
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
         wannk, Hwannk, _ = self.builder.get_wannk_and_Hk()
-        HwannR = k_to_R(
-            self.kpts, self.Rlist, Hwannk, kweights=self.kweights, Rdeg=self.Rdeg
-        )
+        HwannR = k_to_R(self.kpts, self.Rlist, Hwannk, kweights=self.kweights)
 
-        wannR = k_to_R(
-            self.kpts, self.Rlist, wannk, kweights=self.kweights, Rdeg=self.Rdeg
-        )
+        wannR = k_to_R(self.kpts, self.Rlist, wannk, kweights=self.kweights)
 
         wann_centers = get_wannier_centers(
             wannR, self.Rlist, self.atoms.get_scaled_positions(), Rdeg=self.Rdeg
@@ -110,6 +149,11 @@ class PhonopyDownfolder(PhononDownfolder):
         print("wannier_centers: ")
         for i in range(self.nwann):
             print(f"{i}: {wann_centers[i]=}")
+
+        if getattr(self.params, "use_ws_distance", False) and _ws_mesh_ok(self):
+            ws, self.Rlist, self.Rdeg = _ws_materialize(
+                self, {"HwannR": HwannR, "wannR": wannR}, wann_centers)
+            HwannR, wannR = ws["HwannR"], ws["wannR"]
 
         # save the lwf model into a NACLWF object
         self.lwf = LWF(
@@ -204,13 +248,9 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
         wannk, Hwannk_noNAC, _ = self.builder.get_wannk_and_Hk()
-        HwannR_noNAC = k_to_R(
-            self.kpts, self.Rlist, Hwannk_noNAC, kweights=self.kweights, Rdeg=self.Rdeg
-        )
+        HwannR_noNAC = k_to_R(self.kpts, self.Rlist, Hwannk_noNAC, kweights=self.kweights)
 
-        wannR = k_to_R(
-            self.kpts, self.Rlist, wannk, kweights=self.kweights, Rdeg=self.Rdeg
-        )
+        wannR = k_to_R(self.kpts, self.Rlist, wannk, kweights=self.kweights)
         # prepare the H and the eigens for all k-points.
         evals_nac, evecs_nac, Hk_tot, Hk_short, Hk_long = self.model_NAC.solve_all(
             self.kpts, output_H=True
@@ -234,6 +274,17 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         print("wannier_centers: ")
         for i in range(self.nwann):
             print(f"{i}: {wann_centers[i]=}")
+
+        if getattr(self.params, "use_ws_distance", False) and _ws_mesh_ok(self):
+            ws, self.Rlist, self.Rdeg = _ws_materialize(
+                self,
+                {"HR_noNAC": HwannR_noNAC, "wannR": wannR,
+                 "HR_short": HwannR_short, "HR_total": HwannR_total},
+                wann_centers)
+            HwannR_noNAC = ws["HR_noNAC"]
+            wannR = ws["wannR"]
+            HwannR_short = ws["HR_short"]
+            HwannR_total = ws["HR_total"]
 
         # save the lwf model into a NACLWF object
         self.lwf = NACLWF(
@@ -267,6 +318,8 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
         #    # self.ewf.write_lwf_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         #    self.ewf.write_nc(os.path.join(output_path, write_hr_nc), atoms=self.atoms)
         # return self.ewf
+        return self.lwf
+
 
     def get_Hwannk_short(self, wannk=None, Hk_short=None, evecs=None):
         """
@@ -290,14 +343,14 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             Rdeg = np.ones(len(Rlist))
         if Hk_wann_short is None:
             Hk_wann_short = self.get_Hwannk_short()
-        HwannR_short = k_to_R(kpts, Rlist, Hk_wann_short, kweights=kweights, Rdeg=Rdeg)
+        HwannR_short = k_to_R(kpts, Rlist, Hk_wann_short, kweights=kweights)
         return HwannR_short
 
     def get_wannk_interpolated(self, qpt):
         """
         Interpolate Wannier functions from real space to k-space.
         """
-        wannk = R_to_onek(qpt, self.Rlist, self.lwf.wannR)
+        wannk = R_to_onek(qpt, self.Rlist, self.lwf.wannR, self.Rdeg)
         return wannk
 
     def get_wannier_nac(self, Rlist=None):

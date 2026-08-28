@@ -206,6 +206,7 @@ class PhonopyWrapper:
         masses = np.kron(self.atoms.get_masses(), [1, 1, 1])
         self.Mmat = np.sqrt(masses[:, None] * masses[None, :])
         self._use_cache = use_cache
+        self._dm_short = None
         self._prepare_cache()
         atexit.register(self.save_cache)
 
@@ -238,6 +239,31 @@ class PhonopyWrapper:
         self.phonon.symmetrize_force_constants()
         # self.phonon.symmetrize_force_constants_by_space_group()
         pass
+    def _get_short_range_dm(self, k):
+        """Short-range (dipole-dipole excluded) dynamical matrix at k.
+
+        phonopy >= 3 removed ``_short_range_dynamical_matrix``; rebuild the split
+        from the public Gonze short-range force constants. Older phonopy kept
+        the private attribute updated by ``run(q)``.
+        """
+        dm = self.phonon.dynamical_matrix
+        sfc = getattr(dm, "short_range_force_constants", None)
+        if sfc is None and hasattr(dm, "make_Gonze_nac_dataset"):
+            # phonopy >= 3 builds the Gonze dataset lazily inside
+            # _compute_dynamical_matrix, which is skipped at Gamma (no
+            # q_direction); build it explicitly instead.
+            dm.make_Gonze_nac_dataset()
+            sfc = dm.short_range_force_constants
+        if sfc is None:
+            # phonopy < 3: run(q) above has already refreshed these attributes
+            return np.array(dm._short_range_dynamical_matrix)
+        if self._dm_short is None:
+            from phonopy.harmonic.dynamical_matrix import DynamicalMatrix
+
+            self._dm_short = DynamicalMatrix(dm.supercell, dm.primitive, np.array(sfc))
+        self._dm_short.run(k)
+        return np.array(self._dm_short.dynamical_matrix)
+
 
     def solve(self, k, output_H=False):
         # Hk = self.phonon.get_dynamical_matrix_at_q(k)
@@ -251,15 +277,11 @@ class PhonopyWrapper:
                 return self._cache[key]
 
         if self.is_nac:
-            # replace_phonon_dynamics_with_myGL(self.phonon)
-            # self.phonon._dynamical_matrix.run(k)
-            # return self.phonon._dynamical_matrix.get_dynamical_matrix()
-            # self.phonon.dynamical_matrix._compute_dynamical_matrix(k, [0, 0, 0])
-            # Hk, Hshort, Hlong = self.phonon.dynamical_matrix.get_dynamical_matrix(split_short_long=True)
-            Hk = self.phonon.get_dynamical_matrix_at_q(k)
-            # Hk=self.phonon.dynamical_matrix.dynamical_matrix
-            Hshort = self.phonon.dynamical_matrix._short_range_dynamical_matrix
-            Hlong = self.phonon.dynamical_matrix._long_range_dynamical_matrix
+            # Full (short + dipole-dipole) dynamical matrix; copy so the phase
+            # and mass factors below do not mutate phonopy's internal buffer.
+            Hk = np.array(self.phonon.get_dynamical_matrix_at_q(k))
+            Hshort = self._get_short_range_dm(k)
+            Hlong = Hk - Hshort
         else:
             Hk = self.phonon.get_dynamical_matrix_at_q(k)
         phase = np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))

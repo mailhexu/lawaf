@@ -39,7 +39,7 @@ def read_atoms_from_netcdf(fname):
     return Atoms(numbers=numbers, positions=positions, cell=cell)
 
 
-def build_lwf_lattice_mapping_matrix(mylwf, scmaker):
+def build_lwf_lattice_mapping_matrix(mylwf, scmaker, accumulate=True):
     # prim_atoms = mylwf.atoms
     nR, natom3, nlwf = mylwf.wannR.shape
     # mapping matirx: natom3_sc * nlwf_sc
@@ -48,15 +48,25 @@ def build_lwf_lattice_mapping_matrix(mylwf, scmaker):
     # mapping_mat = np.zeros((natom3_sc, nlwf_sc), dtype=float)
     mapping_mat = dok_matrix((natom3_sc, nlwf_sc), dtype=float)
     print(natom3_sc, nlwf_sc)
+    op = (mapping_mat.__setitem__ if not accumulate
+          else lambda key, val: mapping_mat.__setitem__(
+              key, mapping_mat.get(key, 0.0) + val))
     for iwann in range(nlwf):
         for icell, Rsc in enumerate(scmaker.sc_vec):
             iwann_sc = scmaker.sc_i_to_sci(i=iwann, ind_Rv=icell, n_basis=nlwf)
-            for Rwann, iRwann in mylwf.Rdict.items():
+            wR = getattr(mylwf, "Rdeg", None)
+            for iRwann, Rwann in enumerate(mylwf.Rlist):
+                w = 1.0 if wR is None else wR[iRwann]
+                # phonopy LWF exposes mass-scaled displacements; plain LWF
+                # only the raw amplitudes
+                src = getattr(mylwf, "wann_disps", None)
+                if src is None:
+                    src = np.real(mylwf.wannR)
                 for j in range(natom3):
-                    val = np.real(mylwf.wannR[iRwann, j, iwann])
+                    val = src[iRwann, j, iwann] * w
                     if abs(val) > 1e-4:
                         sc_j, sc_R = scmaker.sc_jR_to_scjR(j, Rwann, Rsc, natom3)
-                        mapping_mat[sc_j, iwann_sc] = val
+                        op((sc_j, iwann_sc), val)
     return csr_matrix(mapping_mat)
 
 
@@ -65,7 +75,8 @@ def lwf_to_disp(mapping_mat, lwfamp):
 
 
 class MyLWFSC:
-    def __init__(self, lwf, scmaker, mapping_file=None, scatoms_file=None):
+    def __init__(self, lwf, scmaker, mapping_file=None, scatoms_file=None,
+                 accumulate=True):
         self.lwf = lwf
 
         nR, self.natom3, self.nlwf = self.lwf.wannR.shape
@@ -75,7 +86,8 @@ class MyLWFSC:
         if mapping_file is not None and os.path.exists(mapping_file):
             self.mapping_mat = load_npz(mapping_file)
         else:
-            self.mapping_mat = build_lwf_lattice_mapping_matrix(lwf, scmaker)
+            self.mapping_mat = build_lwf_lattice_mapping_matrix(
+                lwf, scmaker, accumulate=accumulate)
             if mapping_file is not None:
                 save_npz(mapping_file, self.mapping_mat)
         self.prim_atoms = self.lwf.atoms

@@ -1,101 +1,70 @@
 import numpy as np
 
 
-def HR_to_k(HR, Rlist, kpts):
-    # Hk[k,:,:] = sum_R (H[R] exp(i2pi k.R))
+def HR_to_k(HR, Rlist, kpts, Rdeg=None):
+    # Hk[k,:,:] = sum_R Rdeg[R] * H[R] exp(i2pi k.R)
+    if Rdeg is None:
+        Rdeg = np.ones(Rlist.shape[0], dtype=float)
     phase = np.exp(2.0j * np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
-    Hk = np.einsum("rlm, kr -> klm", HR, phase)
+    Hk = np.einsum("rlm, kr, r->klm", HR, phase, Rdeg)
     return Hk
 
 
-def Hk_to_R(Hk, Rlist, kpts, kweights, Rdeg=None):
-    if Rdeg is None:
-        Rdeg = np.ones(Rlist.shape[0], dtype=float)
+def Hk_to_R(Hk, Rlist, kpts, kweights):
+    """Full (unweighted) DFT coefficients; Rdeg is NOT folded into the
+    stored values -- it is metadata applied at every R-sum (see R_to_k)."""
     phase = np.exp(-2.0j * np.pi * np.tensordot(kpts, Rlist, axes=([1], [1])))
-    HR = np.einsum("klm, kr, k, r->rlm", Hk, phase, kweights, Rdeg)
+    HR = np.einsum("klm, kr, k->rlm", Hk, phase, kweights)
     return HR
 
 
-def k_to_R(kpts, Rlist, Mk, kweights=None, Rdeg=None):
+def k_to_R(kpts, Rlist, Mk, kweights=None):
     """
-    Transform k-space wavefunctions to real space.
-    params:
-        kpts: k-points
-        Rlist: list of R vectors
-        Mk: matrix of shape [nkpt, n1, n2] in k-space.
+    Transform k-space tensor to real space (full Fourier coefficients).
 
-    return:
-        MR: matrix of shape [nR, n1, n2], the matrix in R-space.
+    MR[R,:,:] = sum_k w_k Mk[k,:,:] exp(-2 pi i k.R)
 
+    Rdeg is NOT folded into the stored values; pass it to the R-space
+    consumers (R_to_k, R_to_onek, HR_to_k) instead.
     """
     Rlist = np.array(Rlist)
-    if Rdeg is None:
-        Rdeg = np.ones(Rlist.shape[0], dtype=float)
     nkpt, n1, n2 = Mk.shape
     if kweights is None:
         kweights = np.ones(nkpt, dtype=float) / nkpt
-    # phase=np.exp(-2.0j*np.pi*np.tensordot(kpts, Rlist, axes=([1], [1])))
-    # phase = np.exp(-2.0j * np.pi * np.einsum("kd, rd-> kr", kpts, Rlist))
-    # MR = np.einsum("klm, kr, k, r -> rlm", Mk, phase, kweights, Rdeg)
-    # return MR
-
-    nkpt, n1, n2 = Mk.shape
-    nR = Rlist.shape[0]
-    MR = np.zeros((nR, n1, n2), dtype=complex)
-    for iR, R in enumerate(Rlist):
-        for ik in range(nkpt):
-            MR[iR] += (
-                Mk[ik]
-                * np.exp(-2.0j * np.pi * np.dot(kpts[ik], R))
-                * kweights[ik]
-                * Rdeg[iR]
-            )
+    phase = np.exp(-2.0j * np.pi * np.einsum("kd, rd->kr", kpts, Rlist))
+    MR = np.einsum("klm, kr, k -> rlm", Mk, phase, kweights)
     return MR
 
 
-def R_to_k(kpts, Rlist, MR):
+def R_to_k(kpts, Rlist, MR, Rdeg=None):
     """
-    Transform real-space wavefunctions to k-space.
-    params:
-        kpts: k-points
-        Rlist: list of R vectors
-        MR: matrix of shape [nR, n1, n2] in R-space.
+    Transform real-space tensor to k space.
 
-    return:
-        Mk: matrix of shape [nkpt, n1, n2], the matrix in k-space.
+    Mk[k,:,:] = sum_R Rdeg[R] MR[R,:,:] exp(2 pi i k.R)
 
+    Rdeg carries the R-grid degeneracy weights (e.g. 1/2 on the aliased
+    boundary images of an even-mesh Wigner-Seitz grid); it defaults to 1.
     """
-    # phase = np.exp(2.0*np.pi*1j*np.tensordot(kpts, Rlist, axes=([1], [1])))
-    # phase = np.exp(2.0j * np.pi * np.einsum("kd, rd-> kr", kpts, Rlist))
-    # Mk = np.einsum("rlm, kr -> klm", MR, phase)
-    # return Mk
-
+    if Rdeg is None:
+        Rdeg = np.ones(Rlist.shape[0], dtype=float)
     nR, n1, n2 = MR.shape
     nkpt = kpts.shape[0]
     Mk = np.zeros((nkpt, n1, n2), dtype=complex)
     for iR, R in enumerate(Rlist):
         for ik in range(nkpt):
-            Mk[ik] += MR[iR] * np.exp(2.0j * np.pi * np.dot(kpts[ik], R))
+            Mk[ik] += MR[iR] * np.exp(2.0j * np.pi * np.dot(kpts[ik], R)) * Rdeg[iR]
     return Mk
 
 
-def R_to_onek(kpt, Rlist, MR):
+def R_to_onek(kpt, Rlist, MR, Rdeg=None):
     """
-    Transform real-space wavefunctions to k-space.
-    params:
-        kpt: k-point
-        Rlist: list of R vectors
-        MR: matrix of shape [nR, n1, n2] in R-space.
+    Transform real-space tensor to a single k point (weighted sum over R).
 
-    return:
-        Mk: matrix of shape [n1, n2], the matrix in k-space.
+    Mk[:,:] = sum_R Rdeg[R] MR[R,:,:] exp(2 pi i k.R)
 
+    See R_to_k for the Rdeg convention.
     """
-    # phase = np.exp(2.0j * np.pi * np.dot(Rlist, kpt))
-    # Mk = np.einsum("rlm, r -> lm", MR, phase)
-    # return Mk
-    n1, n2 = MR.shape[1:]
-    Mk = np.zeros((n1, n2), dtype=complex)
-    for iR, R in enumerate(Rlist):
-        Mk += MR[iR] * np.exp(2.0j * np.pi * np.dot(kpt, R))
-    return Mk
+    if Rdeg is None:
+        Rdeg = np.ones(Rlist.shape[0], dtype=float)
+    phase = np.exp(2.0j * np.pi * np.einsum("rd, d->r", Rlist, kpt)) * Rdeg
+    return np.einsum("rlm, r->lm", MR, phase)

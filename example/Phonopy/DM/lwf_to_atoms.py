@@ -1,5 +1,6 @@
 import numpy as np
-from banddownfolder.scdm.lwf import LWF
+from ase.io import write
+from lawaf.lwf.lwf import LWF
 
 from lawaf.utils.supercell import SupercellMaker
 
@@ -38,7 +39,7 @@ def test():
         mylwf, scmat=np.diag([5, 5, 5]), amplist=[[(0, 0, 0), 0, 1], [(0, 0, 0), 1, 1]]
     )
     # vesta_view(atoms)
-    atoms.save("test_atoms.vasp")
+    write("test_atoms.vasp", atoms, format="vasp")
 
 
 test()

@@ -34,6 +34,7 @@ class WannierParams:
     enhance_Amn: int = 0
     selected_orbdict = None
     orthogonal = True
+    use_ws_distance: bool = True
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():

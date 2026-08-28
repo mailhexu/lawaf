@@ -6,11 +6,14 @@ from ase import Atoms
 from ase.io import read, write
 from ase.units import Bohr
 from netCDF4 import Dataset
-from pyDFTutils.ase_utils import vesta_view
+try:
+    from pyDFTutils.ase_utils import vesta_view
+except ImportError:
+    vesta_view = None
 from scipy.sparse import csr_matrix, dok_matrix, load_npz, save_npz
 
 from lawaf.plot.mcif import write_mcif
-from lawaf.scdm.lwf import LWF
+from lawaf.lwf.lwf import LWF
 from lawaf.utils.supercell import SupercellMaker
 
 

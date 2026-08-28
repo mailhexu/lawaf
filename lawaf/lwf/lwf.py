@@ -87,9 +87,13 @@ class LWF(GenericWF):
         has_nac=False,
         dielectric=None,
         factor=1.0,
-        fortran_order=False,
         twobody_terms=None,
+        Rdeg=None,
     ):
+        if Rdeg is None:
+            Rdeg = np.ones(len(Rlist), dtype=float)
+        self.Rdeg = np.asarray(Rdeg, dtype=float)
+
         self.wannR = wannR
         self.HwannR = HwannR
         self.Rlist = Rlist
@@ -136,7 +140,8 @@ class LWF(GenericWF):
             # print(f"self.born_effective_charges: {self.born_effective_charges.shape}")
             W_R_tau_i /= np.linalg.norm(W_R_tau_i)
             self.Zwann[i, :] = np.einsum(
-                "Rad,ade->e", W_R_tau_i, self.born_effective_charges
+                "Rad,ade->e", W_R_tau_i * self.Rdeg[:, None, None],
+                self.born_effective_charges
             )
         print(f"Zwann:{self.Zwann=}")
 
@@ -152,7 +157,8 @@ class LWF(GenericWF):
     @property
     def hoppings(self):
         Rlist = [tuple(R) for R in self.Rlist]
-        data = copy.deepcopy(dict(zip(Rlist, self.HwannR)))
+        data = copy.deepcopy(
+            dict(zip(Rlist, self.HwannR * self.Rdeg[:, None, None])))
         np.fill_diagonal(data[(0, 0, 0)], 0.0)
         return data
 
@@ -178,7 +184,7 @@ class LWF(GenericWF):
         hk = np.zeros((self.nwann, self.nwann), dtype=complex)
         for iR, R in enumerate(self.Rlist):
             phase = np.exp(2j * np.pi * np.dot(R, k))
-            hk += self.HwannR[iR, :, :] * phase
+            hk += self.HwannR[iR, :, :] * self.Rdeg[iR] * phase
         return hk
 
     def solve_wann_k(self, k, ham=False):
@@ -296,6 +302,8 @@ class LWF(GenericWF):
         wannR_real[:] = np.real(self.wannR)
         wannR_imag[:] = np.imag(self.wannR)
         wann_center_xred[:] = np.array(self.wann_centers)
+        Rdeg = root.createVariable(prefix + "Rdeg", float, dimensions=("nR",))
+        Rdeg[:] = self.Rdeg
 
         if self.twobody_terms is not None:
             self.twobody_terms.write_to_netcdf_file(root)
@@ -304,7 +312,9 @@ class LWF(GenericWF):
 
     def masses_to_lwf_masses(self, masses):
         m3 = np.kron(masses, [1, 1, 1])
-        lwf_masses = np.einsum("rij,i->j", (self.wannR.conj() * self.wannR), m3)
+        lwf_masses = np.einsum(
+            "rij,i->j",
+            self.wannR.conj() * self.wannR * self.Rdeg[:, None, None], m3)
         return lwf_masses
 
     def born_to_lwf(self, born):
@@ -400,11 +410,32 @@ class LWF(GenericWF):
         wannR_real[:] = np.real(self.wannR)
         wannR_imag[:] = np.imag(self.wannR)
         wann_centers[:, :] = self.wann_centers
+        Rdeg = root.createVariable(prefix + "Rdeg", float, dimensions=("nR",))
+        Rdeg[:] = self.Rdeg
+
 
         root.close()
 
     @staticmethod
     def load_nc(fname, prefix="wann_", order="C"):
+        root = Dataset(fname, "r")
+        legacy = "ndim" in root.dimensions
+        root.close()
+        if not legacy:
+            # grouped-schema file written by
+            # lawaf.interfaces.phonopy.lwf.LWF.write_to_netcdf
+            from lawaf.interfaces.phonopy.lwf import LWF as PhonopyLWF
+
+            plwf = PhonopyLWF.load_from_netcdf(fname)
+            return LWF(
+                wannR=plwf.wannR,
+                HwannR=plwf.HR_total,
+                Rlist=plwf.Rlist,
+                Rdeg=getattr(plwf, "Rdeg", None),
+                atoms=plwf.atoms,
+                wann_centers=plwf.wann_centers,
+                factor=plwf.factor,
+            )
         root = Dataset(fname, "r")
         ndim = root.dimensions["ndim"].size
         nR = root.dimensions["nR"].size
@@ -452,9 +483,13 @@ class LWF(GenericWF):
                 f"Warning: wannier centers {prefix+'wannier_center_xred'} not found, using 0 instead."
             )
             wann_centers = np.zeros((nwann, ndim))
+        try:
+            Rdeg = root.variables[prefix + "Rdeg"][:]
+        except KeyError:
+            Rdeg = None
         return LWF(
-            wannR, Ham, Rlist, cell=np.eye(3), wann_centers=wann_centers, atoms=atoms
-        )
+            wannR, Ham, Rlist, cell=np.eye(3), wann_centers=wann_centers,
+            atoms=atoms, Rdeg=Rdeg)
 
     def make_supercell(self, sc_maker=None, sc_matrix=None):
         from lawaf.utils.supercell import SupercellMaker
@@ -464,7 +499,8 @@ class LWF(GenericWF):
         if self.atoms is not None:
             sc_atoms = sc_maker.sc_atoms(self.atoms)
         sc_Rlist, sc_HR = sc_maker.sc_Rlist_HR(
-            self.Rlist, self.HwannR, n_basis=self.nwann
+            self.Rlist, self.HwannR * self.Rdeg[:, None, None],
+            n_basis=self.nwann
         )
         return sc_atoms, sc_Rlist, sc_HR
 
@@ -495,7 +531,7 @@ class LWF(GenericWF):
 
     def force_ASR(self):
         iR0 = self.find_iR_at_zero()
-        sumHR = np.sum(self.HwannR, axis=(0, 1))
+        sumHR = np.sum(self.HwannR * self.Rdeg[:, None, None], axis=(0, 1))
         self.HwannR[iR0] -= np.diag(sumHR)
 
     def force_ASR_kspace(self, kmesh):
@@ -573,7 +609,7 @@ def merge_two_LWF(wf1, wf2):
         cell,
         wann_centers,
         atoms=wf1.atoms,
-        fortran_order=False,
+        Rdeg=wf1.Rdeg,
         twobody_terms=None,
     )
     # TODO: add onebody terms and twobody_terms

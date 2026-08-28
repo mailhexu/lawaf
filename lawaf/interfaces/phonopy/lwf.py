@@ -105,14 +105,15 @@ class LWF:
         ds_atoms = xr.open_dataset(filename, group="atoms")
         atoms = Atoms(
             positions=ds_atoms["positions"].values,
+            numbers=ds_atoms["atomic_numbers"].values,
             masses=ds_atoms["masses"].values,
             cell=ds_atoms["cell"].values,
-            atomic_numbers=ds_atoms["atomic_numbers"].values,
         )
+        # "factor" is written as a data variable by write_to_netcdf
+        factor = float(ds["factor"].values.item()) if "factor" in ds.variables else None
 
         return cls(
-            factor=ds.attrs["factor"],
-            masses=ds.attrs["masses"],
+            factor=factor,
             Rlist=ds["Rlist"].values,
             Rdeg=ds["Rdeg"].values,
             wannR=wannR,
@@ -179,7 +180,8 @@ class LWF:
         """
         masses = np.repeat(self.atoms.get_masses(), 3)
         self.wann_masses = (
-            np.einsum("j,Rji->i", masses, self.wannR * self.wannR.conj())
+            np.einsum("j,Rji->i", masses,
+                      self.wannR * self.wannR.conj() * self.Rdeg[:, None, None])
             / self.wann_norm
         )
 
@@ -187,7 +189,9 @@ class LWF:
         """
         check the normalization of the LWF.
         """
-        self.wann_norm = np.sum(self.wannR * self.wannR.conj(), axis=(0, 1)).real
+        self.wann_norm = np.sum(
+            self.wannR * self.wannR.conj() * self.Rdeg[:, None, None],
+            axis=(0, 1)).real
         print(f"Norm of Wannier functions: {self.wann_norm}")
 
     def get_disp_wann(self):
@@ -207,7 +211,7 @@ class LWF:
         """
         get the Hamiltonian at k-point.
         """
-        Hk = R_to_onek(kpt, self.Rlist, self.HR_total)
+        Hk = R_to_onek(kpt, self.Rlist, self.HR_total, self.Rdeg)
         return Hk
 
     def solve_k(self, kpt):
@@ -292,7 +296,7 @@ class NACLWF(LWF):
     def __post_init__(self):
         self.natoms = self.born.shape[0]
         self.nwann = self.wannR.shape[2]
-        self.nkpt = self.wannR.shape[0]
+        self.nbasis = self.wannR.shape[1]
         self.nR = self.Rlist.shape[0]
         self.check_normalization()
         self.born_wann = self.get_born_wann()
@@ -301,6 +305,11 @@ class NACLWF(LWF):
 
         # nac_q = self._get_charge_sum(q=[0, 0, 0.001])
         self.split_short_long_wang()
+
+    def _mp_grid_from_kpts(self):
+        """Infer the Monkhorst-Pack divisions from the training k-points."""
+        return np.array([len(np.unique(np.round(self.kpts[:, i], 6)))
+                         for i in range(3)], dtype=int)
 
     def set_nac(self, nac=True):
         self.nac = nac
@@ -314,7 +323,7 @@ class NACLWF(LWF):
         # born = self.born.swapaxes(1,2).reshape( self.natoms * 3, 3)
         born = self.born.reshape(self.natoms * 3, 3)
         self.born_wan = np.einsum(
-            "Rji,jk->ik", self.wannR, born
+            "Rji,jk->ik", self.wannR * self.Rdeg[:, None, None], born
         )  # /self.wann_norm[None, :]**2
         print(self.born_wan)
 
@@ -322,7 +331,9 @@ class NACLWF(LWF):
         born = self.born.reshape(self.natoms * 3, 3)
         masses = np.repeat(self.atoms.get_masses(), 3)
         sqrtm = np.sqrt(masses)
-        self.born_wan = np.einsum("Rji,jk->ik", self.wannR, born / sqrtm[:, None])
+        self.born_wan = np.einsum(
+            "Rji,jk->ik", self.wannR * self.Rdeg[:, None, None],
+            born / sqrtm[:, None])
         self.born_wan = np.abs(self.born_wan)
 
     def get_constant_factor_wang(self, q):
@@ -344,7 +355,6 @@ class NACLWF(LWF):
         return self.remove_phase(dd / mmat, qpt) * 1
         return self.remove_phase(dd / mmat, qpt) * (1 - np.sum(qpt**2) ** 2)
         # return dd
-
     def split_short_long_wang(self):
         self.nkpt = len(self.kpts)
         Hks_short = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
@@ -352,9 +362,30 @@ class NACLWF(LWF):
             Hk_tot = self.get_Hk_nac_total(kpt)
             Hk_long = self.get_Hk_wang_long(kpt)
             Hks_short[ik] = Hk_tot - Hk_long
-        HR_short = k_to_R(
-            self.kpts, self.Rlist, Hks_short, kweights=self.kweights, Rdeg=self.Rdeg
-        )
+        # WS-materialized R lists are not unique mod the mesh: transform on
+        # the plain mesh grid, then scatter onto the stored (union) R list
+        # with the same Wigner-Seitz assignment.
+        Rdeg_is_ones = (self.Rdeg is not None
+                        and np.allclose(self.Rdeg, 1.0))
+        N = self._mp_grid_from_kpts()
+        keys = [tuple(R % N) for R in self.Rlist]
+        unique_mod = len(set(keys)) == len(self.Rlist)
+        if Rdeg_is_ones and not unique_mod:
+            from lawaf.mathutils.ws_distance import (apply_ws_distance,
+                                                     fold_R_to_mesh)
+            mesh_list = np.array(sorted(set(keys)), dtype=int)
+            HRm = k_to_R(self.kpts, mesh_list, Hks_short,
+                         kweights=self.kweights)
+            HR_ws, Rl_ws, _ = apply_ws_distance(
+                HRm, mesh_list, self.wann_centers,
+                np.array(self.atoms.get_cell()), N)
+            index = {tuple(R): i for i, R in enumerate(self.Rlist)}
+            HR_short = np.zeros_like(self.HR_total)
+            pos = np.array([index[tuple(R)] for R in Rl_ws])
+            HR_short[pos] = HR_ws
+        else:
+            HR_short = k_to_R(self.kpts, self.Rlist, Hks_short,
+                              kweights=self.kweights)
         self.HR_short = HR_short
 
     def _get_charge_sum(self, q):
@@ -372,14 +403,14 @@ class NACLWF(LWF):
         """
         get the short range Hamiltonian at k-point.
         """
-        Hk_short = R_to_onek(kpt, self.Rlist, self.HR_short)
+        Hk_short = R_to_onek(kpt, self.Rlist, self.HR_short, self.Rdeg)
         return Hk_short
 
     def get_wannk(self, kpt):
         """
         get the Wannier functions at k-point.
         """
-        wannk = R_to_onek(kpt, self.Rlist, self.wannR)
+        wannk = R_to_onek(kpt, self.Rlist, self.wannR, self.Rdeg)
         return wannk
 
     def get_Hk_long(self, kpt):
@@ -395,7 +426,7 @@ class NACLWF(LWF):
         """
         get the Hamiltonian at k-point without NAC.
         """
-        Hk_noNAC = R_to_onek(kpt, self.Rlist, self.HR_noNAC)
+        Hk_noNAC = R_to_onek(kpt, self.Rlist, self.HR_noNAC, self.Rdeg)
         return Hk_noNAC
 
     def get_Hk_nac(self, kpt):
@@ -405,7 +436,7 @@ class NACLWF(LWF):
         return Hwannk
 
     def get_Hk_nac_total(self, kpt):
-        return R_to_onek(kpt, self.Rlist, self.HR_total)
+        return R_to_onek(kpt, self.Rlist, self.HR_total, self.Rdeg)
 
     def get_Hk(self, kpt, method="wang"):
         """
@@ -415,7 +446,7 @@ class NACLWF(LWF):
             # return self.get_Hk_nac_total(kpt)
             # return self.get_Hk_nac(kpt)
             if method == "wang":
-                Hk_short = R_to_onek(kpt, self.Rlist, self.HR_short)
+                Hk_short = R_to_onek(kpt, self.Rlist, self.HR_short, self.Rdeg)
                 # Hk_short = self.get_Hk_nac_total(kpt)
                 Hk_long = self.get_Hk_wang_long(kpt)
                 # Hk_long =0
