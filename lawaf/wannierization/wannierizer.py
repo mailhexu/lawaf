@@ -309,6 +309,82 @@ class Wannierizer(BasicWannierizer):
         Amnk[:] = self.Amn
         root.close()
 
+    def write_w90(self, prefix, lattice, symbols, frac,
+                  projections=None, kmesh_tol=1e-6, orthogonalize=False,
+                  extra=None):
+        """Export this Wannierization as wannier90 input files.
+
+        Writes ``<prefix>.win``, ``.amn``, ``.eig`` and ``.mmn`` ready for a
+        standalone ``wannier90.x <prefix>`` run. The k-points are written
+        explicitly in lawaf's own order, so wannier90's k indices match
+        lawaf's; the .mmn neighbour list is built with lawaf's faithful
+        port of wannier90's kmesh_get, so every block matches at read time.
+
+        :param prefix: output file prefix (path without extension);
+        :param lattice: (3, 3) rows a1..a3 in Angstrom;
+        :param symbols: atomic symbols per atom (win atoms_frac block);
+        :param frac: (nat, 3) fractional atomic positions;
+        :param projections: None -> ``random`` trial orbitals (the exported
+            .amn carries the real projections), or explicit win projection
+            strings;
+        :param orthogonalize: Loewdin-orthonormalize Amn before writing;
+        :param extra: dict of extra win ``key = value`` settings (e.g.
+            disentanglement windows ``dis_win_min``/``dis_win_max``).
+        """
+        import os
+
+        from lawaf.io.w90 import (
+            compute_Mmn,
+            kmesh_nnlist,
+            write_amn,
+            write_eig,
+            write_mmn,
+            write_win,
+        )
+
+        if not self.is_orthogonal:
+            raise NotImplementedError(
+                "w90 export requires an orthogonal basis (Sk=None); "
+                "non-orthogonal-basis export is not supported"
+            )
+        # Amn is pre-allocated to zeros in __init__, so "not yet computed"
+        # is "all zeros" (a real projection matrix is never identically 0)
+        if self.Amn is None or not np.any(self.Amn):
+            raise ValueError("call get_Amn() before write_w90()")
+        nk_mesh = int(np.prod(self.kmesh[: self.ndim]))
+        if len(self.kpts) != nk_mesh:
+            raise ValueError(
+                f"write_w90: kpts ({len(self.kpts)}) do not form the "
+                f"{tuple(self.kmesh[: self.ndim])} mesh — a downfolder "
+                "anchor k-point appended off-mesh cannot be exported "
+                "(choose an on-mesh anchor)"
+            )
+        prefix = os.fspath(prefix)
+        lattice = np.asarray(lattice, dtype=float)
+        recip = 2.0 * np.pi * np.linalg.inv(lattice).T
+        nnlist, nncell, _, _ = kmesh_nnlist(
+            self.kpts, recip, kmesh_tol=kmesh_tol
+        )
+        psi = np.stack([self.get_psi_k(ik) for ik in range(self.nkpt)])
+        mmn = compute_Mmn(psi, nnlist, nncell)
+        evals = np.stack([self.get_eval_k(ik) for ik in range(self.nkpt)])
+        write_amn(self.Amn, prefix + ".amn", orthogonalize=orthogonalize)
+        write_eig(evals, prefix + ".eig")
+        write_mmn(mmn, nnlist, nncell, prefix + ".mmn")
+        write_win(
+            prefix + ".win",
+            num_wann=self.nwann,
+            num_bands=self.nband,
+            mp_grid=self.kmesh,
+            lattice=lattice,
+            symbols=symbols,
+            frac=frac,
+            kpts=self.kpts,
+            projections=projections,
+            kmesh_tol=kmesh_tol,
+            extra=extra,
+        )
+
 
 def Amnk_to_Hk(Amn, psi, Hk0, kpts):
     """
@@ -321,16 +397,6 @@ def Amnk_to_Hk(Amn, psi, Hk0, kpts):
         Hk_prim.append(hk)
     return np.array(Hk_prim)
 
-
-def Hk_to_Hreal(Hk, kpts, kweights, Rpts, Rdeg):
-    nbasis = Hk.shape[1]
-    nR = len(Rpts)
-    for iR, R in enumerate(Rpts):
-        HR = np.zeros((nR, nbasis, nbasis), dtype=complex)
-        for ik, k in enumerate(kpts):
-            phase = np.exp(-2j * np.pi * np.dot(R, k))
-            HR[iR] += Hk[ik] * phase * kweights[ik] * Rdeg[ik]
-    return HR
 
 
 def enhance_Amn(A, evals, order):

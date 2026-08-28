@@ -124,7 +124,6 @@ class MaxProjectedWannierizer(ProjectedWannierizer):
                 )
             # select the maximum value of A[:, iproj] and set to 1. Others are set to 0.
             imax = np.argmax(np.abs(np.abs(A[:, iproj])))
-            imax = iproj
             print(f"MaxProjectedWannierizer: iproj={iproj}, imax={imax}.")
             # tmp = A[imax, iproj]
             A[:, iproj] = 0

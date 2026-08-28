@@ -251,3 +251,39 @@ We get the following band downfolding result.
 
 ![Downfolded_band](tutor.assets/Downfolded_band-1587474503775.png)
 
+### Exporting to Wannier90 input files
+
+A lawaf Wannierization (orthogonal basis) can be exported as a complete
+wannier90 input set — `<prefix>.win`, `.amn`, `.eig` and `.mmn` — ready
+for a standalone `wannier90.x <prefix>` run:
+
+```python
+wann.write_w90(
+    prefix="lawaf_export",       # output file prefix
+    lattice=cell,                # (3, 3) rows a1..a3 in Angstrom
+    symbols=symbols,             # atomic symbols, e.g. ["Sr", "Mn", "O", ...]
+    frac=frac,                   # (nat, 3) fractional positions
+    projections=None,            # None -> "random" (the .amn carries the real ones)
+    extra={"dis_win_min": -15.0, "dis_win_max": 15.0},  # extra win settings
+)
+```
+
+Notes:
+
+* The k-points are written explicitly in lawaf's own order, so wannier90's
+  k indices match lawaf's exactly; the `.mmn` neighbour list is built with
+  lawaf's faithful port of wannier90's `kmesh_get`, so every block matches
+  at read time.
+* `num_wann < num_bands` triggers wannier90 disentanglement; pass
+  `dis_win_min`/`dis_win_max` (and optionally `dis_froz_min`/`max`)
+  through `extra`.
+* `M^{k,b}_{mn} = <u_{m,k} | u_{n,k+b}>` is computed in the periodic gauge
+  (lawaf's integer-R convention), so the lattice-image label `G` only
+  appears in the `.mmn` block headers, never in the values.
+* Non-orthogonal bases (`Sk` given, e.g. raw Siesta NAO downfolds) are
+  refused with `NotImplementedError`.
+
+The underlying array-level writers (`write_amn`, `write_eig`, `write_mmn`,
+`write_win`) and the neighbour construction (`kmesh_nnlist`) live in
+`lawaf.io.w90` and can be used standalone.
+
