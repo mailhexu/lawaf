@@ -1,0 +1,630 @@
+{
+  "all_gates_pass": false,
+  "basis": {
+    "action": "signed-permutation vector-rep branch action (Cartesian convention)",
+    "coord_pool": 81,
+    "molien_consistent": true,
+    "molien_rows": [
+      {
+        "consistent": true,
+        "constructed": 3,
+        "molien": 3,
+        "note": "",
+        "order": 1,
+        "sector": "q"
+      },
+      {
+        "consistent": true,
+        "constructed": 1,
+        "molien": 1,
+        "note": "",
+        "order": 1,
+        "sector": "strain"
+      },
+      {
+        "consistent": true,
+        "constructed": 0,
+        "molien": 0,
+        "note": "",
+        "order": 1,
+        "sector": "coupled"
+      },
+      {
+        "consistent": true,
+        "constructed": 94,
+        "molien": 94,
+        "note": "",
+        "order": 2,
+        "sector": "q"
+      },
+      {
+        "consistent": true,
+        "constructed": 3,
+        "molien": 3,
+        "note": "",
+        "order": 2,
+        "sector": "strain"
+      },
+      {
+        "consistent": true,
+        "constructed": 12,
+        "molien": 12,
+        "note": "",
+        "order": 2,
+        "sector": "coupled"
+      },
+      {
+        "consistent": true,
+        "constructed": 1984,
+        "molien": 1984,
+        "note": "",
+        "order": 3,
+        "sector": "q"
+      },
+      {
+        "consistent": true,
+        "constructed": 0,
+        "molien": 6,
+        "note": "capped by max_strain_power=2",
+        "order": 3,
+        "sector": "strain"
+      },
+      {
+        "consistent": true,
+        "constructed": 508,
+        "molien": 508,
+        "note": "",
+        "order": 3,
+        "sector": "coupled"
+      },
+      {
+        "consistent": true,
+        "constructed": 1239,
+        "molien": 40939,
+        "note": "",
+        "order": 4,
+        "sector": "q"
+      },
+      {
+        "consistent": true,
+        "constructed": 0,
+        "molien": 11,
+        "note": "capped by max_strain_power=2",
+        "order": 4,
+        "sector": "strain"
+      },
+      {
+        "consistent": true,
+        "constructed": 1968,
+        "molien": 13296,
+        "note": "",
+        "order": 4,
+        "sector": "coupled"
+      }
+    ],
+    "n_terms": 5812
+  },
+  "config": {
+    "fixture": "/home/hexu/projects/lawaf_dev/lawaf/example/Phonopy/BaTiO3/DM_dip_wang/phonopy_params.yaml",
+    "kmesh": [
+      2,
+      2,
+      2
+    ],
+    "max_strain_power": 2,
+    "n_coeff": 120,
+    "n_random": 6,
+    "orders": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "random_amp": 0.3,
+    "ridge_alpha": 1e-06,
+    "sampling_seed": 20260829,
+    "sc_matrix": [
+      3,
+      3,
+      3
+    ],
+    "single_amps": [
+      0.1,
+      0.2,
+      0.3
+    ],
+    "strains": [
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.01,
+        0.01,
+        0.01,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        -0.01,
+        -0.01,
+        -0.01,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        -0.012,
+        0.006,
+        0.006,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        0.015,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        -0.015,
+        0.0,
+        0.0
+      ]
+    ],
+    "train_frac": 0.8
+  },
+  "dataset": {
+    "label_block": "label_000",
+    "n_frames": 157,
+    "provenance": {
+      "coupled": 12,
+      "random": 36,
+      "reference": 1,
+      "single": 108
+    },
+    "ref_frame_index": 156,
+    "splits": {
+      "cv": 30,
+      "train": 127
+    },
+    "teacher": "MACECalculator"
+  },
+  "downfold": {
+    "compat_checks": [
+      {
+        "expected": [
+          "T1u"
+        ],
+        "found": [
+          "T1u"
+        ],
+        "passed": true,
+        "q": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    ],
+    "compat_passed": true,
+    "gauge_eps_max": 1.0602730012528679e-14,
+    "nR": 27,
+    "n_mesh_kpoints": 8
+  },
+  "fit": {
+    "cv": {
+      "ridge": {
+        "energy_mae": 0.1563116261179703,
+        "force_cosine": 0.9771855181759876,
+        "force_rmse": 0.015863030885857544,
+        "n_cv_frames": 30,
+        "n_train_rows": 127,
+        "notes": [],
+        "stress_rmse": 0.0014535296568647348
+      },
+      "screened_greedy": {
+        "energy_mae": 0.11965727226104365,
+        "force_cosine": 0.7987503422149026,
+        "force_rmse": 0.00387937942003466,
+        "n_cv_frames": 30,
+        "n_train_rows": 127,
+        "notes": [],
+        "stress_rmse": 0.000707130271766229
+      }
+    },
+    "fingerprints": {
+      "ridge": "683cd6ab91c766002c2413d1c0574e56c62178c435daf18af5b3f8ded64240b0",
+      "screened_greedy": "004fa44caece15c3022e89a74f63383e25a28e8e70ff7438c99f92a43ecf242c"
+    },
+    "n_selected": {
+      "ridge": 5812,
+      "screened_greedy": 120
+    },
+    "n_terms": 5812,
+    "picked": "ridge"
+  },
+  "gate1_residuals": {
+    "energy_mae": 0.1563116261179703,
+    "energy_mae_frac_of_scale": 0.20426711506182954,
+    "energy_pass": false,
+    "energy_rms_barrier_scale": 0.7652314767879127,
+    "force_cosine": 0.9771855181759876,
+    "force_pass": false,
+    "force_rmse": 0.015863030885857544,
+    "n_cv_frames": 30,
+    "pass": false,
+    "stress_pass": false,
+    "stress_rms": 0.01930261519507301,
+    "stress_rmse": 0.0014535296568647348,
+    "stress_rmse_frac_of_rms": 0.07530221382829763,
+    "thresholds": {
+      "elastic_rel_max": 0.05,
+      "energy_mae_frac": 0.01,
+      "fold_rel": 1e-10,
+      "force_cosine_min": 0.99,
+      "roundtrip_rel": 1e-06,
+      "stress_rmse_frac": 0.05
+    }
+  },
+  "gate2_elastic": {
+    "delta": 0.005,
+    "max_rel_dev": 0.12258687173148396,
+    "model": {
+      "C11": 1.8474466648154753,
+      "C12": 0.6791842400236313,
+      "C44": 1.4469202298144437
+    },
+    "pass": false,
+    "rel_dev": {
+      "C11": 0.09158600228118899,
+      "C12": 0.05516495049187956,
+      "C44": 0.12258687173148396
+    },
+    "teacher": {
+      "C11": 2.033705633615006,
+      "C12": 0.7188389554104851,
+      "C44": 1.649075199809001
+    },
+    "teacher_reference_stress_voigt": [
+      -0.013318963692308835,
+      -0.013318963692308906,
+      -0.013318963692308911,
+      1.420551283915031e-17,
+      1.997057757421299e-17,
+      1.4402608676279542e-17
+    ],
+    "threshold": 0.05,
+    "units": "eV/A^3 (ASE); x160.21766208 for GPa"
+  },
+  "gate3_harmonic_roundtrip": {
+    "fold_rel_max": 4.454133127224201e-15,
+    "freq_rel_max": 2.662727221188256e-15,
+    "model": "zero-anharmonic coefficients (empty invariant basis)",
+    "pass": true,
+    "qset": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.3333333333333333,
+        0.0,
+        0.0
+      ],
+      [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.0
+      ],
+      [
+        0.3333333333333333,
+        0.3333333333333333,
+        0.3333333333333333
+      ],
+      [
+        0.6666666666666666,
+        0.3333333333333333,
+        0.0
+      ]
+    ],
+    "rows": [
+      {
+        "fold_rel": 8.881784197001252e-16,
+        "freq_rel_max": 2.662727221188256e-15,
+        "freqs_ref_cm1": [
+          -202.80428084431898,
+          -202.8042808443191,
+          -202.80428084431915
+        ],
+        "q": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "fold_rel": 4.454133127224201e-15,
+        "freq_rel_max": 2.4303490402575693e-15,
+        "freqs_ref_cm1": [
+          276.48620266564325,
+          276.4862026656446,
+          608.1138412219082
+        ],
+        "q": [
+          0.3333333333333333,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "fold_rel": 3.330703587713678e-15,
+        "freq_rel_max": 1.8339786005197116e-15,
+        "freqs_ref_cm1": [
+          218.38236968306836,
+          464.91888327949766,
+          464.9188832794993
+        ],
+        "q": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.0
+        ]
+      },
+      {
+        "fold_rel": 2.6645358681474805e-15,
+        "freq_rel_max": 2.2554057534994013e-15,
+        "freqs_ref_cm1": [
+          403.25103381588406,
+          403.2510338158848,
+          403.25103381588536
+        ],
+        "q": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ]
+      },
+      {
+        "fold_rel": 2.4426659288742823e-15,
+        "freq_rel_max": 1.5617584590725836e-15,
+        "freqs_ref_cm1": [
+          218.38236968306833,
+          464.9188832794977,
+          464.9188832794993
+        ],
+        "q": [
+          0.6666666666666666,
+          0.3333333333333333,
+          0.0
+        ]
+      }
+    ],
+    "thresholds": {
+      "fold_rel": 1e-10,
+      "roundtrip_rel": 1e-06
+    }
+  },
+  "gate4_molien": {
+    "consistent": true,
+    "rows": [
+      {
+        "consistent": true,
+        "constructed": 3,
+        "molien": 3,
+        "note": "",
+        "order": 1,
+        "sector": "q"
+      },
+      {
+        "consistent": true,
+        "constructed": 1,
+        "molien": 1,
+        "note": "",
+        "order": 1,
+        "sector": "strain"
+      },
+      {
+        "consistent": true,
+        "constructed": 0,
+        "molien": 0,
+        "note": "",
+        "order": 1,
+        "sector": "coupled"
+      },
+      {
+        "consistent": true,
+        "constructed": 94,
+        "molien": 94,
+        "note": "",
+        "order": 2,
+        "sector": "q"
+      },
+      {
+        "consistent": true,
+        "constructed": 3,
+        "molien": 3,
+        "note": "",
+        "order": 2,
+        "sector": "strain"
+      },
+      {
+        "consistent": true,
+        "constructed": 12,
+        "molien": 12,
+        "note": "",
+        "order": 2,
+        "sector": "coupled"
+      },
+      {
+        "consistent": true,
+        "constructed": 1984,
+        "molien": 1984,
+        "note": "",
+        "order": 3,
+        "sector": "q"
+      },
+      {
+        "consistent": true,
+        "constructed": 0,
+        "molien": 6,
+        "note": "capped by max_strain_power=2",
+        "order": 3,
+        "sector": "strain"
+      },
+      {
+        "consistent": true,
+        "constructed": 508,
+        "molien": 508,
+        "note": "",
+        "order": 3,
+        "sector": "coupled"
+      },
+      {
+        "consistent": true,
+        "constructed": 1239,
+        "molien": 40939,
+        "note": "",
+        "order": 4,
+        "sector": "q"
+      },
+      {
+        "consistent": true,
+        "constructed": 0,
+        "molien": 11,
+        "note": "capped by max_strain_power=2",
+        "order": 4,
+        "sector": "strain"
+      },
+      {
+        "consistent": true,
+        "constructed": 1968,
+        "molien": 13296,
+        "note": "",
+        "order": 4,
+        "sector": "coupled"
+      }
+    ]
+  },
+  "gate5_spotcheck": {
+    "categories": {
+      "coupled": {
+        "dE_max": 1079.7971445495164,
+        "dE_mean": 1078.490783037849,
+        "force_cos_mean": 0.7251869163342063,
+        "force_cos_min": 0.2501503613211399,
+        "force_rmse": 0.0335317139830282,
+        "n_frames": 12,
+        "stress_rmse": 0.015224965167365014
+      },
+      "random": {
+        "dE_max": 1079.9616506488098,
+        "dE_mean": 1078.6343400521896,
+        "force_cos_mean": 0.9970615626312243,
+        "force_cos_min": 0.9960222717595879,
+        "force_rmse": 0.02126420150444143,
+        "n_frames": 36,
+        "stress_rmse": 0.015386953923448209
+      },
+      "reference": {
+        "dE_max": 1078.5823974609375,
+        "dE_mean": 1078.5823974609375,
+        "force_cos_mean": 0.8930670042019485,
+        "force_cos_min": 0.8930670042019485,
+        "force_rmse": 2.916741225170205e-06,
+        "n_frames": 1,
+        "stress_rmse": 0.015451571768761631
+      },
+      "single": {
+        "dE_max": 1079.9253560899488,
+        "dE_mean": 1078.5834021021037,
+        "force_cos_mean": 0.9009271766887941,
+        "force_cos_min": 0.69143999091716,
+        "force_rmse": 0.016220968589665517,
+        "n_frames": 108,
+        "stress_rmse": 0.015344714767666415
+      }
+    },
+    "dft_note": "no DFT ASE driver (abinit/siesta class) is configured in this environment and ABINIT input generation is out of scope; per the PRD FR-020 honesty clause the spot check runs against a second independent MLIP (mace_mp medium) and the DFT gap is recorded as unmeasured",
+    "ref_calculator": "mace-r2scan",
+    "test_calculator": "mace"
+  },
+  "gate6_artifact": {
+    "groups": [
+      "anharmonic",
+      "symmetry"
+    ],
+    "max_abs_eval_diff": {
+      "calculator": {
+        "energy": 2.220446049250313e-16,
+        "forces": 1.3487475025719675e-16,
+        "stress": 1.734723475976807e-18
+      },
+      "energy": 1.1102230246251565e-16,
+      "gradient": 3.469446951953614e-17,
+      "stress": 1.3552527156068805e-20,
+      "tolerance": 1e-12
+    },
+    "n_verification_frames": 30,
+    "pass": true,
+    "path": "example/anharmonic_batio3/outputs/bato3_anharmonic_model.nc",
+    "schema_versions": {
+      "anharmonic": 1,
+      "symmetry": 1
+    },
+    "stored_arrays_bitwise": true,
+    "symmetry_fingerprint_matches": true
+  },
+  "gates_summary": {
+    "gate1": false,
+    "gate2": false,
+    "gate3": true,
+    "gate4": true,
+    "gate5": true,
+    "gate6": true
+  },
+  "mapping_symmetrization": {
+    "intertwine_defect": 2.0816681711721685e-17,
+    "n_ops": 48,
+    "rank": 81,
+    "relative_change": 0.5114096369564001
+  },
+  "regauge": {
+    "eps_w_max": 1.9354985204617466e-15,
+    "note": "T1u internal basis rotated to the Cartesian signed-permutation convention (branch rotation at fixed subspace); the invariant basis cluster action is exact in this convention",
+    "tau_resid": 1.7763568394002505e-15
+  },
+  "supercell": {
+    "harmonic_nR": 27,
+    "nQ": 81,
+    "natom_sc": 135,
+    "v_cell_A3": 1710.287959894062
+  },
+  "thresholds": {
+    "elastic_rel_max": 0.05,
+    "energy_mae_frac": 0.01,
+    "fold_rel": 1e-10,
+    "force_cosine_min": 0.99,
+    "roundtrip_rel": 1e-06,
+    "stress_rmse_frac": 0.05
+  },
+  "timings_seconds": {
+    "basis_molien": 27.14,
+    "downfold_gauge_compat": 1.22,
+    "fit": 56.95,
+    "regauge": 1.02,
+    "sampling_labeling": 37.14
+  }
+}

@@ -1,0 +1,5 @@
+outputs/
+outputs_2x2x2/
+
+# rebuildable archived model artifact (14 MB)
+outputs_stale_20260829/*.nc
