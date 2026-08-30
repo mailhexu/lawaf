@@ -1,5 +1,6 @@
 import atexit
 import copy
+import hashlib
 import lzma
 import os
 import pickle
@@ -209,8 +210,31 @@ class PhonopyWrapper:
 
         self.is_orthogonal = True
 
+    def _cache_signature(self):
+        """Fingerprint of everything ``solve`` depends on beyond the
+        k-point: force constants (already symmetrized by ``_prepare``),
+        atomic masses, and the evaluation mode.  The cache key carries
+        it so that a ``phon_cache`` left in the working directory by a
+        run with different force constants (or a different fixture that
+        shares k-point strings) is never served stale (the pre-0.4.1
+        bug: eigenvectors from another configuration silently reused).
+        """
+        fc = getattr(self.phonon, "force_constants", None)
+        if fc is None:
+            return "nofc"
+        h = hashlib.sha256()
+        h.update(np.ascontiguousarray(fc).tobytes())
+        h.update(
+            np.ascontiguousarray(
+                self.atoms.get_masses(), dtype=float
+            ).tobytes()
+        )
+        h.update(self.mode.encode())
+        return h.hexdigest()
+
     def _prepare_cache(self):
         if self._use_cache:
+            self._cache_sig = self._cache_signature()
             self._cache_file = "./phon_cache/cache.pickle"
             # make cache directory
             os.makedirs(os.path.dirname(self._cache_file), exist_ok=True)
@@ -234,9 +258,19 @@ class PhonopyWrapper:
         return self.born, self.dielectric, self.factor
 
     def _prepare(self):
-        self.phonon.symmetrize_force_constants()
+        # Symmetrize once per force-constant ARRAY: re-applying
+        # symmetrize_force_constants is not bit-idempotent (~2e-14 drift
+        # per application), and mutating the caller's phonon at every
+        # wrapper construction made results depend on how many wrappers
+        # had touched the object (and split the cache signature).  The
+        # array identity marks it as already symmetrized; assigning a
+        # new array re-enables symmetrization.
+        fc = getattr(self.phonon, "force_constants", None)
+        if fc is not None and \
+                getattr(self.phonon, "_lawaf_fc_done", None) is not fc:
+            self.phonon.symmetrize_force_constants()
+            self.phonon._lawaf_fc_done = self.phonon.force_constants
         # self.phonon.symmetrize_force_constants_by_space_group()
-        pass
     def _get_short_range_dm(self, k):
         """Short-range (dipole-dipole excluded) dynamical matrix at k.
 
@@ -269,7 +303,11 @@ class PhonopyWrapper:
             msg = "Dynamical matrix has not yet built."
             raise RuntimeError(msg)
 
-        key = (f"{k[0]:8.5f},{k[1]:8.5f},{k[2]:8.5f}", output_H)
+        if self._use_cache:
+            sig = self._cache_sig
+        else:
+            sig = None
+        key = (sig, f"{k[0]:8.5f},{k[1]:8.5f},{k[2]:8.5f}", output_H)
         if self._use_cache:
             if key in self._cache:
                 return self._cache[key]

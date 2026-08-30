@@ -2,6 +2,12 @@
 
 
 ### v0.4 (unreleased)
+* Fixed a stale-cache bug in the phonopy wrapper: `phon_cache` entries
+  are now keyed by a fingerprint of the force constants, masses, and
+  evaluation mode in addition to the k-point, so a cache left in the
+  working directory by a run with a different configuration is never
+  served (previously eigenvectors of another configuration could be
+  silently reused).
 * Phonon symmetry seeds (spgrep-modulation):
 
   * New `symmetry` install extra (`spgrep-modulation>=0.3,<0.4`,
