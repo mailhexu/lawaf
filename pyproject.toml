@@ -33,9 +33,22 @@ test=[
     "pytest>=6.2.0",
 ]
 
+symmetry=[
+    "spgrep-modulation>=0.3,<0.4",
+    "spgrep>=0.5",
+]
+anharmonic=[
+    "atomchain",
+]
+
 dev=[
     "pytest>=6.2.0",
     "black>=21.6b0",
     "pre-commit>=2.13.0",
     "sphinx>=4.1.2",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: MACE-backed campaign integration test",
 ]

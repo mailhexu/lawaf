@@ -9,7 +9,8 @@ This is a tutorial
    :caption: Contents:
 
    ./phonon.md
-   ./electron.md
+   ./lwf_effective_model.md
+   ./lwf_anharmonic_model.md
    ./magnon.md
    ./inputs.md
 

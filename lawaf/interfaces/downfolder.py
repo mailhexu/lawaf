@@ -26,6 +26,12 @@ def select_wannierizer(method):
         w = ProjectedWannierizer
     elif method.lower().startswith("maxprojected"):
         w = MaxProjectedWannierizer
+    elif method.lower().startswith("mlwf") or method.lower().startswith(
+        "maxloc"
+    ) or method.lower().startswith("mv"):
+        from lawaf.wannierization.mlwf import MLWFWannierizer
+
+        w = MLWFWannierizer
     elif method.lower().startswith("dummy"):
         w = DummyWannierizer
     else:
@@ -74,6 +80,7 @@ class Lawaf:
         selected_basis=None,
         anchors=None,
         anchor_kpt=(0, 0, 0),
+        anchor_ibands=(0, 1, 2),
         kshift=np.array([0, 0, 0], dtype=float),
         use_proj=True,
         proj_order=1,
@@ -83,6 +90,23 @@ class Lawaf:
         selected_orbdict=None,
         orthogonal=False,
         use_ws_distance=None,
+        mlwf_tol=1e-10,
+        mlwf_max_iter=100,
+        mlwf_initial_guess="projected",
+        mlwf_fixed_gauge=False,
+        dis_win_min=None,
+        dis_win_max=None,
+        dis_froz_min=None,
+        dis_froz_max=None,
+        dis_mix_ratio=0.5,
+        dis_max_iter=100,
+        dis_tol=1e-10,
+        dis_min_svd=1e-8,
+        dis_slow_tail_change=1e-4,
+        symmetry_seed=False,
+        symmetry_seed_opd=None,
+        symmetry_seed_opd_index=None,
+        window_bands=None,
     ):
         """
         Downfold the Band structure.
@@ -102,6 +126,10 @@ class Lawaf:
          - Gauss: A gaussian centered at mu, and has the half width of sigma.
          - Fermi: A fermi function. The Fermi energy is mu, and the smearing is sigma.
          - window: A window function in the range of (mu, sigma)
+        window_bands: Explicit original sorted-band indices keyed by
+          representative fractional k/q points. Phonopy downfolders reject
+          excluded selections, then validate and expand each selection to its
+          symmetry star before Wannierization.
         mu: see above
         sigma=2.0 : see above
         selected_basis, A list of the indexes of the Wannier functions as initial guess. The number should be equal to nwann.
@@ -119,6 +147,8 @@ class Lawaf:
             nwann=nwann,
             weight_func=weight_func,
             weight_func_params=weight_func_params,
+            window_bands=window_bands,
+            anchor_ibands=anchor_ibands,
             selected_basis=selected_basis,
             anchors=anchors,
             anchor_kpt=anchor_kpt,
@@ -129,6 +159,22 @@ class Lawaf:
             enhance_Amn=enhance_Amn,
             selected_orbdict=selected_orbdict,
             orthogonal=orthogonal,
+            mlwf_tol=mlwf_tol,
+            mlwf_fixed_gauge=mlwf_fixed_gauge,
+            mlwf_max_iter=mlwf_max_iter,
+            mlwf_initial_guess=mlwf_initial_guess,
+            dis_win_min=dis_win_min,
+            dis_win_max=dis_win_max,
+            dis_froz_min=dis_froz_min,
+            dis_froz_max=dis_froz_max,
+            dis_mix_ratio=dis_mix_ratio,
+            dis_max_iter=dis_max_iter,
+            dis_tol=dis_tol,
+            dis_min_svd=dis_min_svd,
+            dis_slow_tail_change=dis_slow_tail_change,
+            symmetry_seed=symmetry_seed,
+            symmetry_seed_opd=symmetry_seed_opd,
+            symmetry_seed_opd_index=symmetry_seed_opd_index,
         )
         if use_ws_distance is not None:
             self._params.use_ws_distance = use_ws_distance
@@ -308,6 +354,25 @@ class Lawaf:
             wann_names=None,
             is_orthogonal=(SwannR is None),
         )
+
+        # story-007/ADR-005: attach MLWF spread diagnostics (Mmn-form,
+        # ADR-004) when the builder produced them; k_to_R is bypassed here,
+        # so the attachment must be done explicitly. The optimized Mmn-form
+        # centres rbar overwrite wann_centers on the result.
+        spreads = getattr(self.builder, "spreads", None)
+        if spreads is not None:
+            for attr, value in (("spreads", dict(spreads)),
+                                ("wann_centers", spreads["rbar"])):
+                try:
+                    setattr(self.lwf, attr, value)
+                except AttributeError:
+                    pass  # frozen result class
+        selection = getattr(self.builder, "selection", None)
+        if selection is not None:
+            try:
+                setattr(self.lwf, "selection", selection)  # FR-007
+            except AttributeError:
+                pass
         return self.lwf
 
     def plot_full_band(

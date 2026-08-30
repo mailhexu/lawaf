@@ -3,7 +3,7 @@ Wannier Module: For building Wannier functions and Hamiltonians.
 """
 
 import numpy as np
-from scipy.linalg import qr, svd
+from scipy.linalg import qr
 from scipy.special import erfc
 
 from .wannierizer import Wannierizer
@@ -98,7 +98,7 @@ class ScdmkWannierizer(Wannierizer):
                 ik = self.find_k(k)
                 self.add_anchors(self.get_psi_k(ik), ibands)
             else:
-                self.add_anchors(self.wfn_anchor[k], ibands)
+                self.add_anchors(self.wfn_anchor[tuple(k)], ibands)
         self.psi_anchors = np.array(self.psi_anchors)
         self.cols = self.cols[: self.nwann]
         print(f"Using the anchor points, these cols are selected: {self.cols}")
@@ -169,9 +169,17 @@ class ScdmkWannierizer(Wannierizer):
             Sk = None
         else:
             Sk = self.S[ik]
-        return self.get_Amn_psi(psik, occ=occ, projs=projs, Sk=Sk)
+        return self.get_Amn_psi(
+            psik,
+            occ=occ,
+            projs=projs,
+            Sk=Sk,
+            window_rows=self._window_rows_by_ik.get(ik),
+        )
 
-    def get_Amn_psi(self, psik, occ=None, projs=None, Sk=None):
+    def get_Amn_psi(
+        self, psik, occ=None, projs=None, Sk=None, window_rows=None
+    ):
         psiT = psik.T.conj()
         if Sk is not None:
             psiT = psiT @ Sk
@@ -194,8 +202,7 @@ class ScdmkWannierizer(Wannierizer):
                 # psi = psik[self.cols, :]
                 psiT = psiT[:, self.cols]
         if self.orthogonal or True:
-            U, _S, VT = svd(psiT, full_matrices=False)
-            Amn_k = U @ VT
+            Amn_k = self._orthonormalize_amn(psiT, window_rows)
         else:
             Amn_k = psiT
         return Amn_k

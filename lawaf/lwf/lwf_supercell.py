@@ -104,7 +104,7 @@ class MyLWFSC:
         atoms.set_positions(positions)
         # write('datoms.vasp', atoms, vasp5=True, sort=True)
         # write_atoms_to_netcdf('datoms.nc', atoms)
-        return self.sc_atoms, disp
+        return atoms, disp
 
 
 def write_lwf_cif(

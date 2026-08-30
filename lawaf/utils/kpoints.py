@@ -3,6 +3,31 @@ from ase.cell import Cell
 from ase.dft.kpoints import bandpath
 
 
+def reciprocal_point_key(point, digits=8):
+    """Return a finite fractional reciprocal point wrapped into ``[0, 1)``."""
+    point = np.asarray(point, dtype=float).reshape(3)
+    if not np.all(np.isfinite(point)):
+        raise ValueError(f"reciprocal point must be finite, got {point!r}")
+    wrapped = point - np.floor(point + 1e-8)
+    return tuple(float(x) for x in (np.round(wrapped, digits) % 1.0))
+
+
+def reciprocal_point_name(point, digits=8):
+    """Conventional cubic label where available, otherwise a point tuple."""
+    key = reciprocal_point_key(point, digits=digits)
+    halves = np.isclose(key, 0.5, rtol=0.0, atol=10.0 ** (-digits))
+    zeroes = np.isclose(key, 0.0, rtol=0.0, atol=10.0 ** (-digits))
+    if np.all(zeroes):
+        return "Gamma"
+    if halves.sum() == 1 and zeroes.sum() == 2:
+        return "X"
+    if halves.sum() == 2 and zeroes.sum() == 1:
+        return "M"
+    if np.all(halves):
+        return "R"
+    return f"({key[0]:g}, {key[1]:g}, {key[2]:g})"
+
+
 def kmesh_to_R(kmesh):
     """
     Build the commensurate R point for a kmesh.

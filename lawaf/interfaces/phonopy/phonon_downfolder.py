@@ -106,6 +106,101 @@ class PhonopyDownfolder(PhononDownfolder):
     def process_parameters(self):
         self.convert_DM_parameters()
 
+    def _parepare_builder(self):
+        self._resolve_window_bands()
+        super()._parepare_builder()
+        if getattr(self.params, "symmetry_seed", False):
+            self._inject_symmetry_seeds()
+            # The anchor-consuming setup (set_anchors / projectors) runs
+            # inside the builder's __init__→set_params chain with
+            # wfn_anchor still None, so binding the seeds afterwards alone
+            # would be ineffective (review round 1, REG finding). Re-run
+            # the anchor setup now that the seeds are bound; both
+            # wannierizer set_params overrides reset their anchor state and
+            # rebuild it from params, so this is idempotent.
+            self.builder.set_params(self.params)
+
+    def _resolve_window_bands(self):
+        """Validate and star-expand explicit phonon mode selections."""
+        requested = getattr(self.params, "window_bands", None)
+        if requested is None:
+            if hasattr(self.params, "_window_bands_resolved"):
+                del self.params._window_bands_resolved
+            return
+
+        from lawaf.anharmonic.representation import (
+            WindowBands,
+            build_space_group_action,
+            check_window_legality,
+        )
+
+        if isinstance(requested, WindowBands):
+            resolved = requested
+        else:
+            action = build_space_group_action(self.model.phonon)
+            resolved = check_window_legality(
+                action,
+                self.model.phonon,
+                requested,
+            )
+        self.params._window_bands_resolved = resolved
+        self.window_bands = resolved
+
+    def _inject_symmetry_seeds(self):
+        """OPD-canonical anchor seeds (story-012, ADR-002/FR-008).
+
+        Computes ``get_symmetry_anchor_wfn`` for every anchor q on the
+        non-NAC model and assigns ``builder.wfn_anchor`` post-construction
+        (wannierizer constructors accept no such kwarg — FEAS-001; the
+        NAC subclass builds its ``self.model`` non-NAC, so this covers
+        both downfolders — FEAS-002). Anchors whose report fell back inject
+        the report's raw eigenvectors (= legacy behavior for that anchor).
+        """
+        import warnings
+
+        from .symmetry_seeds import get_symmetry_anchor_wfn
+
+        params = self.params
+        if not params.anchors:
+            # derive the mapping once and WRITE IT BACK: the set_params
+            # re-run below re-reads params.anchors, and leaving it None
+            # would give projected no projectors and scdmk auto-selection
+            # from raw eigenvectors (review round 1)
+            params.anchors = {
+                tuple(np.asarray(params.anchor_kpt, dtype=float)): tuple(
+                    params.anchor_ibands
+                )
+            }
+        anchors = params.anchors
+        wfn_anchor = {}
+        for q, bands in anchors.items():
+            q = tuple(float(x) for x in np.asarray(q, dtype=float))
+            report = get_symmetry_anchor_wfn(
+                self.model.phonon,
+                np.asarray(q),
+                tuple(bands),
+                opd=params.symmetry_seed_opd,
+                opd_index=params.symmetry_seed_opd_index,
+            )
+            for reason in report.warnings:
+                warnings.warn(
+                    f"symmetry_seed at q={list(q)}: {reason}; "
+                    "injecting raw anchor eigenvectors",
+                    stacklevel=2,
+                )
+            wfn_anchor[q] = report.psi
+            print(f"symmetry seed at q={list(q)}:")
+            for rec in report.per_band:
+                print(
+                    f"  band {rec.band}: eigenspace {rec.eigenspace_index} "
+                    f"(dim {rec.eigenspace_dim}), family {rec.family_index} "
+                    f"-> {rec.sg_symbol} (#{rec.sg_number}), "
+                    f"direction {rec.direction_summary}, "
+                    f"frequency {rec.frequency:.4f} cm^-1, "
+                    f"irrep {rec.irrep_chars}"
+                )
+        self.builder.wfn_anchor = wfn_anchor
+
     # def downfold(
     #    self,
     #    post_func=None,
@@ -167,6 +262,27 @@ class PhonopyDownfolder(PhononDownfolder):
             wann_centers=wann_centers,
             atoms=self.atoms,
         )
+
+        # story-007/ADR-005: attach MLWF Mmn-form spread diagnostics
+        # (ADR-004); k_to_R is bypassed here so the attachment is
+        # explicit. The optimized Mmn-form centres rbar overwrite
+        # wann_centers; the R-space centres stay as a diagnostic.
+        spreads = getattr(self.builder, "spreads", None)
+        if spreads is not None:
+            try:
+                self.lwf.wann_centers_rspace = wann_centers
+                self.lwf.spreads = dict(spreads)
+                self.lwf.wann_centers = spreads["rbar"]
+            except AttributeError:
+                pass  # frozen result class
+
+        # story-031/FR-007: selection diagnostics on the result object
+        selection = getattr(self.builder, "selection", None)
+        if selection is not None:
+            try:
+                self.lwf.selection = selection
+            except AttributeError:
+                pass
 
         if not os.path.exists(output_path):
             os.makedirs(output_path)
@@ -303,6 +419,24 @@ class NACPhonopyDownfolder(PhonopyDownfolder):
             wann_centers=wann_centers,
             atoms=self.atoms,
         )
+
+        # story-007/031: attach MLWF diagnostics (Mmn-form spreads,
+        # ADR-004/005; selection record FR-007); both lwf-assembly seams
+        # above are bypassed here
+        spreads = getattr(self.builder, "spreads", None)
+        if spreads is not None:
+            try:
+                self.lwf.wann_centers_rspace = wann_centers
+                self.lwf.spreads = dict(spreads)
+                self.lwf.wann_centers = spreads["rbar"]
+            except AttributeError:
+                pass  # frozen result class
+        selection = getattr(self.builder, "selection", None)
+        if selection is not None:
+            try:
+                self.lwf.selection = selection
+            except AttributeError:
+                pass
 
         # if post_func is not None:
         #    post_func(self.ewf)

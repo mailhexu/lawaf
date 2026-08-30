@@ -346,6 +346,7 @@ class SupercellMaker(object):
             scaled_positions=sc_pos,
             numbers=sc_numbers,
             magmoms=sc_magmoms,
+            pbc=atoms.pbc,
         )
 
     def phase_factor(self, qpoint, phase=0, real=True):

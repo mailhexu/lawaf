@@ -83,9 +83,22 @@ class ProjectedWannierizer(Wannierizer):
             )
             # A = self.get_psi_k(ik).conj().T @ self.projectors.T * self.occ[ik][:, np.newaxis]
         # using einsum
-        A = (A.conj() * A) **-0.1 * A
-        U, _S, VT = svd(A, full_matrices=False)
-        return U @ VT
+        window_bands = getattr(
+            self.params,
+            "_window_bands_resolved",
+            getattr(self.params, "window_bands", None),
+        )
+        if window_bands is None:
+            # Preserve the legacy path bit-for-bit when pinning is disabled.
+            A = (A.conj() * A) ** -0.1 * A
+        else:
+            magnitude = np.abs(A)
+            scale = np.zeros_like(magnitude)
+            np.power(magnitude, -0.2, out=scale, where=magnitude > 0.0)
+            A *= scale
+        return self._orthonormalize_amn(
+            A, self._window_rows_by_ik.get(ik)
+        )
         # return A
 
     def get_Amn_psi(self, psi):
@@ -105,6 +118,39 @@ class ProjectedWannierizer(Wannierizer):
                 )
         U, _S, VT = svd(A, full_matrices=False)
         return U @ VT
+
+    # -- story-018 parameter hook (FR-004/015, ADR-003) -------------------
+    # With params.symmetry_adapted_gauge set, the standard-path gauge is
+    # routed through lawaf.anharmonic.gauge: get_wannk_and_Hk reimposes the
+    # little-group constraint on self.Amn in place (covering both
+    # Lawaf.downfold and PhonopyDownfolder.downfold, which call this after
+    # get_Amn), and get_wannier returns the fully rebuilt constrained LWF.
+    # Default (flag False) behavior is untouched.
+    def get_wannk_and_Hk(self, shift=0.0):
+        if getattr(self.params, "symmetry_adapted_gauge", False) and not getattr(
+            self, "_gauge_applied", False
+        ):
+            from lawaf.anharmonic.gauge import constrain_builder_amn
+            constrain_builder_amn(
+                self,
+                getattr(self.params, "representation_declaration", None),
+                params=self.params,
+                sga=getattr(self, "gauge_sga", None),
+            )
+        return super().get_wannk_and_Hk(shift=shift)
+
+    def get_wannier(self, Rlist=None, Rdeg=None):
+        if getattr(self.params, "symmetry_adapted_gauge", False):
+            from lawaf.anharmonic.gauge import constrained_localize
+
+            return constrained_localize(
+                self,
+                getattr(self.params, "representation_declaration", None),
+                params=self.params,
+                Rlist=Rlist,
+                Rdeg=Rdeg,
+            )
+        return super().get_wannier(Rlist=Rlist, Rdeg=Rdeg)
 
 
 class MaxProjectedWannierizer(ProjectedWannierizer):

@@ -180,8 +180,6 @@ class PhonopyWrapper:
         if is_nac:
             self.is_nac = True
             self.get_nac_params()
-            # print("replace_phonon_dynamics_with_myGL")
-            replace_phonon_dynamics_with_myGL(self.phonon)
         else:
             self.is_nac = False
 
@@ -205,10 +203,9 @@ class PhonopyWrapper:
         assert self.mode in ["ifc", "dm"]
         masses = np.kron(self.atoms.get_masses(), [1, 1, 1])
         self.Mmat = np.sqrt(masses[:, None] * masses[None, :])
-        self._use_cache = use_cache
+        self._use_cache = use_cache and not self.is_nac
         self._dm_short = None
         self._prepare_cache()
-        atexit.register(self.save_cache)
 
         self.is_orthogonal = True
 
@@ -222,6 +219,7 @@ class PhonopyWrapper:
                     self._cache = pickle.load(f)
             else:
                 self._cache = {}
+            atexit.register(self.save_cache)
 
     def save_cache(self):
         if self._use_cache:
@@ -275,6 +273,40 @@ class PhonopyWrapper:
         if self._use_cache:
             if key in self._cache:
                 return self._cache[key]
+        if self.is_nac and self.mode == "dm":
+            # Phonopy's q-point runner is the authoritative full NAC
+            # dynamical-matrix path.  Reconstructing it from
+            # ``get_dynamical_matrix_at_q`` loses the off-axis dipole term
+            # and splits/merges zone-boundary modes incorrectly.
+            self.phonon.run_qpoints(
+                [k],
+                with_eigenvectors=True,
+                with_dynamical_matrices=output_H,
+            )
+            evals = np.asarray(self.phonon.qpoints.eigenvalues[0], dtype=float)
+            evecs = np.asarray(self.phonon.qpoints.eigenvectors[0], dtype=complex)
+            evecs *= np.exp(2j * np.pi * self._positions @ k)[:, None]
+            evals, evecs = align_all_degenerate_eigenvectors(evals, evecs)
+            if output_H:
+                Hk = np.asarray(
+                    self.phonon.qpoints.dynamical_matrices[0], dtype=complex
+                )
+                Hshort = self._get_short_range_dm(k)
+                Hlong = Hk - Hshort
+                # Return Hk/Hshort/Hlong in the same atom-Bloch gauge as
+                # the eigenvectors (contract of output_H=True, used by
+                # NACPhonopyDownfolder to project HR_short/HR_total).
+                phase = np.exp(-2.0j * np.pi * np.einsum("ijk, k->ij", self.dr, k))
+                Hk = Hk * phase
+                Hshort = Hshort * phase
+                Hlong = Hlong * phase
+                res = evals, evecs, Hk, Hshort, Hlong
+            else:
+                res = evals, evecs
+            if self._use_cache:
+                self._cache[key] = res
+            return res
+
 
         if self.is_nac:
             # Full (short + dipole-dipole) dynamical matrix; copy so the phase

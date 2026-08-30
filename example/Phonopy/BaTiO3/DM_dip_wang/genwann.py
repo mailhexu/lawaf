@@ -57,4 +57,34 @@ downfolder.plot_band_fitting(
     # plot_nonac=True,
 )
 plt.savefig("LWF_BTO.pdf")
-plt.show()
+
+
+def run_symmetry_seed(output_path="result/", **overrides):
+    seed_params = dict(params)
+    seed_params.update(overrides)
+    seed_params["symmetry_seed"] = True
+    downfolder = NACPhonopyDownfolder(
+        phonopy_yaml=fname,
+        mode="DM",
+        params=seed_params,
+        nac_params={"method": "wang"},
+        born_filename="BORN",
+    )
+    lwf = downfolder.downfold()
+    # NACPhonopyDownfolder.downfold does not write outputs itself
+    # (its writing block is commented out upstream); write them here
+    import os
+
+    os.makedirs(output_path, exist_ok=True)
+    lwf.save_txt(os.path.join(output_path, "LWF.txt"))
+    lwf.write_to_netcdf(os.path.join(output_path, "LWF.nc"))
+    return lwf
+
+if __name__ == "__main__":
+    # The legacy flow above runs unchanged (and without the `symmetry`
+    # extra); opt in to the seeded variant with `python genwann.py --seed`.
+    import sys
+
+    if "--seed" in sys.argv:
+        run_symmetry_seed()
+    plt.show()

@@ -13,6 +13,74 @@ from scipy.special import erfc
 from lawaf.lwf.lwf import LWF
 from lawaf.mathutils.occupation_functions import occupation_func
 from lawaf.params import WannierParams
+from lawaf.utils.kpoints import reciprocal_point_key, reciprocal_point_name
+
+
+def _window_kkey(kpoint):
+    """Reciprocal-wrapped k-point key shared with validated window bands."""
+    return reciprocal_point_key(kpoint)
+
+
+def _window_kname(kpoint):
+    return reciprocal_point_name(kpoint)
+
+
+def _apply_window_band_weights(occ, kpts, window_bands, nwann, ibands):
+    """Replace energy weights by exact binary weights at validated q points."""
+    if window_bands is None:
+        return occ, {}
+    bands_by_q = getattr(window_bands, "bands", None)
+    if bands_by_q is None:
+        raise ValueError(
+            "window_bands must be symmetry-validated by a compatible "
+            "downfolder before Wannierization"
+        )
+
+    mesh_indices = {}
+    for ik, kpoint in enumerate(kpts):
+        key = _window_kkey(kpoint)
+        if key in mesh_indices:
+            raise ValueError(
+                f"duplicate reciprocal k-point {_window_kname(key)} in k-point mesh"
+            )
+        mesh_indices[key] = ik
+
+    result = np.array(occ, copy=True)
+    window_rows = {}
+    retained_rows = {int(band): row for row, band in enumerate(ibands)}
+    for qpoint, selected in bands_by_q.items():
+        key = _window_kkey(qpoint)
+        if key not in mesh_indices:
+            raise ValueError(
+                f"window star arm {_window_kname(key)} is not present in the "
+                "k-point mesh"
+            )
+        selected = tuple(selected)
+        if len(selected) != nwann:
+            raise ValueError(
+                f"window at {_window_kname(key)} selects {len(selected)} bands; "
+                f"expected nwann={nwann}"
+            )
+        if len(set(selected)) != len(selected):
+            raise ValueError(
+                f"window at {_window_kname(key)} repeats an original-band index"
+            )
+        if any(
+            isinstance(index, (bool, np.bool_))
+            or not isinstance(index, (int, np.integer))
+            or index not in retained_rows
+            for index in selected
+        ):
+            raise ValueError(
+                f"window at {_window_kname(key)} contains an excluded or "
+                "invalid original-band index"
+            )
+        ik = mesh_indices[key]
+        rows = tuple(retained_rows[index] for index in selected)
+        result[ik] = 0.0
+        result[ik, list(rows)] = 1.0
+        window_rows[ik] = rows
+    return result, window_rows
 
 
 @dataclass
@@ -140,7 +208,13 @@ class Wannierizer(BasicWannierizer):
         # self.nR = self.Rlist.shape[0]
 
         # calculate occupation functions
-        self.occ = self.weight_func(self.evals[:, self.ibands])
+        self.occ, self._window_rows_by_ik = _apply_window_band_weights(
+            self.weight_func(self.evals[:, self.ibands]),
+            self.kpts,
+            getattr(self.params, "_window_bands_resolved", self.params.window_bands),
+            self.nwann,
+            self.ibands,
+        )
 
         self.Amn = np.zeros((self.nkpt, self.nband, self.nwann), dtype=complex)
 
@@ -154,6 +228,17 @@ class Wannierizer(BasicWannierizer):
             self.Swann_k = None
 
         self.set_params(params)
+
+    def _orthonormalize_amn(self, amn, window_rows=None):
+        """Polarize Amn without completing a pinned rank defect off-window."""
+        if window_rows is None:
+            U, _S, VT = svd(amn, full_matrices=False)
+            return U @ VT
+        rows = np.asarray(window_rows, dtype=int)
+        U, _S, VT = svd(amn[rows], full_matrices=False)
+        result = np.zeros_like(amn)
+        result[rows] = U @ VT
+        return result
 
     def set_params(self, params):
         pass
