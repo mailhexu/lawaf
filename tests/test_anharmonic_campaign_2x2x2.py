@@ -44,6 +44,17 @@ def test_gate0_sign_pattern_contract():
     )
     assert not failed["pass"]
 
+    # ADR-014: pass/fail is on SIGN only; ordering is a recorded diagnostic.
+    reordered = _gate0_verdict(
+        {
+            "Gamma": [-10.0],
+            "X": [-30.0, -30.0, -30.0],
+            "M": [-20.0, -20.0, -20.0],
+            "R": [5.0],
+        }
+    )
+    assert reordered["pass"]
+    assert not reordered["ordering"]["ok"]
 
 try:
     from lawaf.anharmonic.teacher import get_atomchain_calculator
@@ -99,6 +110,7 @@ def test_reduced_q7_gate1_calibration_is_explicit(campaign_results_2x2x2):
         "elastic_rel_max": 0.10,
         "energy_mae_frac": 0.15,
         "fold_rel": 1e-10,
+        "gate3_fitted_omega2_rel_max": 0.30,
         "force_cosine_min": 0.75,
         "roundtrip_rel": 1e-6,
         "stress_rmse_frac": 0.05,

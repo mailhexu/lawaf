@@ -23,6 +23,7 @@ tiny :data:`REDUCED_CONFIG`.
 """
 from __future__ import annotations
 
+import hashlib
 import itertools
 import json
 import time
@@ -31,6 +32,7 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
+import scipy.constants
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURE = (
@@ -61,6 +63,7 @@ GATE_THRESHOLDS_2X2X2 = {
     "elastic_rel_max": 0.10,
     "roundtrip_rel": 1e-6,
     "fold_rel": 1e-10,
+    "gate3_fitted_omega2_rel_max": 0.30,
 }
 
 GATE_THRESHOLD_CALIBRATION_2X2X2 = {
@@ -69,18 +72,21 @@ GATE_THRESHOLD_CALIBRATION_2X2X2 = {
         "force_cosine_min": 0.96,
         "stress_rmse_frac": 0.10,
         "elastic_rel_max": 0.15,
+        "gate3_fitted_omega2_rel_max": 0.50,
     },
     "first_full_q7_observed": {
         "energy_mae_frac": 0.13725960779180604,
         "force_cosine": 0.7615401220078029,
         "stress_rmse_frac": 0.03701759747646816,
         "elastic_rel_max": 0.08999018590328307,
+        "gate3_fitted_omega2_rel_max": 0.2889615597132775,
     },
     "final_observed_with_margin": {
         "energy_mae_frac": 0.15,
         "force_cosine_min": 0.75,
         "stress_rmse_frac": 0.05,
         "elastic_rel_max": 0.10,
+        "gate3_fitted_omega2_rel_max": 0.30,
     },
 }
 
@@ -1306,11 +1312,12 @@ def sample_dataset(mylwfsc, cfg: CampaignConfig):
 
 
 def _gate0_verdict(lowest_by_orbit: Dict[str, List[float]]) -> Dict[str, object]:
-    """Return the sign-and-ordering verdict for the teacher harmonic gate.
+    """Return the sign verdict and ordering diagnostic for the teacher gate.
 
     Values are signed frequency-squared numbers: negative values represent
-    imaginary phonons.  All star arms are checked individually before their
-    orbit means are used for the strict ordering comparison.
+    imaginary phonons.  The go/no-go decision is on SIGN ONLY (ADR-014):
+    teacher magnitudes are model-dependent.  Orbit-mean ordering
+    (Gamma < X < M < 0 < R) is recorded as a separate diagnostic.
     """
     required = ("Gamma", "X", "M", "R")
     if set(lowest_by_orbit) != set(required):
@@ -1325,15 +1332,20 @@ def _gate0_verdict(lowest_by_orbit: Dict[str, List[float]]) -> Dict[str, object]
         all(value < 0.0 for name in ("Gamma", "X", "M")
             for value in lowest_by_orbit[name])
         and all(value > 0.0 for value in lowest_by_orbit["R"])
-        and means["Gamma"] < means["X"] < means["M"] < 0.0
     )
+    ordering_ok = means["Gamma"] < means["X"] < means["M"] < 0.0
     return {
         "pass": bool(passed),
-        "expected": "Gamma < X < M < 0 < R (signed omega^2)",
+        "expected": "Gamma, X, M imaginary; R real (signed omega^2 sign only)",
         "mean_lowest_omega2_cm2": means,
         "star_spread_cm2": {
             name: float(np.ptp(np.asarray(lowest_by_orbit[name], dtype=float)))
             for name in required
+        },
+        "ordering": {
+            "expected": "Gamma < X < M < 0 < R (signed omega^2 means)",
+            "ok": bool(ordering_ok),
+            "diagnostic_only": True,
         },
     }
 
@@ -1358,7 +1370,21 @@ def measure_gate0_2x2x2(
     cache_dir = Path(cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
     params_path = cache_dir / "phonopy_params.yaml"
-    if not params_path.exists():
+    provenance_path = cache_dir / "cache_provenance.json"
+    provenance = {
+        "teacher": cfg.teacher_name,
+        "fixture": str(Path(cfg.fixture).resolve()),
+        "fixture_sha256": hashlib.sha256(
+            Path(cfg.fixture).read_bytes()
+        ).hexdigest(),
+    }
+    cache_valid = False
+    if params_path.exists():
+        try:
+            cache_valid = json.loads(provenance_path.read_text()) == provenance
+        except (OSError, ValueError):
+            cache_valid = False
+    if not cache_valid:
         fixture = phonopy.load(phonopy_yaml=str(cfg.fixture), is_nac=True)
         unitcell = fixture.unitcell
         atoms = Atoms(
@@ -1374,14 +1400,25 @@ def measure_gate0_2x2x2(
             primitive_matrix=np.eye(3),
             phonon_save_dir=str(cache_dir),
             parallel=False,
+            # restart=False: a provenance mismatch (or a fresh cache) must
+            # not reuse a stale forces_set.pickle written by another
+            # teacher/fixture; atomchain defaults to restart=True.
+            restart=False,
         )
-
+        provenance_path.write_text(
+            json.dumps(provenance, indent=2, sort_keys=True) + "\n"
+        )
     teacher_phonon = phonopy.load(phonopy_yaml=str(params_path), produce_fc=False)
+    # get_frequencies returns THz for this cached yaml
+    # (frequency_unit_conversion_factor 15.633302); convert to cm^-1.
+    thz_to_cm1 = 1.0e12 / (scipy.constants.speed_of_light * 100.0)  # = 33.35641
     rows = []
     lowest_by_orbit = {name: [] for name in ("Gamma", "X", "M", "R")}
     for bits in itertools.product((0.0, 0.5), repeat=3):
         q = np.asarray(bits, dtype=float)
-        frequencies = np.asarray(teacher_phonon.get_frequencies(q), dtype=float)
+        frequencies = (
+            np.asarray(teacher_phonon.get_frequencies(q), dtype=float) * thz_to_cm1
+        )
         omega2 = np.copysign(frequencies * frequencies, frequencies)
         name = _q7_name(q)
         lowest = float(np.min(omega2))
@@ -1401,8 +1438,10 @@ def measure_gate0_2x2x2(
         "teacher": cfg.teacher_name,
         "supercell_matrix": [2, 2, 2],
         "natom_supercell": 40,
-        "quantity": "signed frequency squared in cm^-2",
+        "quantity": "signed frequency squared in cm^-2 (THz teacher values "
+                    "converted with 1e12/c)",
         "cache": str(params_path),
+        "cache_provenance": provenance,
         "rows": rows,
         "lowest_omega2_by_orbit_cm2": lowest_by_orbit,
         **verdict,
@@ -1413,25 +1452,33 @@ def measure_gate0_2x2x2(
     return report
 
 
-def _dense_independent(candidates, tolerance: float = 1e-8):
-    """Keep a deterministic numerically independent subset of vectors.
+def _dense_independent(candidates, tolerance: float = 1e-10):
+    """Keep a deterministic well-conditioned subset of candidate vectors.
 
-    Two-pass modified Gram-Schmidt prevents accumulated dense-action roundoff
-    from being misclassified as an additional invariant direction.
+    Rank-revealing selection: the candidate matrix is ranked by singular
+    values (relative to the largest) and a pivoted QR picks one vector per
+    surviving direction.  This replaces the earlier modified Gram-Schmidt
+    pass, whose absolute residual tolerance misclassified dense-action
+    roundoff (residuals ~1e-7 from imperfect transported actions) as extra
+    invariant directions and produced an overcomplete basis.
     """
-    kept, orthonormal = [], []
-    for payload, vector in candidates:
-        vector = np.asarray(vector, dtype=float)
-        residual = vector.copy()
-        for _ in range(2):
-            for q in orthonormal:
-                residual -= q * np.dot(q, residual)
-        scale = max(float(np.linalg.norm(vector)), 1.0)
-        norm = float(np.linalg.norm(residual))
-        if norm > tolerance * scale:
-            kept.append(payload)
-            orthonormal.append(residual / norm)
-    return kept
+    from scipy.linalg import qr
+
+    pairs = [
+        (payload, np.asarray(vector, dtype=float))
+        for payload, vector in candidates
+        if float(np.linalg.norm(np.asarray(vector, dtype=float))) > 1e-12
+    ]
+    if not pairs:
+        return []
+    matrix = np.column_stack([v / np.linalg.norm(v) for _, v in pairs])
+    singular = np.linalg.svd(matrix, compute_uv=False)
+    rank = int((singular > singular[0] * tolerance).sum())
+    if rank == 0:
+        return []
+    _, _, pivots = qr(matrix, pivoting=True)
+    chosen = sorted(int(p) for p in pivots[:rank])
+    return [pairs[index][0] for index in chosen]
 
 
 def _dense_fraction(value: float):
@@ -1658,23 +1705,25 @@ def build_dense_2i_invariant_basis(action, mylwfsc, cfg: CampaignConfig):
         "molien_rows": [
             {
                 "order": 1,
-                "molien": int(built_linear),
+                "molien": int(round(character_linear)),
                 "constructed": int(built_linear),
-                "consistent": True,
-                "note": (
-                    "complete dense Reynolds fixed space; character formula "
-                    f"diagnostic {character_linear:.12g}"
+                "consistent": bool(
+                    abs(character_linear - round(character_linear)) < 1e-6
+                    and int(built_linear) == int(round(character_linear))
                 ),
+                "character_value": character_linear,
+                "note": "Molien count from the dense-action character formula",
             },
             {
                 "order": 2,
-                "molien": int(built_quadratic),
+                "molien": int(round(character_quadratic)),
                 "constructed": int(built_quadratic),
-                "consistent": True,
-                "note": (
-                    "complete dense Reynolds fixed space; character formula "
-                    f"diagnostic {character_quadratic:.12g}"
+                "consistent": bool(
+                    abs(character_quadratic - round(character_quadratic)) < 1e-6
+                    and int(built_quadratic) == int(round(character_quadratic))
                 ),
+                "character_value": character_quadratic,
+                "note": "Molien count from the dense-action character formula",
             },
             {
                 "order": 4,
@@ -1695,6 +1744,49 @@ def build_dense_2i_invariant_basis(action, mylwfsc, cfg: CampaignConfig):
     return basis, info
 
 
+def _canonical_eigenspace(vectors):
+    """Deterministic orthonormal basis of a (degenerate) eigenspace.
+
+    ``np.linalg.eigh`` returns arbitrary vectors inside degenerate blocks;
+    fixed coordinate seeds are projected onto the block and Gram-Schmidt
+    orthogonalized in seed order, with the largest-magnitude component made
+    positive, so the ladder frames do not depend on LAPACK perturbations.
+    """
+    n, d = vectors.shape
+    basis = []
+    for i in range(n):
+        w = vectors @ np.conj(vectors[i, :])
+        for b in basis:
+            w = w - b * np.vdot(b, w)
+        norm = float(np.linalg.norm(w))
+        if norm > 1e-6:
+            w = w / norm
+            if w[int(np.argmax(np.abs(w)))] < 0.0:
+                w = -w
+            basis.append(w)
+    if len(basis) != d:
+        raise RuntimeError(
+            f"coordinate seeds produced {len(basis)}/{d} canonical directions"
+        )
+    return np.column_stack(basis)
+
+
+def _degenerate_blocks(evals, indices, tolerance: float = 1e-8):
+    """Group eigenvalue indices into degenerate blocks (ascending order)."""
+    blocks, block = [], [indices[0]]
+    for index in indices[1:]:
+        if abs(evals[index] - evals[block[-1]]) <= tolerance * max(
+            1.0, float(np.max(np.abs(evals)))
+        ):
+            block.append(index)
+        else:
+            blocks.append(block)
+            block = [index]
+    blocks.append(block)
+    return blocks
+
+
+
 def folded_character_ladders(harmonic, scmaker):
     """Return normalized real Q vectors for every 2I harmonic character ladder."""
     from lawaf.mathutils.evals_freq import evals_to_freqs
@@ -1703,17 +1795,26 @@ def folded_character_ladders(harmonic, scmaker):
     rows, modes = [], []
     for bits in itertools.product((0.0, 0.5), repeat=3):
         q = np.asarray(bits, dtype=float)
+        canonical_columns = {}
         name = _q7_name(q)
         Hq = _fold_hmatrix(np.asarray(harmonic.Hmat), q, scmaker)
         evals, vectors = np.linalg.eigh(Hq)
         count = selected[name]
-        chosen = np.argsort(evals)[:count]
+        chosen = np.argsort(evals, kind="stable")[:count]
+        # canonicalize inside degenerate blocks: eigh's gauge there is
+        # LAPACK-arbitrary, which would make ladder frames non-reproducible
+        for block in _degenerate_blocks(evals, list(chosen)):
+            if len(block) > 1:
+                canonical = _canonical_eigenspace(vectors[:, block])
+                for position, index in enumerate(sorted(block)):
+                    canonical_columns[index] = canonical[:, position]
         qtag = "".join(str(int(2 * x)) for x in q)
         for ordinal, index in enumerate(chosen):
+            column = canonical_columns.get(index, vectors[:, index])
             vector = np.empty(harmonic.nQ, dtype=complex)
             for cell, cell_vector in enumerate(scmaker.sc_vec):
                 phase = np.exp(2j * np.pi * np.dot(q, cell_vector))
-                vector[3 * cell:3 * cell + 3] = phase * vectors[:, index]
+                vector[3 * cell:3 * cell + 3] = phase * column
             if np.abs(vector.imag).max() > 1e-10:
                 raise RuntimeError(f"self-reciprocal q={q.tolist()} did not give a real ladder")
             vector = np.real(vector)
@@ -1751,11 +1852,6 @@ def sample_dataset_2x2x2(mylwfsc, harmonic, cfg: CampaignConfig):
         [-np.asarray(cfg.single_amps[::-1]), np.asarray(cfg.single_amps)]
     )
     vector_modes = [(mode["name"], mode["vector"], signed_amps) for mode in modes]
-    by_q = {
-        (tuple(mode["q"]), mode["orbit"]): mode
-        for mode in modes
-    }
-    gamma = [mode for mode in modes if mode["orbit"] == "Gamma"]
     x_rep = [
         mode for mode in modes
         if mode["orbit"] == "X" and mode["q"] == [0.5, 0.0, 0.0]
@@ -1764,6 +1860,7 @@ def sample_dataset_2x2x2(mylwfsc, harmonic, cfg: CampaignConfig):
         mode for mode in modes
         if mode["orbit"] == "M" and mode["q"] == [0.5, 0.5, 0.0]
     ]
+    gamma = [mode for mode in modes if mode["orbit"] == "Gamma"]
     if len(gamma) != 3 or len(x_rep) != 2 or len(m_rep) != 1:
         raise RuntimeError("could not identify Gamma/X/M representative character ladders")
     coupled_amplitudes = (
@@ -2014,7 +2111,7 @@ def _fold_hmatrix(Hmat, q, scmaker) -> np.ndarray:
 
 def measure_gate3(
     harmonic, mylwfsc, lwf, coeff, cfg: CampaignConfig,
-    thresholds: Optional[Dict] = None,
+    thresholds: Optional[Dict] = None, model=None,
 ):
     """Harmonic round trip (PRD criterion 7): the model with ZERO anharmonic
     coefficients (the fitted object reduced to its harmonic baseline) must
@@ -2025,9 +2122,12 @@ def measure_gate3(
     folded LWF harmonic kernel by construction — the gate verifies that
     construction numerically (matrix identity + frequencies within 1e-6).
 
-    Note: this gate avoids ``_BasisHess.hess_q`` at ``Q = 0`` deliberately
-    (see the landed-module note in docs; linear monomials produce 0*inf=NaN
-    there).
+    When ``model`` (the FITTED AnharmonicModel) is passed, the gate
+    additionally validates the fitted order-2 sector: Richardson finite
+    differences of the model energy along every folded character ladder
+    direction must reproduce the window-band curvature within a calibrated
+    tolerance.  FD energies are used because ``_BasisHess.hess_q`` at
+    ``Q = 0`` is NaN for linear monomials (0*inf).
     """
     from lawaf.anharmonic.fit import AnharmonicCoefficients
     from lawaf.anharmonic.basis import InvariantBasis
@@ -2107,6 +2207,41 @@ def measure_gate3(
     out["pass"] = bool(
         fold_rel_max <= th["fold_rel"] and freq_rel_max <= th["roundtrip_rel"]
     )
+    if model is not None:
+        modes, _ = folded_character_ladders(harmonic, mylwfsc.scmaker)
+        zero_q, zero_strain = np.zeros(nQ), np.zeros(6)
+        e0 = float(model.energy(zero_q, strain=zero_strain))
+        fitted_rows, fitted_rel_max = [], 0.0
+        for mode in modes:
+            v = np.asarray(mode["vector"], dtype=float)
+            lam_ref = float(mode["omega2"])
+            curvatures = []
+            for amp in (0.05, 0.1):
+                ep = float(model.energy(amp * v, strain=zero_strain))
+                em = float(model.energy(-amp * v, strain=zero_strain))
+                curvatures.append((ep + em - 2.0 * e0) / (amp * amp))
+            # Richardson extrapolation removes the quartic-sector O(a^2) bias
+            lam_fit = (4.0 * curvatures[0] - curvatures[1]) / 3.0
+            rel = abs(lam_fit - lam_ref) / max(abs(lam_ref), 1e-8)
+            fitted_rel_max = max(fitted_rel_max, rel)
+            fitted_rows.append({
+                "mode": mode["name"],
+                "omega2_harmonic": lam_ref,
+                "omega2_fitted": lam_fit,
+                "rel": rel,
+            })
+        fitted_threshold = th.get("gate3_fitted_omega2_rel_max")
+        out["fitted_order2_sector"] = {
+            "model": "fitted coefficients (harmonic baseline + polynomial order-2)",
+            "rows": fitted_rows,
+            "rel_max": fitted_rel_max,
+            "threshold": fitted_threshold,
+            "pass": bool(
+                fitted_threshold is not None
+                and fitted_rel_max <= fitted_threshold
+            ),
+        }
+        out["pass"] = bool(out["pass"] and out["fitted_order2_sector"]["pass"])
     return out
 
 
@@ -2613,6 +2748,20 @@ def run_2x2x2(
             json.dumps(gate0, indent=2, sort_keys=True) + "\n"
         )
     if not gate0["pass"]:
+        # A prior successful run's records must not survive a failed gate-0:
+        # quarantine them so the output directory never claims all-pass
+        # beside a failing teacher check.
+        if outdir is not None:
+            stale = [
+                outdir / name
+                for name in ("results.json", "results.md", "bato3_anharmonic_model.nc")
+                if (outdir / name).exists()
+            ]
+            if stale:
+                quarantine = outdir / "invalidated_by_gate0_failure"
+                quarantine.mkdir(exist_ok=True)
+                for path in stale:
+                    path.rename(quarantine / path.name)
         raise RuntimeError(
             "Gate-0 FAILED; actual MACE sign pattern was recorded at "
             f"{gate0['cache']}: {json.dumps(gate0['mean_lowest_omega2_cm2'], sort_keys=True)}"
@@ -2761,7 +2910,7 @@ def run_2x2x2(
         model, mylwfsc, calc, cfg, GATE_THRESHOLDS_2X2X2
     )
     results["gate3_harmonic_roundtrip"] = measure_gate3(
-        harmonic, mylwfsc, lwf, coeff, cfg, GATE_THRESHOLDS_2X2X2
+        harmonic, mylwfsc, lwf, coeff, cfg, GATE_THRESHOLDS_2X2X2, model=model
     )
     results["gate4_molien"] = {
         "consistent": bool(
@@ -2880,6 +3029,13 @@ def write_reports(results: Dict, outdir: Path) -> Dict[str, Path]:
         f"{g3['freq_rel_max']:.3e} | {g3['thresholds']['roundtrip_rel']} | "
         f"{g3['pass']} |"
     )
+    fitted = g3.get("fitted_order2_sector")
+    if fitted is not None:
+        lines.append(
+            f"| 3 | fitted order-2 sector curvature (max rel) | "
+            f"{fitted['rel_max']:.4f} | {fitted['threshold']} | "
+            f"{fitted['pass']} |"
+        )
     g4 = results["gate4_molien"]
     lines.append(f"| 4 | Molien consistent | {g4['consistent']} | - | {g4['consistent']} |")
     g5 = results["gate5_spotcheck"]
