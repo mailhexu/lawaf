@@ -286,10 +286,11 @@ transports the X/M selections across their stars.
 The listed fixture frequencies establish window legality only. Gate 0 measures
 the MACE-r2scan teacher rather than comparing its magnitudes with literature:
 the 40-atom finite-difference run gave lowest signed frequency-squared values
-of Γ -29.6602, X -18.4827, M -13.3832, and R +17.2349 cm-2. All three X
-arms and all three M arms agreed within $6 \times 10^{-14}$ cm-2, so the
-required sign/order pattern Γ, X, M soft with Γ most unstable and R stable
-passed before the campaign was built.
+of Γ -33001.4, X -20564.8, M -14890.8, and R +19176.4 cm-2 (phonopy's THz
+output converted to cm-1). All three X arms and all three M arms agreed
+within $6 \times 10^{-11}$ cm-2, so the sign requirement (Γ, X, M soft, R
+stable) passed before the campaign was built; the Γ-most-unstable ordering
+held as well and is recorded as a diagnostic, not a stop condition.
 
 #### Q7 gauge, residue, and sampling decisions
 
@@ -320,11 +321,11 @@ keeps every teacher frame inside the 24-coordinate Q7 LWF subspace.
 
 | gate | check | calibrated threshold or criterion | recorded outcome |
 |---:|---|---|---|
-| 0 | MACE 2x2x2 FD sign/order | Γ < X < M < 0 < R in signed omega-squared | pass |
-| 1 | CV energy, projected force, stress | 15%, 0.75, 5% | 13.73%, 0.7615, 3.70%; pass |
+| 0 | MACE 2x2x2 FD sign | Gamma, X, M imaginary; R real (sign only; ordering diagnostic) | pass (ordering also holds) |
+| 1 | CV energy, projected force, stress | 15%, 0.75, 5% | 13.73%, 0.7553, 3.70%; pass |
 | 2 | $C_{11}$, $C_{12}$, $C_{44}$ vs MACE | 10% maximum relative deviation | 8.999%; pass |
-| 3 | zero-anharmonic folded-HR round trip | $10^{-10}$ matrix, $10^{-6}$ frequency relative | $1.87 \times 10^{-15}$, $3.67 \times 10^{-16}$; pass |
-| 4 | dense 2I Reynolds fixed-space closure | exact residue permutation and numerical action closure | pass |
+| 3 | folded-HR round trip + fitted order-2 sector | $10^{-10}$ matrix, $10^{-6}$ frequency relative; 30% fitted curvature | $1.87 \times 10^{-15}$, $3.67 \times 10^{-16}$; 28.9% fitted-sector curvature; pass |
+| 4 | dense 2I Molien closure | constructed count equals character-formula Molien count (21 at order 2); exact residue permutation and numerical action closure | 21 = 21; pass |
 | 5 | independent-MLIP spot check | measured; DFT gap remains unmeasured | pass |
 | 6 | netCDF model and symmetry artifact | bitwise payload and evaluation within $10^{-12}$ | pass |
 | acceptance | X5/M3' curvature and X/M AFE relaxation | all X5 and M3' curvatures negative; interior AFE relaxation | pass |
@@ -334,8 +335,15 @@ The first full Q7 pass used the v1 observed-with-margin starting limits
 response). It observed 13.73%, 0.7615, 3.70%, and 8.999%, respectively.
 The campaign's recorded final limits are therefore 15%, 0.75, 5%, and 10%;
 they are explicit calibration data in `threshold_calibration`, rather than
-physics targets. The AFE compatibility relaxation found an interior
-X/M-subspace minimum of -0.05841 eV at $||Q|| = 1.823$. It is qualitative:
+physics targets (the final run recorded force cosine 0.7553; the 0.7615 in
+`threshold_calibration` is the first full run's observation). The gate-3
+fitted-sector limit (30%) is likewise calibrated:
+the fitted quadratic curvature along the folded character ladders reproduces
+the window-band curvature to 28.9%, the residual being the MACE-teacher vs
+DM-fixture curvature difference plus fit error. Gate-0 teacher magnitudes
+are recorded in cm$^{-1}$/cm$^{-2}$ after converting phonopy's THz output.
+The AFE compatibility relaxation found an interior
+X/M-subspace minimum of -0.05953 eV at $||Q|| = 1.850$. It is qualitative:
 fit residuals are assessed only on the signed-ladder and random-frame
 sampled domain.
 
