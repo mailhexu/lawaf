@@ -342,3 +342,131 @@ def test_phonon_netcdf_roundtrip_preserves_swann(tmp_path):
     assert np.abs(lwf2.SwannR - lwf.SwannR).max() < 1e-10
     q = np.array([0.25, 0.11, -0.37])
     assert np.abs(lwf2.solve_k(q)[0] - lwf.solve_k(q)[0]).max() < 1e-8
+
+
+# --------------------------------------------- constant GL gauge transform
+class OrthoTB:
+    """Genuinely orthogonal two-band parent (orthonormal psi)."""
+
+    is_orthogonal = True
+
+    def __init__(self, seed=31):
+        rng = np.random.default_rng(seed)
+        a = rng.standard_normal((2, 2)) + 1j * rng.standard_normal((2, 2))
+        self.H0 = a + a.conj().T
+        b = rng.standard_normal((2, 2)) + 1j * rng.standard_normal((2, 2))
+        self.hop = 0.3 * (b + b.conj().T)
+        self._r = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=int)
+        self.atoms = Atoms("H2", positions=[[0, 0, 0], [0.5, 0.5, 0.5]], cell=np.eye(3))
+
+    def _Hk(self, k):
+        H = self.H0.copy()
+        for R in self._r[1:]:
+            ph = np.exp(2j * np.pi * np.dot(R, k))
+            H += self.hop * ph + self.hop.conj().T * ph.conj()
+        return H
+
+    def solve_all(self, kpts):
+        nk = len(kpts)
+        e = np.zeros((nk, 2))
+        v = np.zeros((nk, 2, 2), dtype=complex)
+        for ik, k in enumerate(kpts):
+            e[ik], v[ik] = eigh(self._Hk(k))
+        return e, v
+
+
+def _G(seed=4, n=2, scale=0.2):
+    rng = np.random.default_rng(seed)
+    return np.eye(n) + scale * (
+        rng.standard_normal((n, n)) + 1j * rng.standard_normal((n, n))
+    )
+
+
+def test_gauge_transform_with_mlwf():
+    """constant G on top of the MV-optimized orthonormal gauge: onsite
+    overlap G^dag G delta_R0 and pencil-exact bands at every k (ws off)."""
+    m = OrthoTB()
+    G = _G()
+    res = {}
+    for tag, extra in [("ctl", {}), ("mlwfG", dict(nonorthogonal_gauge=G))]:
+        df = Lawaf(
+            m,
+            params=dict(
+                method="mlwf", kmesh=(3, 3, 3), nwann=2, selected_basis=[0, 1],
+                weight_func="unity", mlwf_max_iter=50, use_ws_distance=False,
+                **extra,
+            ),
+        )
+        res[tag] = (df, df.downfold())
+    lwf = res["mlwfG"][1]
+    assert not lwf.is_orthogonal
+    assert lwf.SwannR is not None
+    assert res["ctl"][1].SwannR is None
+    i0 = int(np.where(np.all(lwf.Rlist == 0, axis=1))[0][0])
+    others = np.delete(lwf.SwannR, i0, axis=0)
+    assert np.abs(others).max() < 1e-12  # onsite-only overlap
+    assert np.linalg.norm(lwf.SwannR[i0] - G.conj().T @ G) < 1e-12
+    rng = np.random.default_rng(12)
+    q = rng.uniform(-0.5, 0.5, size=(5, 3))
+    e_c = np.array([res["ctl"][1].solve_k(x)[0] for x in q])
+    e_g = np.array([lwf.solve_k(x)[0] for x in q])
+    assert np.abs(e_c - e_g).max() < 1e-12
+
+
+def test_gauge_transform_with_window_selection(tmp_path):
+    """The previously-refused composition (window_bands + non-orthogonal)
+    works through a constant G: overlap G^dag G delta_R0, bands equal to
+    the orthonormal control at arbitrary q (ws off -> exact everywhere)."""
+    G = _G(seed=9, n=3, scale=0.25)
+    base = dict(
+        method="projected", nwann=3,
+        anchors={(0.0, 0.0, 0.0): (0, 1, 2)}, use_proj=True,
+        weight_func="unity", kmesh=(2, 2, 2), gamma=True,
+        use_ws_distance=False,
+        window_bands={
+            (0.0, 0.0, 0.0): (0, 1, 2),
+            (0.5, 0.0, 0.0): (0, 1, 4),
+            (0.5, 0.5, 0.0): (0, 1, 4),
+            (0.5, 0.5, 0.5): (0, 1, 2),
+        },
+    )
+    res = {}
+    for tag, extra in [("ctl", {}), ("G", dict(nonorthogonal_gauge=G))]:
+        df = PhonopyDownfolder(
+            phonopy_yaml=str(FIXTURE), mode="DM", params=dict(base, **extra),
+            symmetrize_fc=False, is_nac=False,
+        )
+        res[tag] = (df, df.downfold(output_path=str(tmp_path / tag),
+                                    write_hr_nc=None, write_hr_txt=None))
+    lwf = res["G"][1]
+    assert lwf.SwannR is not None
+    assert res["ctl"][1].SwannR is None
+    i0 = int(np.where(np.all(lwf.Rlist == 0, axis=1))[0][0])
+    assert np.abs(np.delete(lwf.SwannR, i0, axis=0)).max() < 1e-12
+    assert np.linalg.norm(lwf.SwannR[i0] - G.conj().T @ G) < 1e-12
+    rng = np.random.default_rng(13)
+    q = rng.uniform(-0.5, 0.5, size=(5, 3))
+    e_c = np.array([res["ctl"][1].solve_k(x)[0] for x in q])
+    e_g = np.array([lwf.solve_k(x)[0] for x in q])
+    assert np.abs(e_c - e_g).max() < 1e-10
+
+
+def test_gauge_transform_shape_and_rank_refused(tmp_path):
+    m = OrthoTB()
+    with pytest.raises(ValueError, match="nonorthogonal_gauge must be"):
+        Lawaf(
+            m,
+            params=dict(method="projected", kmesh=(3, 3, 3), nwann=2,
+                        selected_basis=[0, 1], weight_func="unity",
+                        use_ws_distance=False, nonorthogonal_gauge=np.eye(3)),
+        ).downfold()
+    with pytest.raises(ValueError, match="rank-deficient"):
+        Lawaf(
+            m,
+            params=dict(
+                method="projected", kmesh=(3, 3, 3), nwann=2,
+                selected_basis=[0, 1], weight_func="unity",
+                use_ws_distance=False,
+                nonorthogonal_gauge=np.array([[1.0, 0.5], [0.5, 0.25]]),
+            ),
+        ).downfold()

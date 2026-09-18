@@ -222,7 +222,13 @@ class Wannierizer(BasicWannierizer):
         # self.wannR = np.zeros((self.nR, self.nbasis, self.nwann), dtype=complex)
         self.Hwann_k = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
         # self.HwannR = np.zeros((self.nR, self.nwann, self.nwann), dtype=complex)
-        if not self.params.orthogonal:
+        # keep the overlap whenever the final gauge is non-orthogonal:
+        # raw projected gauges (orthogonal=False) or a constant GL factor
+        # applied on top of the orthonormal pipeline (nonorthogonal_gauge)
+        self._keep_overlap = (not self.params.orthogonal) or (
+            getattr(self.params, "nonorthogonal_gauge", None) is not None
+        )
+        if self._keep_overlap:
             self.Swann_k = np.zeros((self.nkpt, self.nwann, self.nwann), dtype=complex)
         else:
             self.Swann_k = None
@@ -312,27 +318,38 @@ class Wannierizer(BasicWannierizer):
         calculate Wannier function and H in k-space.
 
         With ``params.orthogonal=False`` the gauge is left
-        non-orthonormalized and the overlap ``Swann_k = B_k^dag M_k B_k``
-        is propagated (``B_k = psi_k Amn_k``; ``M_k`` is the basis metric
-        -- ``S_k`` for a non-orthogonal basis, identity otherwise), so the
-        interpolated bands come from the pencil ``(Hwann_k, Swann_k)``.
-        With ``params.orthogonal=True`` (default) the Amn is orthonormal
-        by construction and the overlap is dropped.
+        non-orthonormalized; with ``params.nonorthogonal_gauge=G`` a
+        constant full-rank GL factor is applied after the orthonormal
+        pipeline (works with every method, including mlwf and window
+        selections). In both cases the overlap ``Swann_k`` is propagated
+        so the interpolated bands come from the pencil
+        ``(Hwann_k, Swann_k)``; for a constant G the overlap is
+        onsite-only (``G^dag G`` at R=0) and the pencil stays exact at
+        every k (congruence invariance).
         """
+        G = np.asarray(self.params.nonorthogonal_gauge, dtype=complex) if (
+            getattr(self.params, "nonorthogonal_gauge", None) is not None
+        ) else None
+        if G is not None and G.shape != (self.nwann, self.nwann):
+            raise ValueError(
+                f"nonorthogonal_gauge must be (nwann, nwann)="
+                f"{(self.nwann, self.nwann)}, got {G.shape}"
+            )
         for ik in range(self.nkpt):
-            self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
+            A = self.Amn[ik] @ G if G is not None else self.Amn[ik]
+            self.wannk[ik] = self.get_psi_k(ik) @ A
             h = (
-                self.Amn[ik, :, :].T.conj()
+                A.T.conj()
                 @ np.diag(self.get_eval_k(ik) + shift)
-                @ self.Amn[ik, :, :]
+                @ A
             )
             self.Hwann_k[ik] = h
-            if not self.params.orthogonal:
+            if self._keep_overlap:
                 if self.is_orthogonal:
                     s = self.wannk[ik].T.conj() @ self.wannk[ik]
                 else:
                     s = self.wannk[ik].T.conj() @ self.S[ik] @ self.wannk[ik]
-                # A rank-deficient raw gauge makes the pencil
+                # A rank-deficient gauge makes the pencil
                 # (Hwann_k, Swann_k) unsolvable; per-k band weighting
                 # (window_bands selections, energy-weighted gauges) is
                 # designed to be undone by the polar orthonormalization
@@ -341,14 +358,15 @@ class Wannierizer(BasicWannierizer):
                 w_min = np.linalg.eigvalsh(s).min()
                 if w_min < 1e-8:
                     raise ValueError(
-                        f"orthogonal=False: the raw gauge is rank-deficient "
+                        f"the final gauge is rank-deficient "
                         f"at k={self.kpts[ik]} (min eigenvalue of A^dag A = "
                         f"{w_min:.3e}); weighted or hand-selected bands need "
-                        "the orthonormalizing path (orthogonal=True)"
+                        "an orthonormal gauge (use nonorthogonal_gauge for a "
+                        "non-orthogonal result)"
                     )
                 self.Swann_k[ik] = s
 
-        if self.params.orthogonal:
+        if not self._keep_overlap:
             return self.wannk, self.Hwann_k, None
         return self.wannk, self.Hwann_k, self.Swann_k
 

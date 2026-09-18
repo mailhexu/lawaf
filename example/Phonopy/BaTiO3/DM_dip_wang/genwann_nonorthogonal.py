@@ -57,6 +57,57 @@ def run(orthogonal):
     return downfolder, lwf
 
 
+def run_gauge_transform():
+    """Non-orthogonal LWFs FROM a disentangled selection: run the standard
+    orthonormal pipeline (window_bands hand-selection), then apply a
+    constant full-rank GL factor G. The overlap becomes onsite-only
+    (G^dag G at R=0) and the pencil stays exact at every k
+    (congruence invariance; here with use_ws_distance=False so the
+    equivalence to the orthonormal control is machine-exact off-mesh
+    too). With the default WS folding the equivalence is exact on-mesh
+    and carries the usual small off-mesh gauge sensitivity."""
+    rng = np.random.default_rng(9)
+    G = np.eye(3) + 0.25 * (
+        rng.standard_normal((3, 3)) + 1j * rng.standard_normal((3, 3))
+    )
+    wb = {
+        (0.0, 0.0, 0.0): (0, 1, 2),
+        (0.5, 0.0, 0.0): (0, 1, 4),
+        (0.5, 0.5, 0.0): (0, 1, 4),
+        (0.5, 0.5, 0.5): (0, 1, 2),
+    }
+    res = {}
+    for tag, extra in [("selection_ctl", {}), ("selection_G",
+                                               dict(nonorthogonal_gauge=G))]:
+        df = PhonopyDownfolder(
+            phonopy_yaml=FNAME,
+            mode="DM",
+            params=dict(PARAMS, use_ws_distance=False,
+                        window_bands=dict(wb), **extra),
+            symmetrize_fc=False,
+            is_nac=False,
+        )
+        res[tag] = (df, df.downfold(output_path=f"gauge_{tag}/",
+                                    write_hr_nc="LWF.nc",
+                                    write_hr_txt="LWF.txt"))
+    df, lwf = res["selection_G"]
+    print("=" * 70)
+    print("GL gauge transform on a disentangled selection:")
+    print("  SwannR present:", lwf.SwannR is not None,
+          "(control:", res["selection_ctl"][1].SwannR is not None, ")")
+    i0 = int(np.where(np.all(lwf.Rlist == 0, axis=1))[0][0])
+    print("  max |S(R!=0)| =", np.abs(np.delete(lwf.SwannR, i0, axis=0)).max())
+    print("  ||S(0) - G^dag G|| =",
+          np.linalg.norm(lwf.SwannR[i0] - G.conj().T @ G))
+    q = rng.uniform(-0.5, 0.5, size=(5, 3))
+    e_c = np.array([res["selection_ctl"][1].solve_k(x)[0] for x in q])
+    e_g = np.array([lwf.solve_k(x)[0] for x in q])
+    print(f"  selection control vs G-transformed bands at random q: "
+          f"max|diff| = {np.abs(e_c - e_g).max():.2e} (pencil-exact)")
+    assert np.abs(e_c - e_g).max() < 1e-10
+    return lwf
+
+
 def main():
     df_no, lwf_no = run(False)
     df_or, lwf_or = run(True)
@@ -120,6 +171,7 @@ def main():
     fig.tight_layout()
     fig.savefig("LWF_BTO_nonorthogonal.png", dpi=150)
     print("wrote LWF_BTO_nonorthogonal.png")
+    run_gauge_transform()
     print("=" * 70)
     print("PHONON NON-ORTHOGONAL EXAMPLE PASSED")
 

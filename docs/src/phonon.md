@@ -48,6 +48,12 @@ arms and the downfold refuses with a `ValueError` naming the k-point
 (use `orthogonal=True` for selections; `method="mlwf"` refuses
 `orthogonal=False` outright).
 
+To get non-orthogonal LWFs *from* a disentangled selection, apply a
+constant full-rank GL factor after the orthonormal pipeline instead:
+`nonorthogonal_gauge=G` (shape `(nwann, nwann)`) gives onsite-only
+overlap $G^\dagger G\,\delta_{R0}$ and pencil-exact bands at every k —
+demonstrated at the end of `genwann_nonorthogonal.py`.
+
 ### Dipole-dipole interaction and LO-TO splitting
 
 For polar materials the dynamical matrix is non-analytical at $\Gamma$.

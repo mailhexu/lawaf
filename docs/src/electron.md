@@ -303,6 +303,29 @@ time. Disentanglement (`mlwf` with `dis_*` windows, or `window_bands`
 selections) therefore pairs with the default orthonormal gauge;
 non-orthogonal gauges are the full-rank projected path.
 
+#### Constant GL gauge transform (`nonorthogonal_gauge`)
+
+The composable route to non-orthogonal Wannier functions on any parent:
+run the standard orthonormal pipeline (any method, including `mlwf`,
+`dis_*` windows and `window_bands` selections), then apply a constant
+full-rank matrix $G$ to the gauge, $A'(k) = U(k)G$:
+
+```python
+params = dict(method="mlwf", ..., nonorthogonal_gauge=G)  # (nwann, nwann)
+```
+
+The overlap becomes onsite-only, $S^w(R) = G^\dagger G\,\delta_{R0}$,
+the Hamiltonian range is unchanged ($H^w \to G^\dagger H^w G$), and the
+pencil $(G^\dagger H^w G,\; G^\dagger G)$ is a congruence of $H^w$ —
+the interpolated bands are unchanged at **every** k (machine-exact with
+`use_ws_distance=False`; exact on-mesh with the default WS folding,
+where the G-shifted Wannier centers re-classify a few lattice images
+off-mesh). A rank-deficient or wrongly shaped `G` is refused with a
+`ValueError`. This is the two-step baseline of the non-orthogonal MLWF
+research memo (specs/research/2026-09-18-nonorthogonal-mlwf.md); a
+localization-optimized $G$ (or a smooth k-dependent one) is the v2
+direction.
+
 ### Exporting to Wannier90 input files
 
 A lawaf Wannierization (orthogonal basis) can be exported as a complete

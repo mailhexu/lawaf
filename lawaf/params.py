@@ -34,6 +34,11 @@ class WannierParams:
     enhance_Amn: int = 0
     selected_orbdict = None
     orthogonal = True
+    # constant full-rank GL factor applied AFTER the orthonormal pipeline
+    # (all methods, incl. mlwf/disentanglement): A'(k) = U(k) @ G gives a
+    # non-orthogonal gauge with onsite-only overlap S^w = G^dag G (delta_R0)
+    # and pencil-exact bands at every k (congruence invariance)
+    nonorthogonal_gauge: Union[None, np.ndarray] = None
     use_ws_distance: bool = True
     mlwf_tol: float = 1e-10
     mlwf_max_iter: int = 100
