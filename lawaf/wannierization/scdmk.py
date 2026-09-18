@@ -201,10 +201,13 @@ class ScdmkWannierizer(Wannierizer):
             else:
                 # psi = psik[self.cols, :]
                 psiT = psiT[:, self.cols]
-        if self.orthogonal or True:
-            Amn_k = self._orthonormalize_amn(psiT, window_rows)
-        else:
-            Amn_k = psiT
+        # SCDM-k's column weighting (occupation/projection factors) is
+        # designed to be undone by this polar orthonormalization: the raw
+        # weighted columns are rank-deficient by construction, so the
+        # gauge is always orthonormalized here regardless of
+        # params.orthogonal (non-orthogonal gauges come from the
+        # projected method; the S-metric handling above still applies).
+        Amn_k = self._orthonormalize_amn(psiT, window_rows)
         return Amn_k
 
     def prepare(self):

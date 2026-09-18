@@ -233,10 +233,15 @@ class PhonopyDownfolder(PhononDownfolder):
         self.builder.get_Amn()
         # compute the Wannier functions and the Hamiltonian in k-space without NAC
         # wannk: (nkpt, nbasis, nwann)
-        wannk, Hwannk, _ = self.builder.get_wannk_and_Hk()
+        wannk, Hwannk, Swannk = self.builder.get_wannk_and_Hk()
         HwannR = k_to_R(self.kpts, self.Rlist, Hwannk, kweights=self.kweights)
 
         wannR = k_to_R(self.kpts, self.Rlist, wannk, kweights=self.kweights)
+        SwannR = (
+            k_to_R(self.kpts, self.Rlist, Swannk, kweights=self.kweights)
+            if Swannk is not None
+            else None
+        )
 
         wann_centers = get_wannier_centers(
             wannR, self.Rlist, self.atoms.get_scaled_positions(), Rdeg=self.Rdeg
@@ -246,9 +251,13 @@ class PhonopyDownfolder(PhononDownfolder):
             print(f"{i}: {wann_centers[i]=}")
 
         if getattr(self.params, "use_ws_distance", False) and _ws_mesh_ok(self):
+            tensors = {"HwannR": HwannR, "wannR": wannR}
+            if SwannR is not None:
+                tensors["SwannR"] = SwannR
             ws, self.Rlist, self.Rdeg = _ws_materialize(
-                self, {"HwannR": HwannR, "wannR": wannR}, wann_centers)
+                self, tensors, wann_centers)
             HwannR, wannR = ws["HwannR"], ws["wannR"]
+            SwannR = ws.get("SwannR")
 
         # save the lwf model into a NACLWF object
         self.lwf = LWF(
@@ -257,6 +266,7 @@ class PhonopyDownfolder(PhononDownfolder):
             Rdeg=self.Rdeg,
             wannR=wannR,
             HR_total=HwannR,
+            SwannR=SwannR,
             kpts=self.kpts,
             kweights=self.kweights,
             wann_centers=wann_centers,

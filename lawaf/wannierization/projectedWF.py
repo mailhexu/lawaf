@@ -72,16 +72,13 @@ class ProjectedWannierizer(Wannierizer):
                 * self.occ[ik][:, np.newaxis]
             )
         else:
-            # A = self.get_psi_k(ik).conj().T @ self.projectors * self.occ[ik][:, np.newaxis]
-            # A=np.einsum('ob, wo, b ->bw', self.get_psi_k(ik).conj(), self.projectors, self.occ[ik])
-            # A=np.einsum('ob, ow, b ->bw', self.get_psi_k(ik).conj(), self.projectors, self.occ[ik])
+            # dual-bra projection in the LCAO metric: <g| = g^dag S
             A = (
                 self.get_psi_k(ik).conj().T
-                # @ self.S[ik]
+                @ self.S[ik]
                 @ self.projectors.T
                 * self.occ[ik][:, np.newaxis]
             )
-            # A = self.get_psi_k(ik).conj().T @ self.projectors.T * self.occ[ik][:, np.newaxis]
         # using einsum
         window_bands = getattr(
             self.params,
@@ -96,10 +93,13 @@ class ProjectedWannierizer(Wannierizer):
             scale = np.zeros_like(magnitude)
             np.power(magnitude, -0.2, out=scale, where=magnitude > 0.0)
             A *= scale
-        return self._orthonormalize_amn(
-            A, self._window_rows_by_ik.get(ik)
-        )
-        # return A
+        if self.params.orthogonal:
+            return self._orthonormalize_amn(
+                A, self._window_rows_by_ik.get(ik)
+            )
+        # non-orthogonal gauge: raw projections; the overlap propagates
+        # as Swann_k = A^dag A and the bands come from the pencil
+        return A
 
     def get_Amn_psi(self, psi):
         """

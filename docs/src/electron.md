@@ -251,6 +251,48 @@ We get the following band downfolding result.
 
 ![Downfolded_band](tutor.assets/Downfolded_band-1587474503775.png)
 
+### Non-orthogonal Wannier functions
+
+By default every Wannierization orthonormalizes its gauge, so the overlap
+of the Wannier basis is the identity and the interpolated bands come from
+a standard eigenproblem. With `orthogonal=False` (projected method) the
+raw projected gauge is kept instead, and the overlap is propagated
+through the whole pipeline:
+
+$$
+S^w(k) = (\psi_k A_k)^\dagger\, S_k\, (\psi_k A_k) = A_k^\dagger A_k
+\qquad
+H^w(k) = A_k^\dagger \varepsilon_k A_k
+$$
+
+using the S-orthonormality $\psi^\dagger S \psi = 1$ of the generalized
+eigenproblem $H \psi = S \psi \varepsilon$. The overlap is Fourier
+transformed to `SwannR` (Wigner-Seitz folded together with `HwannR` and
+the amplitudes), persisted in the netCDF output, and band interpolation
+solves the pencil `(H^w(k), S^w(k))` (`solve_k` does this
+automatically). This is the natural output when downfolding from a raw
+Siesta NAO Hamiltonian (`SiestaDownfolder` uses `orth=False` for the
+basis), but it works for orthogonal parent models too, where
+$S^w(k) = A_k^\dagger A_k$ simply measures the non-orthonormality of the
+gauge:
+
+```python
+params = dict(method="projected", kmesh=[2, 2, 2], orthogonal=False, ...)
+wann = downfolder.downfold()
+wann.SwannR            # (nR, nwann, nwann) overlap in real space
+wann.solve_k(kpoint)   # generalized eigenproblem (H^w(k), S^w(k))
+```
+
+Any full-rank gauge reproduces the retained bands exactly on the
+downfolding mesh (Rayleigh-Ritz identity), so orthonormality is a choice
+of localization, not of correctness. Two caveats: keep full-rank
+projections (use `weight_func="unity"`; energy/window weights zero out
+rows and are designed to be undone by the polar orthonormalization), and
+expect a somewhat larger real-space truncation error when interpolating
+far off the mesh, because the raw gauge is less smooth in k. See
+`example/Siesta/SrMnO3_SOC/downfold_nonorthogonal.py` for a runnable
+spinor example (Mn-3d + O-2p window of SrMnO3).
+
 ### Exporting to Wannier90 input files
 
 A lawaf Wannierization (orthogonal basis) can be exported as a complete

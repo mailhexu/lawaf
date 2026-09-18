@@ -24,6 +24,23 @@ downfolder.downfold(write_hr_nc="Downfolded_hr.nc",
 Here the weight function is applied in frequency space (cm$^{-1}$ by default);
 `weight_func_params` gives the frequency window/Gauss center and width.
 
+
+### Non-orthogonal lattice Wannier functions
+
+`orthogonal=False` keeps the raw projected gauge also for phonons: the
+overlap $S^w(q) = A_q^\dagger A_q$ of the (generally non-orthonormal)
+lattice Wannier basis is Fourier transformed to `lwf.SwannR`
+(Wigner-Seitz folded together with the dynamical matrix and the
+amplitudes), written to the netCDF output, and `lwf.solve_k(q)` solves
+the generalized pencil `(D^w(q), S^w(q))`. On the downfolding mesh the
+bands are identical to the orthonormal gauge (same subspace); off the
+mesh the raw gauge trades interpolation smoothness for per-mode
+character. Use `weight_func="unity"` so the raw projections stay
+full-rank (weighted selections are designed for the orthonormalizing
+path; `method="scdmk"` always orthonormalizes). A runnable demo lives at
+`example/Phonopy/BaTiO3/DM_dip_wang/genwann_nonorthogonal.py` (three
+soft Ti-dominated BaTiO3 modes).
+
 ### Dipole-dipole interaction and LO-TO splitting
 
 For polar materials the dynamical matrix is non-analytical at $\Gamma$.

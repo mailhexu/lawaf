@@ -32,6 +32,7 @@ class LWF:
     Rdeg: np.ndarray = None
     wannR: np.ndarray = None
     HR_total: np.ndarray = None
+    SwannR: np.ndarray = None
     kpts: np.ndarray = None
     kweights: np.ndarray = None
     wann_centers: np.ndarray = None
@@ -54,29 +55,33 @@ class LWF:
         import xarray as xr
 
         print(f"wann_masses: {self.wann_masses}")
-        ds = xr.Dataset(
-            {
-                "factor": self.factor,
-                "Rlist": (["nR", "dim"], self.Rlist),
-                "Rdeg": (["nR"], self.Rdeg),
-                "wannR": (
-                    ["ncplx", "nR", "nbasis", "nwann"],
-                    np.stack([np.real(self.wannR), np.imag(self.wannR)], axis=0),
-                ),
-                "wann_disps": (
-                    ["nR", "nbasis", "nwann"],
-                    self.wann_disps,
-                ),
-                "Hwann_R": (
-                    ["ncplx", "nR", "nwann", "nwann"],
-                    np.stack([np.real(self.HR_total), np.imag(self.HR_total)], axis=0),
-                ),
-                "kpts": (["nkpt", "dim"], self.kpts),
-                "kweights": (["nkpt"], self.kweights),
-                "wann_centers": (["nwann", "dim"], self.wann_centers),
-                "wann_masses": (["nwann"], self.wann_masses.real),
-            }
-        )
+        data_vars = {
+            "factor": self.factor,
+            "Rlist": (["nR", "dim"], self.Rlist),
+            "Rdeg": (["nR"], self.Rdeg),
+            "wannR": (
+                ["ncplx", "nR", "nbasis", "nwann"],
+                np.stack([np.real(self.wannR), np.imag(self.wannR)], axis=0),
+            ),
+            "wann_disps": (
+                ["nR", "nbasis", "nwann"],
+                self.wann_disps,
+            ),
+            "Hwann_R": (
+                ["ncplx", "nR", "nwann", "nwann"],
+                np.stack([np.real(self.HR_total), np.imag(self.HR_total)], axis=0),
+            ),
+            "kpts": (["nkpt", "dim"], self.kpts),
+            "kweights": (["nkpt"], self.kweights),
+            "wann_centers": (["nwann", "dim"], self.wann_centers),
+            "wann_masses": (["nwann"], self.wann_masses.real),
+        }
+        if self.SwannR is not None:
+            data_vars["Swann_R"] = (
+                ["ncplx", "nR", "nwann", "nwann"],
+                np.stack([np.real(self.SwannR), np.imag(self.SwannR)], axis=0),
+            )
+        ds = xr.Dataset(data_vars)
         ds.to_netcdf(filename, group="lwf", mode="w")
 
         atoms = self.atoms
@@ -101,6 +106,10 @@ class LWF:
         ds = xr.open_dataset(filename, group="lwf")
         wannR = ds["wannR"].values[0] + 1j * ds["wannR"].values[1]
         HR_total = ds["Hwann_R"].values[0] + 1j * ds["Hwann_R"].values[1]
+        if "Swann_R" in ds.variables:
+            SwannR = ds["Swann_R"].values[0] + 1j * ds["Swann_R"].values[1]
+        else:
+            SwannR = None
 
         ds_atoms = xr.open_dataset(filename, group="atoms")
         atoms = Atoms(
@@ -118,6 +127,7 @@ class LWF:
             Rdeg=ds["Rdeg"].values,
             wannR=wannR,
             HR_total=HR_total,
+            SwannR=SwannR,
             kpts=ds["kpts"].values,
             kweights=ds["kweights"].values,
             wann_centers=ds["wann_centers"].values,
@@ -149,7 +159,17 @@ class LWF:
                             f"R = {R}, i = {i}, j={j} :: H(i,j,R)= {d[i,j]:.4f} \n"
                         )
                 myfile.write("-" * 60 + "\n")
-
+            if self.SwannR is not None:
+                myfile.write("Overlap:  \n" + "=" * 60 + "\n")
+                for iR, R in enumerate(self.Rlist):
+                    myfile.write(f"index of R: {iR}.  R = {R}\n")
+                    d = self.SwannR[iR]
+                    for i in range(self.nwann):
+                        for j in range(self.nwann):
+                            myfile.write(
+                                f"R = {R}, i = {i}, j={j} :: S(i,j,R)= {d[i,j]:.4f} \n"
+                            )
+                    myfile.write("-" * 60 + "\n")
     def write_to_cif(
         self, sc_matrix=None, center=True, amp=1.0, list_lwf=None, prefix="LWF"
     ):
@@ -214,15 +234,29 @@ class LWF:
         Hk = R_to_onek(kpt, self.Rlist, self.HR_total, self.Rdeg)
         return Hk
 
+    def get_Sk(self, kpt):
+        """
+        get the overlap matrix at k-point (None for an orthogonal LWF basis).
+        """
+        if self.SwannR is None:
+            return None
+        return R_to_onek(kpt, self.Rlist, self.SwannR, self.Rdeg)
+
+    @property
+    def is_orthogonal(self):
+        return self.SwannR is None
+
     def solve_k(self, kpt):
         """
-        solve the Hamiltonian at k-point with NAC.
+        solve at k-point; generalized pencil (Hk, Sk) when the LWF basis
+        is non-orthogonal (SwannR given).
         """
-        # if np.linalg.norm(kpt) < 1e-6:
-        #    Hk = self.get_Hk_noNAC(kpt)
-        # else:
         Hk = self.get_Hk(kpt)
-        evals, evecs = eigh(Hk)
+        Sk = self.get_Sk(kpt)
+        if Sk is None:
+            evals, evecs = eigh(Hk)
+        else:
+            evals, evecs = eigh(Hk, Sk)
         return evals, evecs
 
     def solve_all(self, kpts):
@@ -290,6 +324,7 @@ class NACLWF(LWF):
         self.kpts = kpts
         self.kweights = kweights
         self.wann_centers = wann_centers
+        self.SwannR = None
         self.atoms = atoms
         self.__post_init__()
 
@@ -371,8 +406,7 @@ class NACLWF(LWF):
         keys = [tuple(R % N) for R in self.Rlist]
         unique_mod = len(set(keys)) == len(self.Rlist)
         if Rdeg_is_ones and not unique_mod:
-            from lawaf.mathutils.ws_distance import (apply_ws_distance,
-                                                     fold_R_to_mesh)
+            from lawaf.mathutils.ws_distance import apply_ws_distance
             mesh_list = np.array(sorted(set(keys)), dtype=int)
             HRm = k_to_R(self.kpts, mesh_list, Hks_short,
                          kweights=self.kweights)

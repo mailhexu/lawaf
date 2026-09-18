@@ -88,7 +88,7 @@ class Lawaf:
         post_func=None,
         enhance_Amn=0,
         selected_orbdict=None,
-        orthogonal=False,
+        orthogonal=True,
         use_ws_distance=None,
         mlwf_tol=1e-10,
         mlwf_max_iter=100,
@@ -352,6 +352,8 @@ class Lawaf:
             Rdeg=self.Rdeg,
             atoms=self.atoms,
             wann_names=None,
+            kpts=self.kpts,
+            kweights=self.kweights,
             is_orthogonal=(SwannR is None),
         )
 

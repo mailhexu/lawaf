@@ -7,7 +7,7 @@ from typing import Callable, Optional, Tuple
 
 import numpy as np
 from netCDF4 import Dataset
-from scipy.linalg import eigh, svd
+from scipy.linalg import svd
 from scipy.special import erfc
 
 from lawaf.lwf.lwf import LWF
@@ -310,32 +310,33 @@ class Wannierizer(BasicWannierizer):
     def get_wannk_and_Hk(self, shift=0.0):
         """
         calculate Wannier function and H in k-space.
+
+        With ``params.orthogonal=False`` the gauge is left
+        non-orthonormalized and the overlap ``Swann_k = B_k^dag M_k B_k``
+        is propagated (``B_k = psi_k Amn_k``; ``M_k`` is the basis metric
+        -- ``S_k`` for a non-orthogonal basis, identity otherwise), so the
+        interpolated bands come from the pencil ``(Hwann_k, Swann_k)``.
+        With ``params.orthogonal=True`` (default) the Amn is orthonormal
+        by construction and the overlap is dropped.
         """
         for ik in range(self.nkpt):
             self.wannk[ik] = self.get_psi_k(ik) @ self.Amn[ik, :, :]
-            # if self.is_orthogonal:
-            # print(f"Calculating Wannier function for k={self.kpts[ik]}")
             h = (
                 self.Amn[ik, :, :].T.conj()
                 @ np.diag(self.get_eval_k(ik) + shift)
                 @ self.Amn[ik, :, :]
             )
-
-            if self.is_orthogonal or self.params.orthogonal:
-                self.Hwann_k[ik] = h
-                self.Swann_k = None
-                evals, evecs = eigh(self.Hwann_k[ik])
-            else:
-                self.Hwann_k[ik] = h
-                s = self.wannk[ik].T.conj() @ self.S[ik] @ self.wannk[ik]
+            self.Hwann_k[ik] = h
+            if not self.params.orthogonal:
+                if self.is_orthogonal:
+                    s = self.wannk[ik].T.conj() @ self.wannk[ik]
+                else:
+                    s = self.wannk[ik].T.conj() @ self.S[ik] @ self.wannk[ik]
                 self.Swann_k[ik] = s
-                # evals, evecs = eigh(self.Hwann_k[ik], self.Swann_k[ik])
 
-            # diff=evals-self.get_eval_k(ik)
-        if self.is_orthogonal:
+        if self.params.orthogonal:
             return self.wannk, self.Hwann_k, None
-        else:
-            return self.wannk, self.Hwann_k, self.Swann_k
+        return self.wannk, self.Hwann_k, self.Swann_k
 
     def get_wannier_centers(self, wannR, Rlist, Rdeg, positions):
         wann_centers = np.zeros((self.nwann, 3), dtype=float)
@@ -348,12 +349,11 @@ class Wannierizer(BasicWannierizer):
 
     def _assure_normalized(self, wannR):
         """
-        make sure that all the Wannier functions are normalized
+        print the norm of every Wannier function.
         # TODO: should we use overlap matrix for non-orthogonal basis?
         """
-        for iwann in range(self.nwann):
-            norm = np.trace(wannR[:, :, iwann].conj().T @ wannR[:, :, iwann])
-        print("Normalization check: ", norm)
+        norms = np.einsum("rij,rij->j", wannR.conj(), wannR).real
+        print("Normalization check: ", norms)
 
     def k_to_R(self, Rlist, Rdeg):
         """
