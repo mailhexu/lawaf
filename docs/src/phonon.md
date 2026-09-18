@@ -41,6 +41,13 @@ path; `method="scdmk"` always orthonormalizes). A runnable demo lives at
 `example/Phonopy/BaTiO3/DM_dip_wang/genwann_nonorthogonal.py` (three
 soft Ti-dominated BaTiO3 modes).
 
+Disentanglement composes with the orthonormal gauge only:
+`window_bands` hand-selections zero out non-selected band rows, so with
+`orthogonal=False` the raw gauge goes rank-deficient at the selection
+arms and the downfold refuses with a `ValueError` naming the k-point
+(use `orthogonal=True` for selections; `method="mlwf"` refuses
+`orthogonal=False` outright).
+
 ### Dipole-dipole interaction and LO-TO splitting
 
 For polar materials the dynamical matrix is non-analytical at $\Gamma$.

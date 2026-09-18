@@ -267,6 +267,55 @@ def _phonon(orthogonal, tmp_path):
     )
 
 
+def test_mlwf_refuses_nonorthogonal_gauge():
+    from lawaf.wannierization.mlwf import MLWFWannierizer
+
+    evals, evecs, kpts, kweights = _builder_inputs()
+    params = WannierParams(
+        method="mlwf", kmesh=(2, 2, 2), nwann=3,
+        selected_basis=[0, 1, 2], weight_func="unity", orthogonal=False,
+    )
+    with pytest.raises(NotImplementedError, match="orthonormal gauges"):
+        MLWFWannierizer(
+            evals=evals, evecs=evecs, kpts=kpts, kweights=kweights,
+            params=params,
+        )
+
+
+def test_windowed_selection_raw_gauge_refused(tmp_path):
+    """window_bands zero out non-selected band rows; with the raw
+    (non-orthonormalized) gauge the Gram A^dag A goes singular at the
+    selection arms — refused with k context, not a scipy crash."""
+    params = dict(
+        method="projected",
+        nwann=3,
+        anchors={(0.0, 0.0, 0.0): (0, 1, 2)},
+        use_proj=True,
+        weight_func="unity",
+        kmesh=(2, 2, 2),
+        gamma=True,
+        orthogonal=False,
+        window_bands={
+            (0.0, 0.0, 0.0): (0, 1, 2),
+            (0.5, 0.0, 0.0): (0, 1, 4),
+            (0.5, 0.5, 0.0): (0, 1, 4),
+            (0.5, 0.5, 0.5): (0, 1, 2),
+        },
+    )
+    df = PhonopyDownfolder(
+        phonopy_yaml=str(FIXTURE),
+        mode="DM",
+        params=params,
+        symmetrize_fc=False,
+        is_nac=False,
+    )
+    with pytest.raises(ValueError, match="rank-deficient"):
+        df.downfold(output_path=str(tmp_path), write_hr_nc=None,
+                    write_hr_txt=None)
+
+
+
+
 def test_phonon_nonorthogonal_pencil(tmp_path):
     df, lwf = _phonon(False, tmp_path)
     assert lwf.SwannR is not None

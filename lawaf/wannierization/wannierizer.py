@@ -332,6 +332,20 @@ class Wannierizer(BasicWannierizer):
                     s = self.wannk[ik].T.conj() @ self.wannk[ik]
                 else:
                     s = self.wannk[ik].T.conj() @ self.S[ik] @ self.wannk[ik]
+                # A rank-deficient raw gauge makes the pencil
+                # (Hwann_k, Swann_k) unsolvable; per-k band weighting
+                # (window_bands selections, energy-weighted gauges) is
+                # designed to be undone by the polar orthonormalization
+                # and regularly zeroes rows. Fail here with k context
+                # instead of deep inside scipy.linalg.eigh at solve time.
+                w_min = np.linalg.eigvalsh(s).min()
+                if w_min < 1e-8:
+                    raise ValueError(
+                        f"orthogonal=False: the raw gauge is rank-deficient "
+                        f"at k={self.kpts[ik]} (min eigenvalue of A^dag A = "
+                        f"{w_min:.3e}); weighted or hand-selected bands need "
+                        "the orthonormalizing path (orthogonal=True)"
+                    )
                 self.Swann_k[ik] = s
 
         if self.params.orthogonal:

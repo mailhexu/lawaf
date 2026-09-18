@@ -293,6 +293,16 @@ far off the mesh, because the raw gauge is less smooth in k. See
 `example/Siesta/SrMnO3_SOC/downfold_nonorthogonal.py` for a runnable
 spinor example (Mn-3d + O-2p window of SrMnO3).
 
+Two combinations are refused rather than silently degraded:
+`method="mlwf"` requires orthonormal gauges (ADR-3), so
+`orthogonal=False` there raises `NotImplementedError`; and any per-k
+band weighting (energy/window weights, hand-selected `window_bands`)
+makes the raw gauge rank-deficient at the selection arms, which raises
+a `ValueError` with k context instead of a scipy failure at solve
+time. Disentanglement (`mlwf` with `dis_*` windows, or `window_bands`
+selections) therefore pairs with the default orthonormal gauge;
+non-orthogonal gauges are the full-rank projected path.
+
 ### Exporting to Wannier90 input files
 
 A lawaf Wannierization (orthogonal basis) can be exported as a complete

@@ -298,6 +298,14 @@ class MLWFWannierizer(ProjectedWannierizer):
                 "needed for a non-orthogonal basis is not implemented. "
                 "Orthogonalize the basis first (e.g. Lowdin/use_proj path)."
             )
+        if not self.params.orthogonal:
+            raise NotImplementedError(
+                "MLWFWannierizer requires orthonormal gauges (ADR-3): the "
+                "MV sweeps and the spread decomposition assume Amn with "
+                "orthonormal columns, so orthogonal=False (raw gauge) is "
+                "not supported. Non-orthogonal gauges come from "
+                "method='projected' with full-rank projections."
+            )
         self.selection = None
 
     def get_Amn(self):
