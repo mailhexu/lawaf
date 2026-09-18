@@ -105,7 +105,57 @@ def run_gauge_transform():
     print(f"  selection control vs G-transformed bands at random q: "
           f"max|diff| = {np.abs(e_c - e_g).max():.2e} (pencil-exact)")
     assert np.abs(e_c - e_g).max() < 1e-10
-    return lwf
+
+
+def run_optimized_gauge():
+    """Maximally localized NON-ORTHOGONAL LWFs: optimize the constant GL
+    factor G to minimize the normalized per-orbital spread (the GL
+    generalization of the MV objective; the orthonormal gauge is a
+    stationary point, so gains come from the non-unitary directions).
+    A logdet barrier keeps the set invertible - without it the spread
+    infimum is degenerate (columns collapse onto the single
+    best-localized function). Bands are pencil-exact throughout."""
+    from lawaf import optimize_nonorthogonal_gauge
+    from lawaf.wannierization.nonorthogonal_gauge import (
+        apply_gauge_transform,
+        nonorthogonal_spread,
+        position_moment_matrices,
+    )
+
+    df = PhonopyDownfolder(
+        phonopy_yaml=FNAME,
+        mode="DM",
+        params=dict(PARAMS, use_ws_distance=False),
+        symmetrize_fc=False,
+        is_nac=False,
+    )
+    lwf = df.downfold(output_path="gauge_optimized/", write_hr_nc=None,
+                      write_hr_txt=None)
+    basis_pos = np.repeat(lwf.atoms.get_scaled_positions(), 3, axis=0)
+    x, y = position_moment_matrices(lwf.wannR, lwf.Rlist, lwf.Rdeg, basis_pos)
+    G, res = optimize_nonorthogonal_gauge(lwf.wannR, lwf.Rlist, lwf.Rdeg,
+                                          basis_pos)
+    o0 = nonorthogonal_spread(np.eye(3), x, y)
+    o1 = nonorthogonal_spread(G, x, y)
+    print("=" * 70)
+    print("optimized non-orthogonal gauge:")
+    print(f"  spread (fractional units^2): {o0:.8f} -> {o1:.8f}")
+    S = G.conj().T @ G
+    print("  S = G^dag G off-diagonal magnitude:",
+          np.abs(S - np.diag(np.diag(S))).max().round(6))
+    print("  (symmetry-related triplets are near GL-optimal; large gains")
+    print("   appear when the orthonormal gauge is symmetry-pinned, e.g.")
+    print("   bonding/antibonding-like pairs)")
+    lwf_no = apply_gauge_transform(lwf, G)
+    rng = np.random.default_rng(2)
+    q = rng.uniform(-0.5, 0.5, size=(4, 3))
+    e0 = np.array([lwf.solve_k(k)[0] for k in q])
+    e1 = np.array([lwf_no.solve_k(k)[0] for k in q])
+    print(f"  band preservation max|diff| = {np.abs(e0 - e1).max():.2e}")
+    assert o1 <= o0 + 1e-12
+    assert np.abs(e0 - e1).max() < 1e-10
+    return lwf_no
+
 
 
 def main():
@@ -172,6 +222,7 @@ def main():
     fig.savefig("LWF_BTO_nonorthogonal.png", dpi=150)
     print("wrote LWF_BTO_nonorthogonal.png")
     run_gauge_transform()
+    run_optimized_gauge()
     print("=" * 70)
     print("PHONON NON-ORTHOGONAL EXAMPLE PASSED")
 

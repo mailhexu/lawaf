@@ -54,6 +54,13 @@ constant full-rank GL factor after the orthonormal pipeline instead:
 overlap $G^\dagger G\,\delta_{R0}$ and pencil-exact bands at every k —
 demonstrated at the end of `genwann_nonorthogonal.py`.
 
+`lawaf.optimize_nonorthogonal_gauge(lwf.wannR, lwf.Rlist, lwf.Rdeg,
+positions)` chooses $G$ to maximally localize the non-orthogonal LWFs
+(normalized per-orbital spread, GL generalization of the MV
+objective, with a logdet barrier against gauge collapse), and
+`lawaf.apply_gauge_transform(lwf, G)` installs it — the final demo of
+`genwann_nonorthogonal.py`.
+
 ### Dipole-dipole interaction and LO-TO splitting
 
 For polar materials the dynamical matrix is non-analytical at $\Gamma$.

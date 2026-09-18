@@ -326,6 +326,39 @@ research memo (specs/research/2026-09-18-nonorthogonal-mlwf.md); a
 localization-optimized $G$ (or a smooth k-dependent one) is the v2
 direction.
 
+#### Choosing $G$ for maximal localization
+
+`lawaf.optimize_nonorthogonal_gauge` minimizes the normalized
+per-orbital spread $\sum_n \omega_n$ over the GL factor — the
+generalization of the MV objective without the orthonormality
+constraint (the orthonormal gauge is itself a stationary point, so
+every gain comes from non-unitary directions):
+
+```python
+import lawaf
+
+lwf = downfolder.downfold()               # any orthonormal pipeline
+positions = ...                           # (nbasis, 3) basis positions
+G, res = lawaf.optimize_nonorthogonal_gauge(
+    lwf.wannR, lwf.Rlist, lwf.Rdeg, positions)
+lwf_no = lawaf.apply_gauge_transform(lwf, G)
+```
+
+The moments are evaluated in the diagonal position approximation on
+`wannR` (the LWF-centre convention; pass fractional positions to match
+`lwf.wann_centers`, Cartesian for a spread in Å²). Three properties to
+know: the spread infimum over GL is **degenerate** — columns can
+collapse onto the single best-localized function — so a
+$-\mu\log\det(G^\dagger G)$ conditioning barrier (weight
+`barrier_weight`) keeps the set invertible; the optimum is only
+meaningful up to per-column phases and equal-spread unitary freedom;
+and a generic optimal $G$ mixes irreps, so symmetry-labelled gauges
+should restrict $G$ (blocks) rather than optimize freely. Gains are
+large when the orthonormal gauge is symmetry-pinned (bonding/
+antibonding-like situations, where the localized non-orthogonal set is
+the natural description) and small when the MV gauge is already
+near-optimal. Bands stay pencil-exact throughout (verified 1e-15).
+
 ### Exporting to Wannier90 input files
 
 A lawaf Wannierization (orthogonal basis) can be exported as a complete
