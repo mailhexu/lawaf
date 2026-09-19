@@ -9,13 +9,19 @@ the phonon bands come from the generalized pencil ``(D^w(q), S^w(q))``.
 Run from this directory (needs phonopy_params.yaml):
     python genwann_nonorthogonal.py
 """
+import warnings
+
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lawaf import PhonopyDownfolder
+from lawaf import (
+    PhonopyDownfolder,
+    apply_gauge_transform,
+    optimize_nonorthogonal_gauge,
+)
 
 FNAME = "phonopy_params.yaml"
 
@@ -223,8 +229,52 @@ def main():
     print("wrote LWF_BTO_nonorthogonal.png")
     run_gauge_transform()
     run_optimized_gauge()
-    print("=" * 70)
+    run_kdependent_gauge()
     print("PHONON NON-ORTHOGONAL EXAMPLE PASSED")
+
+
+def run_kdependent_gauge():
+    """k-DEPENDENT gauge G(k) = exp[sum_R Lambda(R) e^{2 pi i k.R}] on
+    shells of the model R-list: the overlap gains finite off-site
+    range while mesh-k bands stay pencil-exact. Optimize Lambda beyond
+    the constant-G optimum (logdet conditioning barrier per k). Off
+    the mesh the interpolation is gauge-dependent — consume the result
+    in real space."""
+    from lawaf import optimize_kdependent_gauge
+    from lawaf.mathutils.kR_convert import R_to_k
+
+    df = PhonopyDownfolder(
+        phonopy_yaml=FNAME,
+        mode="DM",
+        params=dict(PARAMS, use_ws_distance=False),
+        symmetrize_fc=False,
+        is_nac=False,
+    )
+    lwf = df.downfold(output_path="kdependent/", write_hr_nc=None,
+                      write_hr_txt=None)
+    pos = np.repeat(lwf.atoms.get_scaled_positions(), 3, axis=0)
+    Gc, _ = optimize_nonorthogonal_gauge(lwf.wannR, lwf.Rlist, lwf.Rdeg,
+                                         pos)
+    gauge, res, info = optimize_kdependent_gauge(
+        lwf.wannR, lwf.Rlist, lwf.Rdeg, pos, lwf.kpts, shells=1, G0=Gc,
+        verbose=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        lwf_k = apply_gauge_transform(lwf, gauge)
+    Sk = R_to_k(lwf.kpts, lwf_k.Rlist, lwf_k.SwannR, lwf_k.Rdeg)
+    print("  min_R lambda_min S(R) (recomputed):",
+          float(min(np.linalg.eigvalsh(m).min() for m in Sk)))
+    e0 = np.array([lwf.solve_k(k)[0] for k in lwf.kpts])
+    e1 = np.array([lwf_k.solve_k(k)[0] for k in lwf.kpts])
+    print("=" * 70)
+    print("k-dependent gauge (shells=1):")
+    print(f"  spread: {info['omega_start']:.8f} -> {info['omega_opt']:.8f}"
+          f"  (constant-G optimum included in the path)")
+    print(f"  min_k lambda_min S(k) = {info['min_eig_S']:.6f}")
+    print(f"  mesh band preservation max|diff| = "
+          f"{np.abs(e0 - e1).max():.2e}")
+    assert np.abs(e0 - e1).max() < 1e-12
+    return lwf_k
 
 
 if __name__ == "__main__":

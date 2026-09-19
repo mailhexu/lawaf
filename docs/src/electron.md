@@ -359,6 +359,17 @@ antibonding-like situations, where the localized non-orthogonal set is
 the natural description) and small when the MV gauge is already
 near-optimal. Bands stay pencil-exact throughout (verified 1e-15).
 
+#### k-dependent gauge G(k) (experimental)
+
+`lawaf.optimize_kdependent_gauge(lwf.wannR, lwf.Rlist, lwf.Rdeg,
+positions, lwf.kpts, shells=1, G0=G)` parametrizes
+$G(\mathbf k) = \exp[\sum_R \Lambda(\mathbf R) e^{2\pi i \mathbf k\cdot
+\mathbf R}]$ on shells of the model R-list and minimizes the same
+normalized spread under a per-k conditioning barrier. The overlap gains
+finite off-site range and the bands stay pencil-exact on the mesh;
+off-mesh interpolation is gauge-dependent (the application warns), so
+consume the result in real space.
+
 ### Exporting to Wannier90 input files
 
 A lawaf Wannierization (orthogonal basis) can be exported as a complete

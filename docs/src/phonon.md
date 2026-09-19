@@ -61,6 +61,31 @@ objective, with a logdet barrier against gauge collapse), and
 `lawaf.apply_gauge_transform(lwf, G)` installs it — the final demo of
 `genwann_nonorthogonal.py`.
 
+### k-dependent gauge G(k) (experimental)
+
+Beyond the constant factor, `lawaf.optimize_kdependent_gauge` builds a
+smooth k-dependent gauge
+$G(\mathbf k) = \exp[\sum_{\mathbf R} \Lambda(\mathbf R)
+e^{2\pi i\mathbf k\cdot\mathbf R}]$ on shells of the model R-list
+(shell 1 = $R=0$ plus nearest neighbours), initialized from the
+constant-G optimum, and minimizes the same normalized per-orbital
+spread under a per-k scale-invariant logdet conditioning barrier and a
+Tikhonov smoothness term. The overlap $S^w(\mathbf k) =
+G^\dagger G$ becomes k-dependent — $S^w(\mathbf R)$ gains finite
+off-site range — while bands remain pencil-exact **on the downfolding
+mesh**; off-mesh interpolation is gauge-dependent, so treat the
+result as an R-space-consumed model (a warning is emitted on
+application):
+
+```python
+gauge, res, info = lawaf.optimize_kdependent_gauge(
+    lwf.wannR, lwf.Rlist, lwf.Rdeg, positions, lwf.kpts,
+    shells=1, G0=G_constant)
+lwf_k = lawaf.apply_gauge_transform(lwf, gauge)
+info["omega_start"], info["omega_opt"], info["min_eig_S"]
+```
+
+
 ### Dipole-dipole interaction and LO-TO splitting
 
 For polar materials the dynamical matrix is non-analytical at $\Gamma$.

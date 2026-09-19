@@ -271,6 +271,12 @@ def apply_gauge_transform(lwf, G):
     ``SwannR = G^dag G`` at R=0. ``NACLWF`` is refused (the NAC split
     is defined for orthonormal LWFs). The input object is not modified.
     """
+    if hasattr(G, "G_of_k"):  # KDepGauge: k-dependent dispatch
+        from lawaf.wannierization.kdependent_gauge import (
+            apply_kdependent_gauge,
+        )
+
+        return apply_kdependent_gauge(lwf, G)
     G = np.asarray(G, dtype=complex)
     if getattr(lwf, "nac", False):
         raise NotImplementedError(
