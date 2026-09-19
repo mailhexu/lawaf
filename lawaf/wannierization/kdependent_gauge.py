@@ -202,7 +202,7 @@ def kdependent_objective(wannR, Rlist, Rdeg, positions, kpts, Rg):
 
 
 def optimize_kdependent_gauge(
-    wannR, Rlist, Rdeg, positions, kpts, shells=(0, 1), G0=None,
+    wannR, Rlist, Rdeg, positions, kpts, shells=1, G0=None,
     barrier_weight=1e-2, tikhonov=1e-3, pin_reg=1e-8, maxiter=600,
     tol=1e-12, verbose=False,
 ):
@@ -218,8 +218,8 @@ def optimize_kdependent_gauge(
     :param kpts: (nk, 3) the downfolding mesh the model was built from
         (``lwf.kpts``);
     :param shells: number of non-constant generator shells on the model
-        R-list (1 = R0 + nearest neighbors); the constant-G path is the
-        shell-0 special case;
+        R-list (1 = R0 + nearest neighbors, default; 0 = the constant-G
+        special case);
     :param G0: constant-G initialization (nwann, nwann); default
         identity. ``Lambda(0) = logm(G0)`` when G0 has positive
         eigenvalues, else zeros;
