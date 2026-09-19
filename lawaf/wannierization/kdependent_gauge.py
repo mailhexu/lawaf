@@ -46,7 +46,7 @@ warns accordingly).
 import warnings
 
 import numpy as np
-from scipy.linalg import expm, expm_frechet
+from scipy.linalg import eigh, expm, expm_frechet
 from scipy.optimize import minimize
 
 from lawaf.mathutils.kR_convert import k_to_R, R_to_k
@@ -201,10 +201,48 @@ def kdependent_objective(wannR, Rlist, Rdeg, positions, kpts, Rg):
     return f, omega, (nk, nb, nw)
 
 
+def kdependent_offmesh_penalty(Lam, qpts, Rg, HwannR, Rlist, Rdeg,
+                               weight=1.0):
+    """Off-mesh interpolation penalty and its Wirtinger gradient.
+
+    At each q in ``qpts`` the transformed pencil eigenvalues are matched
+    (sorted) against the orthonormal control spectrum
+    ``spec(eigh(H(q)))``; returns ``(penalty, dPenalty/dLambda*)`` with
+    the gradient chained per eigenpair
+    ``d eps_n = 2 Re[(dG w_n)^dag (H(q) - eps_n) G q w_n]`` through the
+    exp adjoint.
+    """
+    qpts = np.asarray(qpts, dtype=float).reshape(-1, Rg.shape[1])
+    phase = np.exp(2j * np.pi * np.einsum("kd,rd->kr", qpts, Rg))
+    L = np.einsum("rlm,kr->klm", Lam, phase)
+    nwann = Lam.shape[1]
+    pen = 0.0
+    cL = np.zeros_like(Lam)
+    eye = np.eye(nwann)
+    for iq, q in enumerate(qpts):
+        Gq = expm(L[iq])
+        Ho = R_to_k(q[None, :], Rlist, HwannR, Rdeg)[0]
+        Hp = Gq.conj().T @ Ho @ Gq
+        Sp = Gq.conj().T @ Gq
+        eps, W = eigh(Hp, Sp)
+        ec = np.sort(eigh(Ho)[0])
+        g = eps - ec
+        pen += weight * float((g**2).sum())
+        c_q = np.zeros_like(Gq)
+        for n in range(nwann):
+            p_n = (Ho - eps[n] * eye) @ (Gq @ W[:, n])
+            c_q += weight * g[n] * np.outer(W[:, n], p_n.conj())
+        c_q *= 2.0
+        X = expm_frechet(L[iq].conj().T, c_q, compute_expm=False)
+        cL += np.einsum("r,lm->rlm", np.exp(-2j * np.pi * q @ Rg.T), X)
+    return pen, cL
+
+
 def optimize_kdependent_gauge(
-    wannR, Rlist, Rdeg, positions, kpts, shells=1, G0=None,
+    wannR, Rlist, Rdeg, positions, kpts, HwannR=None, shells=1, G0=None,
     barrier_weight=1e-2, tikhonov=1e-3, pin_reg=1e-8, maxiter=600,
-    tol=1e-12, verbose=False,
+    tol=1e-12, offmesh_weight=0.0, offmesh_points=None, offmesh_seed=19,
+    verbose=False,
 ):
     """Optimize a smooth k-dependent GL gauge for maximal localization.
 
@@ -217,6 +255,9 @@ def optimize_kdependent_gauge(
         ``lwf.wann_centers`` for comparability);
     :param kpts: (nk, 3) the downfolding mesh the model was built from
         (``lwf.kpts``);
+    :param HwannR: (nR, nwann, nwann) Hamiltonian of the orthonormal
+        model. Required when ``offmesh_weight > 0`` (the off-mesh
+        penalty needs the control spectrum);
     :param shells: number of non-constant generator shells on the model
         R-list (1 = R0 + nearest neighbors, default; 0 = the constant-G
         special case);
@@ -226,9 +267,18 @@ def optimize_kdependent_gauge(
     :param barrier_weight: scale-invariant per-k logdet barrier weight
         (frozen as ``mu = barrier_weight * max(Omega_start, 1)``);
     :param tikhonov: smoothness weight on the non-constant shells;
+    :param offmesh_weight: weight of the off-mesh interpolation penalty
+        (0 disables it). The penalty is the squared mismatch between
+        the transformed pencil eigenvalues and the orthonormal control
+        spectrum at ``offmesh_points`` off-mesh points — the
+        smoothness-aware term that bounds the gauge-dependent
+        interpolation error;
+    :param offmesh_points: number of seeded uniform off-mesh points
+        (default 6), or an explicit (nq, 3) array;
     :returns: ``(gauge, res, info)`` with ``gauge`` a :class:`KDepGauge`,
-        and ``info`` carrying start/optimal spreads and the per-k
-        minimum eigenvalue of ``S(k)``.
+        and ``info`` carrying start/optimal spreads, the per-k minimum
+        eigenvalue of ``S(k)``, and the off-mesh band errors
+        (``offmesh_err_start`` / ``offmesh_err_opt``).
     """
     wannR = np.asarray(wannR, dtype=complex)
     nwann = wannR.shape[2]
@@ -251,6 +301,48 @@ def optimize_kdependent_gauge(
     mu = barrier_weight * max(start_om, 1.0)
     off = ~np.all(Rg == 0, axis=1)
 
+    # ---- off-mesh interpolation penalty (smoothness proxy) ------------
+    # At off-mesh points the transformed pencil no longer reproduces the
+    # orthonormal control spectrum; penalizing the sorted-eigenvalue
+    # mismatch trades a little spread for interpolation fidelity. The
+    # analytic gradient uses d eps_n = 2 Re[(dG w_n)^dag (H(q) - eps_n)
+    # G(k) w_n] (S-orthonormal w_n), chained through the exp adjoint.
+    if offmesh_weight > 0 and HwannR is None:
+        raise ValueError(
+            "offmesh_weight > 0 requires HwannR (the orthonormal model "
+            "Hamiltonian) for the control spectrum"
+        )
+    if offmesh_points is None:
+        offmesh_points = 6
+    if isinstance(offmesh_points, int):
+        orng = np.random.default_rng(offmesh_seed)
+        qpts = orng.uniform(0.0, 1.0, size=(offmesh_points, kpts.shape[1]))
+    else:
+        qpts = np.asarray(offmesh_points, dtype=float).reshape(
+            -1, kpts.shape[1])
+    HwannR = None if HwannR is None else np.asarray(HwannR, dtype=complex)
+    control = []
+    if HwannR is not None:
+        for q in qpts:
+            Ho = R_to_k(np.asarray(q)[None, :], Rlist, HwannR, Rdeg)[0]
+            control.append(np.sort(eigh(Ho)[0]))
+
+    def offmesh_terms(Lam):
+        pen, cL = kdependent_offmesh_penalty(
+            Lam, qpts, Rg, HwannR, Rlist, Rdeg, weight=offmesh_weight)
+        return pen, cL
+
+    def offmesh_err(Lam):
+        phase = np.exp(2j * np.pi * np.einsum("kd,rd->kr", qpts, Rg))
+        L = np.einsum("rlm,kr->klm", Lam, phase)
+        err = 0.0
+        for iq, q in enumerate(qpts):
+            Gq = expm(L[iq])
+            Ho = R_to_k(np.asarray(q)[None, :], Rlist, HwannR, Rdeg)[0]
+            eps = eigh(Gq.conj().T @ Ho @ Gq, Gq.conj().T @ Gq)[0]
+            err = max(err, float(np.abs(eps - control[iq]).max()))
+        return err
+
     def unpack(p):
         h = nwann * nwann * len(Rg)
         return (p[:h].reshape(len(Rg), nwann, nwann)
@@ -259,13 +351,20 @@ def optimize_kdependent_gauge(
     def fun(p):
         Lam = unpack(p)
         tot, _, _, _ = f(Lam, mu=mu, pin_reg=pin_reg)
-        return tot + tikhonov * float((np.abs(Lam[off]) ** 2).sum())
+        tot = tot + tikhonov * float((np.abs(Lam[off]) ** 2).sum())
+        if offmesh_weight > 0:
+            pen, _ = offmesh_terms(Lam)
+            tot += offmesh_weight * pen
+        return float(tot)
 
     def jac(p):
         Lam = unpack(p)
         _, c, _, _ = f(Lam, mu=mu, pin_reg=pin_reg)
         c = c.copy()
         c[off] += 2 * tikhonov * Lam[off]
+        if offmesh_weight > 0:
+            _, cL = offmesh_terms(Lam)
+            c += cL
         # f real, c = df/dLam*: df/dRe = 2 Re c, df/dIm = +2 Im c
         return np.concatenate([(2 * c.real).ravel(), (2 * c.imag).ravel()])
 
@@ -284,10 +383,19 @@ def optimize_kdependent_gauge(
         "mu": mu,
         "Rg": Rg,
     }
+    if HwannR is not None:
+        info["offmesh_err_start"] = offmesh_err(Lam0)
+        info["offmesh_err_opt"] = offmesh_err(Lam)
     if verbose:
-        print(f"k-dependent gauge ({len(Rg) - 1} generator vectors): spread "
-              f"{start_om:.8f} -> {om_opt:.8f}; min eig S(k) = {min_eig:.6f}; "
-              f"{res.message}")
+        msg = (f"k-dependent gauge ({len(Rg) - 1} generator vectors): "
+               f"spread {start_om:.8f} -> {om_opt:.8f}; "
+               f"min eig S(k) = {min_eig:.6f}; ")
+        if HwannR is not None:
+            msg += (f"off-mesh err "
+                    f"{info['offmesh_err_start']:.3e} -> "
+                    f"{info['offmesh_err_opt']:.3e}; ")
+        msg += res.message
+        print(msg)
     return gauge, res, info
 
 

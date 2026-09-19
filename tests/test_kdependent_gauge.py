@@ -245,3 +245,77 @@ def test_exports_importable():
 
     assert lawaf.optimize_kdependent_gauge is optimize_kdependent_gauge
     assert lawaf.apply_gauge_transform is apply_gauge_transform
+
+
+def test_offmesh_penalty_gradient_fd():
+    """FD check of the packed objective gradient with the off-mesh
+    penalty active (eigenvalue adjoint + exp adjoint chained)."""
+    from lawaf.wannierization.kdependent_gauge import (
+        kdependent_offmesh_penalty, kdependent_objective as ko)
+
+    m, df, lwf = _orthonormal_downfold(nb=3)
+    kpts = _kpoints((3, 3, 3))
+    Rg = select_shells(lwf.Rlist, max_shell=1)
+    pos = lwf.atoms.get_positions()
+    f, _, _ = ko(lwf.wannR, lwf.Rlist, lwf.Rdeg, pos, kpts, Rg)
+    rng = np.random.default_rng(23)
+    Lam = 0.25 * (rng.standard_normal((len(Rg), 3, 3))
+                  + 1j * rng.standard_normal((len(Rg), 3, 3)))
+    orng = np.random.default_rng(17)
+    qpts = orng.uniform(0.0, 1.0, size=(4, 3))
+    weight = 20.0
+
+    def total(L):
+        base, _, _, _ = f(L, mu=1e-2, pin_reg=1e-8)
+        pen, _ = kdependent_offmesh_penalty(L, qpts, Rg, lwf.HwannR,
+                                            lwf.Rlist, lwf.Rdeg,
+                                            weight=weight)
+        return base + pen
+
+    _, c_base, _, _ = f(Lam, mu=1e-2, pin_reg=1e-8)
+    _, c_pen = kdependent_offmesh_penalty(Lam, qpts, Rg, lwf.HwannR,
+                                          lwf.Rlist, lwf.Rdeg,
+                                          weight=weight)
+    c = c_base + c_pen
+    h = 1e-6
+    err = 0.0
+    for idx in [(0, 0, 0), (0, 1, 1), (3, 0, 2), (len(Rg) - 1, 2, 0)]:
+        for part in (0, 1):
+            Lp = Lam.copy()
+            Lp[idx] += h if part == 0 else 1j * h
+            fd = (total(Lp) - total(Lam)) / h
+            cc = c[idx]
+            an = 2 * cc.real if part == 0 else 2 * cc.imag
+            err = max(err, abs(fd - an))
+    assert err < 1e-5
+
+
+def test_offmesh_penalty_reduces_interpolation_error():
+    """The off-mesh penalty trades a little spread for interpolation
+    fidelity: with the penalty on, the off-mesh band error against the
+    orthonormal control drops below the unpenalized run's."""
+    m = OrthoTB()
+    df = Lawaf(
+        m, params=dict(method="projected", kmesh=(3, 3, 3), nwann=3,
+                       selected_basis=[0, 1, 2], weight_func="unity",
+                       use_ws_distance=False))
+    lwf = df.downfold()
+    pos = lwf.atoms.get_positions()
+    Gc, _ = optimize_nonorthogonal_gauge(lwf.wannR, lwf.Rlist, lwf.Rdeg,
+                                         pos)
+    out = {}
+    for tag, extra in [("plain", {}),
+                       ("pen", dict(offmesh_weight=30.0,
+                                    offmesh_points=6,
+                                    offmesh_seed=21))]:
+        gauge, res, info = optimize_kdependent_gauge(
+            lwf.wannR, lwf.Rlist, lwf.Rdeg, pos, lwf.kpts, HwannR=lwf.HwannR,
+            shells=1, G0=Gc, maxiter=300, **extra)
+        out[tag] = (info, gauge)
+    assert (out["pen"][0]["offmesh_err_opt"]
+            < out["plain"][0]["offmesh_err_opt"])
+    # mesh exactness is untouched
+    e_orth = np.array([lwf.solve_k(k)[0] for k in lwf.kpts])
+    lwf_k = apply_gauge_transform(lwf, out["pen"][1])
+    e_k = np.array([lwf_k.solve_k(k)[0] for k in lwf.kpts])
+    assert np.abs(e_orth - e_k).max() < 1e-12
