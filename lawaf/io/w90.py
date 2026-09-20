@@ -451,3 +451,54 @@ def write_mmn(mmn, nnlist, nncell, path):
                             f"{m[mi, n].real:18.12f}"
                             f"{m[mi, n].imag:18.12f}\n"
                         )
+
+def read_mmn(path):
+    """Read a wannier90 ``.mmn`` file (inverse of :func:`write_mmn`).
+
+    Accepts the standard layout: one comment line, ``nb nk nntot``,
+    then per (k, neighbour) block a header ``ik jk G1 G2 G3`` (1-based)
+    followed by the matrix written n outer, m inner. Returns
+    ``(mmn, nnlist, nncell)`` with lawaf's 0-based conventions.
+
+    This is the explicit cross-k provider entry point for electron
+    models: a caller holding a genuine ``.mmn`` from a wannier90 run
+    can feed ``covariant_mmn_links``/MV diagnostics without LaWaF
+    synthesizing links from HR/SR data.
+    """
+    with open(path) as fh:
+        lines = [ln for ln in (l.strip() for l in fh) if ln]
+    if len(lines) < 2:
+        raise ValueError(f"read_mmn: {path} is empty")
+    nb, nkpt, nntot = (int(t) for t in lines[1].split()[:3])
+    if nb <= 0 or nkpt <= 0 or nntot <= 0:
+        raise ValueError(f"read_mmn: invalid header {lines[1]!r}")
+    expected = 2 + nkpt * nntot * (1 + nb * nb)
+    if len(lines) != expected:
+        raise ValueError(
+            f"read_mmn: expected {expected} lines for nb={nb}, nk={nkpt}, "
+            f"nntot={nntot}, got {len(lines)}"
+        )
+    mmn = np.empty((nkpt, nntot, nb, nb), dtype=complex)
+    nnlist = np.empty((nkpt, nntot), dtype=int)
+    nncell = np.empty((nkpt, nntot, 3), dtype=int)
+    pos = 2
+    for ik in range(nkpt):
+        for ib in range(nntot):
+            head = [int(t) for t in lines[pos].split()[:5]]
+            pos += 1
+            ik_f, jk_f, g1, g2, g3 = head
+            if ik_f != ik + 1:
+                raise ValueError(
+                    f"read_mmn: block k index {ik_f} != {ik + 1} at "
+ f"block ({ik}, {ib})"
+                )
+            nnlist[ik, ib] = jk_f - 1
+            nncell[ik, ib] = (g1, g2, g3)
+            block = np.empty((nb, nb), dtype=complex)
+            for n in range(nb):
+                for mi in range(nb):
+                    re, im = (float(t) for t in lines[pos].split()[:2])
+                    block[mi, n] = complex(re, im)
+                    pos += 1
+            mmn[ik, ib] = block
+    return mmn, nnlist, nncell

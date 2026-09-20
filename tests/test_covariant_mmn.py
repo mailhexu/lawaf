@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from lawaf.io.w90 import compute_Mmn, kmesh_nnlist, read_mmn, write_mmn
 from lawaf.wannierization.covariant_mmn import (
     covariant_mmn_links,
     electron_covariant_mmn,
@@ -90,3 +91,38 @@ def test_package_exports():
 
     assert lawaf.phonon_mmn is phonon_mmn
     assert lawaf.covariant_mmn_links is covariant_mmn_links
+
+
+def test_mmn_roundtrip_provider(tmp_path):
+    """write_mmn -> read_mmn round trip is the explicit electron provider
+    entry: read-back links drive covariant_mmn_links identically."""
+    rng = np.random.default_rng(9)
+    kpts = np.array(
+        [[i, j, k] for i in (0.0, 0.5) for j in (0.0, 0.5) for k in (0.0, 0.5)]
+    )
+    cell = 4.0 * np.eye(3)
+    recip = 2 * np.pi * np.linalg.inv(cell).T
+    psi = np.empty((8, 4, 4), dtype=complex)
+    for ik in range(8):
+        q, _ = np.linalg.qr(
+            rng.standard_normal((4, 4)) + 1j * rng.standard_normal((4, 4))
+        )
+        psi[ik] = q
+    nnlist, nncell, _, _ = kmesh_nnlist(kpts, recip)
+    M = compute_Mmn(psi, nnlist, nncell)
+    path = tmp_path / "provider.mmn"
+    write_mmn(M, nnlist, nncell, str(path))
+    M2, nn2, nc2 = read_mmn(str(path))
+    assert np.array_equal(nn2, nnlist) and np.array_equal(nc2, nncell)
+    assert np.abs(M - M2).max() < 1e-11  # 12-decimal text precision
+    # covariant machinery works on the read-back provider data
+    G = np.array([
+        np.eye(4) + 0.15 * (
+            rng.standard_normal((4, 4)) + 1j * rng.standard_normal((4, 4))
+        )
+        for _ in range(8)
+    ])
+    Q, B, L = covariant_mmn_links(M2, nn2, G)
+    Qr, Br, Lr = covariant_mmn_links(M, nnlist, G)
+    assert np.abs(B - Br).max() < 1e-11
+    assert np.abs(L - Lr).max() < 1e-11

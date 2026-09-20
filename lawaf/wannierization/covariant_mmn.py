@@ -176,5 +176,8 @@ def electron_covariant_mmn(*_args, **_kwargs):
     raise NotImplementedError(
         "electron covariant MMN requires a cross-k S(k,k+b), MMN, or "
         "Berry-link provider; current Siesta/Wannier90-HR consumers only "
-        "retain same-k H/S and cannot synthesize it safely"
+        "retain same-k H/S and cannot synthesize it safely. Explicit "
+        "provider path: read a genuine wannier90 .mmn with "
+        "lawaf.io.w90.read_mmn and pass (mmn, nnlist) directly to "
+        "covariant_mmn_links"
     )
