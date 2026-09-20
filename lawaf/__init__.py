@@ -6,6 +6,7 @@ from lawaf.interfaces.phonopy.symmetry_seeds import (
 from lawaf.lwf.lwf import LWF
 from lawaf.wannierization.covariant_mmn import (
     covariant_mmn_links,
+    mmn_form_spread,
     phonon_mmn,
 )
 from lawaf.wannierization.kdependent_gauge import (
@@ -30,5 +31,6 @@ __all__ = [
     "optimize_kdependent_gauge",
     "phonon_mmn",
     "covariant_mmn_links",
+    "mmn_form_spread",
     "apply_gauge_transform",
 ]

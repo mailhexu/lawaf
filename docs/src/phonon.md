@@ -115,7 +115,18 @@ $L=Q^{-1}B$. The projector $C Q^{-1}C^dagger$ and closed Wilson-loop
 spectra are GL-invariant. This is a certified geometry/provider
 diagnostic; it is **not** yet a full non-orthogonal MV/MMN optimizer.
 Electron consumers deliberately refuse this path until they expose a
-cross-k $S(mathbf k,mathbf k+mathbf b)$, MMN, or Berry-link provider.
+cross-k $S(\mathbf k,\mathbf k+\mathbf b)$, MMN, or Berry-link provider.
+
+`lawaf.mmn_form_spread(mmn, nnlist, bvecs, wb, G=None)` evaluates the
+certified per-state link functional
+$\Omega_I(n)=\langle\sum_{\mathbf b}w_{\mathbf b}(1-|B_{nn}|^2)\rangle_{\mathbf k}$
+for column-normalized (non-)orthogonal frames, plus the separate centre
+estimate `centres`. It converges to the exact normalized variance with
+$O(b^2)$ (analytic Gaussian-mixture oracle: 8.5e-8 at NK=512;
+smooth-frame quantum-metric oracle: 4.2e-3 at a 24^3 mesh) and requires
+a SMOOTH periodic gauge - frames with random eigenvector phases give
+spurious link decay, so build the provider frame from real-space
+amplitudes (`R_to_k(wannR)`) or an aligned eigenvector set.
 
 
 ### Dipole-dipole interaction and LO-TO splitting

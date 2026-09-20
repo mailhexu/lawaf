@@ -2,12 +2,14 @@
 
 import numpy as np
 import pytest
+from scipy.linalg import expm
 
 from lawaf.io.w90 import compute_Mmn, kmesh_nnlist, read_mmn, write_mmn
 from lawaf.wannierization.covariant_mmn import (
     covariant_mmn_links,
     electron_covariant_mmn,
     frame_projector,
+    mmn_form_spread,
     normalized_line_links,
     phonon_mmn,
 )
@@ -126,3 +128,72 @@ def test_mmn_roundtrip_provider(tmp_path):
     Qr, Br, Lr = covariant_mmn_links(M, nnlist, G)
     assert np.abs(B - Br).max() < 1e-11
     assert np.abs(L - Lr).max() < 1e-11
+
+
+def test_mmn_form_spread_converges_to_quantum_metric():
+    """On a smooth periodic frame U(k) = expm(i sum_a f_a(k) H_a), the
+    link functional Omega_I converges with O(b^2) to the exact
+    k-averaged line metric sum_a [||d_a u_n||^2 - (Im<u_n|d_a u_n>)^2]
+    (Berry-connection squared subtracted). Rough projected gauges
+    (random eigenvector phases) do not satisfy this, so certification
+    uses the analytic frame; see research/2026-09-21-mmn-functional.md.
+    """
+    from lawaf.io.w90 import compute_Mmn, kmesh_nnlist
+
+    rng = np.random.default_rng(31)
+    nw = 3
+
+    def herm():
+        a = rng.standard_normal((nw, nw)) + 1j * rng.standard_normal((nw, nw))
+        return (a + a.conj().T) / 2
+
+    Hs = [herm() for _ in range(3)]
+    eps = 0.1
+
+    def U_of(ks):
+        out = np.empty((len(ks), nw, nw), dtype=complex)
+        for ik, k in enumerate(np.asarray(ks)):
+            out[ik] = expm(
+                1j * eps * (np.cos(2 * np.pi * k[0]) * Hs[0]
+                            + np.sin(2 * np.pi * k[1]) * Hs[1]
+                            + np.cos(2 * np.pi * k[2]) * Hs[2])
+            )
+        return out
+
+    def mesh(N):
+        return np.array([[i, j, l] for i in range(N) for j in range(N)
+                         for l in range(N)], dtype=float) / N
+
+    cell = 4.0 * np.eye(3)
+    recip = 2 * np.pi * np.linalg.inv(cell).T
+
+    def omega_at(N):
+        ks = mesh(N)
+        U = U_of(ks)
+        nnlist, nncell, bvecs, wb = kmesh_nnlist(ks, recip)
+        M = compute_Mmn(U, nnlist, nncell)
+        return mmn_form_spread(M, nnlist, bvecs, wb)["omega_I"]
+
+    N = 20
+    ks = mesh(N)
+    dk = 1e-6
+    tot = np.zeros(nw)
+    for k in ks:
+        for alpha in range(3):
+            kp = k.copy()
+            kp[alpha] += dk
+            km = k.copy()
+            km[alpha] -= dk
+            dup = (U_of(kp[None, :])[0] - U_of(km[None, :])[0]) / (2 * dk)
+            u = U_of(k[None, :])[0]
+            berry2 = np.imag(np.einsum("an,an->n", u.conj(), dup)) ** 2
+            tot += np.einsum("an,an->n", dup.conj(), dup).real - berry2
+    tgt = tot / N**3 * (4.0 / (2 * np.pi)) ** 2
+
+    o8 = omega_at(8)
+    o16 = omega_at(16)
+    e8 = np.abs(o8 - tgt).max()
+    e16 = np.abs(o16 - tgt).max()
+    assert e16 < e8 / 3.0, (e8, e16)
+    assert e16 < 0.05 * np.abs(tgt).max(), (e16, tgt)
+    assert np.allclose(o16, tgt, rtol=0.05)
