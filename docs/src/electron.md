@@ -370,6 +370,15 @@ finite off-site range and the bands stay pencil-exact on the mesh;
 off-mesh interpolation is gauge-dependent (the application warns), so
 consume the result in real space.
 
+
+`exact_smetric_spread` deliberately does **not** accept generic EWF,
+Siesta, or Wannier90-HR consumers: exact metric localization requires
+the full parent position matrices $X_lpha=\langle\phi|r_lpha|\phiangle$
+and $Y_lpha=\langle\phi|r_lpha^2|\phiangle$ (or equivalent
+covariant Berry/MMN links). HR/SR and atomic centres do not determine
+them; LaWaF raises `NotImplementedError` instead of silently replacing
+them with a centre-diagonal approximation.
+
 ### Exporting to Wannier90 input files
 
 A lawaf Wannierization (orthogonal basis) can be exported as a complete

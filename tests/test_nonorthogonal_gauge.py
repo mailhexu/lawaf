@@ -24,6 +24,7 @@ import pytest
 from lawaf.interfaces.phonopy.phonon_downfolder import PhonopyDownfolder
 from lawaf.wannierization.nonorthogonal_gauge import (
     apply_gauge_transform,
+    exact_smetric_spread,
     nonorthogonal_spread,
     nonorthogonal_spread_gradient,
     optimize_nonorthogonal_gauge,
@@ -105,6 +106,42 @@ def test_optimizer_beats_orthonormal_two_site():
     assert np.allclose(np.abs(G), 1 / np.sqrt(2), atol=1e-3)
     # and stays well conditioned (the logdet barrier forbids collapse)
     assert np.linalg.eigvalsh(G.conj().T @ G).min() > 0.5
+
+
+
+def test_exact_smetric_phonon_target_matches_gl_moments(tmp_path):
+    """For the discrete phonon site basis the S-metric target is exact:
+    direct transformed-Wannier moments equal the projected G-dressed
+    x/y formula used by the non-orthogonal gauge optimizer."""
+    df = PhonopyDownfolder(
+        phonopy_yaml=str(FIXTURE), mode="DM",
+        params=dict(method="projected", nwann=3,
+                    anchors={(0.0, 0.0, 0.0): (0, 1, 2)}, use_proj=True,
+                    weight_func="unity", kmesh=(2, 2, 2), gamma=True,
+                    use_ws_distance=False),
+        symmetrize_fc=False, is_nac=False,
+    )
+    lwf = df.downfold(output_path=str(tmp_path), write_hr_nc=None,
+                      write_hr_txt=None)
+    rng = np.random.default_rng(15)
+    G = np.eye(3) + 0.2 * (
+        rng.standard_normal((3, 3)) + 1j * rng.standard_normal((3, 3))
+    )
+    lwf_no = apply_gauge_transform(lwf, G)
+    report = exact_smetric_spread(lwf_no)
+    pos = np.repeat(lwf.atoms.get_scaled_positions(), 3, axis=0)
+    x, y = position_moment_matrices(lwf.wannR, lwf.Rlist, lwf.Rdeg, pos)
+    expected = nonorthogonal_spread(G, x, y, per_orbital=True)
+    assert report["position_model"] == "exact_discrete_phonon_site"
+    assert np.abs(report["per_orbital"] - expected).max() < 1e-12
+    assert abs(report["target"] - expected.sum()) < 1e-12
+    assert np.abs(report["norms"] - np.diag(G.conj().T @ G)).max() < 1e-12
+
+
+def test_exact_smetric_refuses_generic_ewf():
+    # The generic H/S/amplitude consumer does not carry X_alpha/Y_alpha.
+    with pytest.raises(NotImplementedError, match="X_alpha"):
+        exact_smetric_spread(object())
 
 
 def test_moments_reproduce_lwf_centers(tmp_path):

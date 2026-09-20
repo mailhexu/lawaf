@@ -59,6 +59,7 @@ from scipy.optimize import minimize
 
 __all__ = [
     "position_moment_matrices",
+    "exact_smetric_spread",
     "nonorthogonal_spread",
     "nonorthogonal_spread_gradient",
     "optimize_nonorthogonal_gauge",
@@ -103,6 +104,58 @@ def position_moment_matrices(wannR, Rlist, Rdeg, positions):
         y[alpha] = 0.5 * (y[alpha] + y[alpha].conj().T)
     return x, y
 
+
+
+def exact_smetric_spread(lwf, positions=None):
+    """Exact normalized localization target for a phonon LWF.
+
+    The Phonopy/LWF parent basis consists of atom-centred Cartesian
+    displacement DOFs: its metric is the identity and its position
+    operator is exactly diagonal at the atomic sites. Consequently the
+    full cross-Wannier moment matrices computed from wannR give the
+    exact discrete-site S-metric target for an orthogonal or
+    non-orthogonal LWF (SwannR may have finite range).
+
+    This is not an electron/LCAO target: generic EWF inputs are refused
+    because HR/SR and atom centres do not determine the full parent
+    X_alpha=<phi|r_alpha|phi> and Y_alpha=<phi|r_alpha^2|phi> matrices.
+    """
+    if not hasattr(lwf, "HR_total") or getattr(lwf, "atoms", None) is None:
+        raise NotImplementedError(
+            "exact_smetric_spread requires explicit parent position "
+            "operators X_alpha=<phi|r_alpha|phi> and "
+            "Y_alpha=<phi|r_alpha^2|phi>; generic EWF/Siesta/Wannier90 "
+            "consumer models do not retain that provider. The exact "
+            "discrete-site implementation currently supports phonon LWFs."
+        )
+    if positions is None:
+        positions = np.repeat(lwf.atoms.get_scaled_positions(), 3, axis=0)
+    positions = np.asarray(positions, dtype=float)
+    if positions.shape != (lwf.wannR.shape[1], 3):
+        raise ValueError(
+            "positions must have shape (nbasis, 3)="
+            f"{(lwf.wannR.shape[1], 3)}, got {positions.shape}"
+        )
+    x, y = position_moment_matrices(lwf.wannR, lwf.Rlist, lwf.Rdeg, positions)
+    norms = np.einsum(
+        "ran,ra->n", np.abs(lwf.wannR) ** 2,
+        np.asarray(lwf.Rdeg, dtype=float)[:, None],
+    ).real
+    if np.any(norms <= 0):
+        raise ValueError("zero or negative LWF norm in exact site target")
+    first = np.array([np.diag(xa).real for xa in x])
+    second = np.array([np.diag(ya).real for ya in y])
+    centers = (first / norms[None, :]).T
+    second_moments = (second / norms[None, :]).T
+    per_orbital = (second / norms[None, :] - (first / norms[None, :]) ** 2).sum(axis=0)
+    return {
+        "target": float(per_orbital.sum()),
+        "per_orbital": per_orbital,
+        "norms": norms,
+        "centers": centers,
+        "second_moments": second_moments,
+        "position_model": "exact_discrete_phonon_site",
+    }
 
 def nonorthogonal_spread(G, x, y, per_orbital=False):
     """Total normalized spread Omega(G) = sum_n omega_n (and optionally

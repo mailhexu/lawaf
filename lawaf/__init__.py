@@ -9,6 +9,7 @@ from lawaf.wannierization.kdependent_gauge import (
 )
 from lawaf.wannierization.nonorthogonal_gauge import (
     apply_gauge_transform,
+    exact_smetric_spread,
     optimize_nonorthogonal_gauge,
 )
 
@@ -21,6 +22,7 @@ __all__ = [
     "get_symmetry_anchor_wfn",
     "list_opd_families",
     "optimize_nonorthogonal_gauge",
+    "exact_smetric_spread",
     "optimize_kdependent_gauge",
     "apply_gauge_transform",
 ]

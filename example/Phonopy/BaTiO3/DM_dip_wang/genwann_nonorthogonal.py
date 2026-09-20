@@ -20,6 +20,7 @@ import numpy as np
 from lawaf import (
     PhonopyDownfolder,
     apply_gauge_transform,
+    exact_smetric_spread,
     optimize_nonorthogonal_gauge,
 )
 
@@ -153,6 +154,11 @@ def run_optimized_gauge():
     print("   appear when the orthonormal gauge is symmetry-pinned, e.g.")
     print("   bonding/antibonding-like pairs)")
     lwf_no = apply_gauge_transform(lwf, G)
+    exact = exact_smetric_spread(lwf_no)
+    print(
+        "  exact S-metric site target: "
+        f"{exact['target']:.8f} ({exact['position_model']})"
+    )
     rng = np.random.default_rng(2)
     q = rng.uniform(-0.5, 0.5, size=(4, 3))
     e0 = np.array([lwf.solve_k(k)[0] for k in q])

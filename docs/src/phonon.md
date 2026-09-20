@@ -85,6 +85,24 @@ lwf_k = lawaf.apply_gauge_transform(lwf, gauge)
 info["omega_start"], info["omega_opt"], info["min_eig_S"]
 ```
 
+### Exact S-metric localization target (phonon LWF)
+
+For a phonon `LWF`, the parent basis is the discrete set of
+atom-centred Cartesian displacement DOFs: $S=I$ and the position
+operator is exactly diagonal at the atomic sites. Therefore
+`lawaf.exact_smetric_spread(lwf_no)` evaluates the **exact discrete-site**
+metric-normalized target $\Omega^S$, returning the total and
+per-orbital spreads, norms, centres, and second moments:
+
+```python
+report = lawaf.exact_smetric_spread(lwf_no)
+report["target"], report["per_orbital"], report["position_model"]
+# (..., ..., "exact_discrete_phonon_site")
+```
+
+This exactness is specific to the phonon site basis; it is not a claim
+that atom centres determine an electron/LCAO position operator.
+
 
 ### Dipole-dipole interaction and LO-TO splitting
 
