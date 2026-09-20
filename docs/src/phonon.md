@@ -104,6 +104,20 @@ This exactness is specific to the phonon site basis; it is not a claim
 that atom centres determine an electron/LCAO position operator.
 
 
+### Covariant MMN geometry pilot (phonon)
+
+`lawaf.phonon_mmn(Uref, kpts, cell)` builds the exact phonon overlap
+links $M_{mathbf kmathbf b}=U(mathbf k)^dagger U(mathbf k+mathbf b)$
+for a selected orthonormal displacement frame. Given a non-orthogonal
+frame $G(mathbf k)$, `covariant_mmn_links` returns
+$Q=G^dagger G$, raw links $B=G^dagger M G'$, and dual links
+$L=Q^{-1}B$. The projector $C Q^{-1}C^dagger$ and closed Wilson-loop
+spectra are GL-invariant. This is a certified geometry/provider
+diagnostic; it is **not** yet a full non-orthogonal MV/MMN optimizer.
+Electron consumers deliberately refuse this path until they expose a
+cross-k $S(mathbf k,mathbf k+mathbf b)$, MMN, or Berry-link provider.
+
+
 ### Dipole-dipole interaction and LO-TO splitting
 
 For polar materials the dynamical matrix is non-analytical at $\Gamma$.

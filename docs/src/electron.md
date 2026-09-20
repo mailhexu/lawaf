@@ -373,11 +373,20 @@ consume the result in real space.
 
 `exact_smetric_spread` deliberately does **not** accept generic EWF,
 Siesta, or Wannier90-HR consumers: exact metric localization requires
-the full parent position matrices $X_lpha=\langle\phi|r_lpha|\phiangle$
-and $Y_lpha=\langle\phi|r_lpha^2|\phiangle$ (or equivalent
+the full parent position matrices $X_lpha=\langle\phi|r_lpha|\phi
+angle$
+and $Y_lpha=\langle\phi|r_lpha^2|\phi
+angle$ (or equivalent
 covariant Berry/MMN links). HR/SR and atomic centres do not determine
 them; LaWaF raises `NotImplementedError` instead of silently replacing
 them with a centre-diagonal approximation.
+
+
+The same provider boundary applies to the covariant MMN pilot:
+non-orthogonal links need the cross-k metric
+$S(mathbf k,mathbf k+mathbf b)$ (or raw MMN/Berry links) with the
+correct orbital Bloch phases. Same-k SR and atom centres are not enough,
+so `electron_covariant_mmn` explicitly raises `NotImplementedError`.
 
 ### Exporting to Wannier90 input files
 

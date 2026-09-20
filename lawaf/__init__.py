@@ -4,6 +4,10 @@ from lawaf.interfaces.phonopy.symmetry_seeds import (
     list_opd_families,
 )
 from lawaf.lwf.lwf import LWF
+from lawaf.wannierization.covariant_mmn import (
+    covariant_mmn_links,
+    phonon_mmn,
+)
 from lawaf.wannierization.kdependent_gauge import (
     optimize_kdependent_gauge,
 )
@@ -24,5 +28,7 @@ __all__ = [
     "optimize_nonorthogonal_gauge",
     "exact_smetric_spread",
     "optimize_kdependent_gauge",
+    "phonon_mmn",
+    "covariant_mmn_links",
     "apply_gauge_transform",
 ]

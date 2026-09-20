@@ -21,6 +21,8 @@ from lawaf import (
     PhonopyDownfolder,
     apply_gauge_transform,
     exact_smetric_spread,
+    covariant_mmn_links,
+    phonon_mmn,
     optimize_nonorthogonal_gauge,
 )
 
@@ -279,6 +281,18 @@ def run_kdependent_gauge():
     print(f"  min_k lambda_min S(k) = {info['min_eig_S']:.6f}")
     print(f"  mesh band preservation max|diff| = "
           f"{np.abs(e0 - e1).max():.2e}")
+    # Safe Epic-13 pilot: exact phonon MMN links and GL-covariant dual
+    # links. This is a diagnostic; it is NOT an unproven full
+    # non-orthogonal MV optimizer.
+    from lawaf.mathutils.kR_convert import R_to_k
+
+    Uref = R_to_k(df.kpts, lwf.Rlist, lwf.wannR, lwf.Rdeg)
+    mmn = phonon_mmn(Uref, df.kpts, df.atoms.get_cell())
+    Q, B, L = covariant_mmn_links(mmn.mmn, mmn.nnlist, gauge.G_of_k(df.kpts))
+    print(
+        f"  covariant MMN pilot: {mmn.nnlist.shape[1]} links/k, "
+        f"min lambda(Q)={min(np.linalg.eigvalsh(q).min() for q in Q):.6f}"
+    )
     assert np.abs(e0 - e1).max() < 1e-12
     return lwf_k
 
