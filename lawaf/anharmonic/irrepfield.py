@@ -3,9 +3,7 @@
 Research memo 2026-09-22-symmetry-projected-pwf (stage R1): at each
 supplied q, decompose the 3N-dimensional displacement representation of
 the little group into labeled irreps (lawaf's own character machinery,
-no third-party irrep engine), and check subduction compatibility of the
-decompositions along caller-supplied edges (q_from, q_to) with
-``G_{q_to} subset G_{q_from}``.
+no third-party irrep engine) and report the JSON-serializable field.
 
 This is an *analysis* layer for window/subspace design (ADR-012-style
 legality, mesh-global): it does not construct Wannier functions and does
@@ -89,7 +87,9 @@ class IrrepField:
     def point_at(self, qpoint, tol: float = 1e-6) -> IrrepFieldPoint:
         q = np.asarray(qpoint, dtype=float).reshape(3) % 1.0
         for p in self.points:
-            if np.all(np.abs(np.asarray(p.qpoint) - q) <= tol):
+            # minimum-image (periodic) difference
+            d = ((np.asarray(p.qpoint) - q + 0.5) % 1.0) - 0.5
+            if np.all(np.abs(d) <= tol):
                 return p
         raise KeyError(
             f"q {tuple(np.round(q, 6))} not in this IrrepField "

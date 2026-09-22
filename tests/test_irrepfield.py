@@ -62,6 +62,13 @@ def test_to_dict_round_trip(field_batio3):
     assert sum(b["dim"] * b["multiplicity"] for b in g["blocks"]) == 15
 
 
+def test_point_at_periodic_boundary(field_batio3):
+    """Minimum-image matching across the periodic boundary (QT-F04)."""
+    _sga, f = field_batio3
+    p = f.point_at((1.0 - 1e-9, 0.0, 0.0))
+    assert p.qpoint == (0.0, 0.0, 0.0)
+
+
 def test_missing_point_raises(field_batio3):
     sga, f = field_batio3
     with pytest.raises(KeyError):

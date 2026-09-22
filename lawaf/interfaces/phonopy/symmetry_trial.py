@@ -2,21 +2,27 @@
 
 Research memo 2026-09-22-symmetry-projected-pwf (stage R2): build
 deterministic, symmetry-exact trial orbitals at the Gamma point from a
-:class:`lawaf.anharmonic.compatibility.RepresentationDeclaration` by
-Wigner projection of local Cartesian displacement seeds onto the
-isotypic component of each declared site irrep,
+:class:`lawaf.anharmonic.compatibility.RepresentationDeclaration`.
+
+Construction (review QT-F01): the declared site carrier induces a
+representation ``Ind_H^G chi_site`` of the Gamma little group; the
+trial-orbital projector is the sum of the central Wigner projectors over
+every little-group irrep contained in that induced sector,
 
 .. math::
+    Q = \\sum_{\\alpha \\,\\subset\\, \\mathrm{Ind}\\,\\chi_{\\mathrm{site}}}
+    \\hat P^{(\\alpha)}, \\qquad
     \\hat P^{(\\alpha)} = \\frac{d_\\alpha}{|G|}
     \\sum_{g\\in G}\\chi^{(\\alpha)}(g)^{*}\\,D(g),
 
-followed by orthonormalization (SCMPWF-style: symmetry exact by
-construction, no localization iterations). The report carries the
-projector diagnostics and, against a reference eigenspectrum, the
-per-copy overlaps that document the memo's central finding: the
-projection selects the irrep SECTOR exactly but never the COPY (on
-BaTiO3 the projected Ti seeds overlap the soft triplet at svmin
-0.68 only).
+applied to local Cartesian displacement seeds of the declared Wyckoff
+orbit and orthonormalized (SCMPWF-style: symmetry exact by construction,
+no localization iterations). ``n_orbit * d_site * multiplicity``
+orthonormal carriers are extracted; the report carries projector
+diagnostics and, against a reference eigenspectrum, the per-copy
+overlaps documenting the memo's central finding: the projection selects
+the irrep SECTOR exactly but never the COPY (on BaTiO3 the projected Ti
+seeds overlap the soft triplet at svmin 0.68 only).
 
 Scope: Gamma point (``q=(0,0,0)``); non-Gamma q is rejected with a
 clear error (general-q induction needs Bloch-phase machinery that is
@@ -28,6 +34,7 @@ projected-Wannier construction path; the orbitals are consumable via
 from __future__ import annotations
 
 import warnings
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -35,10 +42,11 @@ import numpy as np
 
 from lawaf.anharmonic.compatibility import (
     RepresentationDeclaration,
+    character_table,
+    induced_characters,
     little_group,
     resolve_site_irrep,
 )
-from lawaf.anharmonic.gauge import site_irrep_matrices
 from lawaf.anharmonic.representation import build_space_group_action
 
 __all__ = ["TrialOrbitalReport", "symmetry_trial_orbitals"]
@@ -55,13 +63,14 @@ class TrialOrbitalReport:
         displacement row basis (mass-weighted, ``(natom, 3)``
         flattened), ready for ``set_projectors(orbitals.T)``.
     blocks :
-        One entry per declared site irrep: name, dimension, number of
-        copies the projector selected (``rank``), projector
-        idempotency residual, and character deviation of the projected
-        span from the site irrep.
+        One entry per distinct declared site irrep: name, site-irrep
+        dimension, induced-sector irreps (label: multiplicity), the
+        number of carriers extracted, projector idempotency residual,
+        and the sector-purity residual (characters of the extracted
+        span decompose into integer multiplicities within the sector).
     copy_overlaps :
         Per degenerate reference-eigenspace block overlapping the
-        projected span: eigenvalue, block size, and the product of the
+        extracted span: eigenvalue, block size, and the product of the
         overlap singular values (1.0 = the span IS that block).
     soft_overlap_svmin :
         Smallest singular value of the overlap with the lowest
@@ -100,16 +109,18 @@ def symmetry_trial_orbitals(
     Parameters
     ----------
     phonon :
-        A prepared ``phonopy.Phonopy`` object (force constants set;
-        symmetrized or not -- the representation uses its symmetry
-        dataset only; reference eigenvectors, if requested, come from a
-        cache-free non-NAC solve of its dynamical matrix).
+        A prepared ``phonopy.Phonopy`` object (force constants set or
+        not -- the construction uses its symmetry dataset only;
+        reference eigenvectors, if requested, come from a cache-free
+        non-NAC solve of its dynamical matrix).
     declaration :
         Declared site representation (wyckoff letter + site_irreps
-        with repetition = multiplicity).
+        with repetition = multiplicity of independent carriers).
     seed_atoms :
         Atom indices whose Cartesian x/y/z unit displacements seed the
         projection. Default: all atoms of the declared Wyckoff orbit.
+        More seeds than the orbit are needed when the declaration
+        requests several copies of one site irrep.
     with_reference :
         Compute per-copy overlaps against the reference eigenspectrum
         (cheap at Gamma; set False to skip the reference solve).
@@ -117,8 +128,9 @@ def symmetry_trial_orbitals(
     Raises
     ------
     ValueError
-        For non-Gamma q, an unknown Wyckoff letter in the structure, or
-        a declared site irrep that does not exist on the site.
+        For non-Gamma anchors, an unknown Wyckoff letter, an unknown
+        site-irrep name, or seeds insufficient to furnish the requested
+        multiplicity.
     """
     if isinstance(declaration, dict):
         declaration = RepresentationDeclaration(**declaration)
@@ -135,7 +147,25 @@ def symmetry_trial_orbitals(
 
     sga = build_space_group_action(phonon, symprec=symprec)
     lg = little_group(sga, q)
+    ct = character_table(sga, lg)
     nbasis = 3 * len(sga.symmetry_dataset.wyckoffs)
+
+    # reference Gamma eigensystem (cache-free, non-NAC): used both for
+    # the copy-overlap diagnostics and as the fallback copy splitter
+    # (the dynamical matrix commutes with the little group, so its
+    # eigenvalue clusters inside a sector-irrep range are invariant
+    # subspaces -- frequency splits what symmetric seeds cannot)
+    H = None
+    if with_reference:
+        from lawaf.interfaces.phonopy.phonopywrapper import PhonopyWrapper
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            wrapper = PhonopyWrapper(phonon, mode="dm", is_nac=False,
+                                     use_cache=False)
+        _evals, evecs = wrapper.solve_all([q])
+        evecs = np.asarray(evecs[0])
+        H = (evecs * _evals[0][None, :]) @ evecs.conj().T
 
     wyckoffs = tuple(sga.symmetry_dataset.wyckoffs)
     letter = str(declaration.wyckoff).lstrip("0123456789")
@@ -152,47 +182,137 @@ def symmetry_trial_orbitals(
     kappa0 = orbit[0]
     site_ops = [g for g in lg if sga.atom_maps[g][kappa0] == kappa0]
 
-    M = {g: np.asarray(sga.matrix(g, q), dtype=complex) for g in lg}
+    M = {int(g): np.asarray(sga.matrix(g, q), dtype=complex) for g in lg}
 
     columns = []
     blocks = []
-    for name in declaration.site_irreps:
-        chi_site, _, dim = resolve_site_irrep(sga, site_ops, name)
-        tau = site_irrep_matrices(sga, site_ops, name)
-        chi = np.array(
-            [np.trace(np.asarray(tau[g], dtype=complex)) for g in lg],
-            dtype=complex,
-        )
-        P = np.zeros((nbasis, nbasis), dtype=complex)
-        for ig, g in enumerate(lg):
-            P += np.conj(chi[ig]) * M[g]
-        P *= dim / len(lg)
-        idem = float(np.abs(P @ P - P).max())
+    for name, m_decl in sorted(Counter(declaration.site_irreps).items()):
+        chi_site, _, dim_site = resolve_site_irrep(sga, site_ops, name)
+        chi_ind = induced_characters(sga, lg, site_ops, chi_site)
+        chi_ind_d = {int(g): chi_ind[i] for i, g in enumerate(lg)}
+        mult_ind = ct.multiplicities(chi_ind_d)
+        if np.abs(mult_ind.real - np.round(mult_ind.real)).max() > 1e-4:
+            raise ValueError(
+                f"non-integer induced-sector multiplicities for {name}"
+            )
+        # central projector of every little-group irrep contained in the
+        # induced sector (QT-F01: correct for proper site stabilizers,
+        # i.e. any Wyckoff orbit, not just maximal-symmetry sites)
+        P_of = {}
+        for j, m in enumerate(mult_ind):
+            if int(round(m.real)) >= 1:
+                chi_a = {int(g): ct.chars[j, ct._cls_of[int(g)]] for g in lg}
+                P = np.zeros((nbasis, nbasis), dtype=complex)
+                for g in lg:
+                    P += (
+                        ct.dims[j] / len(lg) * np.conj(chi_a[int(g)]) * M[int(g)]
+                    )
+                P_of[j] = P
+        Q = sum(P_of.values())
+        idem = float(np.abs(Q @ Q - Q).max())
 
-        seeds = np.zeros((len(seed_atoms if seed_atoms else orbit) * 3, nbasis),
-                         dtype=complex)
+        # copy splitter: a seed-weight operator symmetrized over the
+        # little group commutes with every M(g), so its eigenvalue
+        # CLUSTERS inside each sector-irrep range are invariant
+        # subspaces; taking whole clusters yields symmetry-exact
+        # carriers and resolves the copy multiplicity (QT-F02)
         atoms = seed_atoms if seed_atoms is not None else orbit
+        seeds = np.zeros((3 * len(atoms), nbasis), dtype=complex)
         for i, kappa in enumerate(atoms):
             for a in range(3):
                 seeds[3 * i + a, 3 * kappa + a] = 1.0
-        u, s, _ = np.linalg.svd(P @ seeds.T)
-        rank = int((s > 1e-8).sum())
-        U = u[:, :rank]
-        # character of the projected span must equal the site irrep's
-        rho_chars = [np.trace(U.conj().T @ (M[g] @ U)) for g in lg]
-        char_dev = float(
-            max(abs(rc - c) for rc, c in zip(rho_chars, chi))
+        S = seeds.T @ seeds.conj()
+        A = np.zeros((nbasis, nbasis), dtype=complex)
+        for g in lg:
+            A += M[int(g)] @ S @ M[int(g)].conj().T
+
+        carriers = []
+        for j, P in P_of.items():
+            # declared multiplicity times the induced-copy count
+            need = m_decl * int(round(mult_ind[j].real)) * ct.dims[j]
+            PA = P @ A @ P
+            w, v = np.linalg.eigh(PA)
+            order = np.argsort(w.real)[::-1]
+            take = []
+            i = 0
+            while i < len(order) and len(take) < need:
+                ev = w.real[order[i]]
+                cluster = [k for k in order[i:]
+                           if abs(w.real[k] - ev) <= 1e-8 * max(1.0, abs(ev))]
+                if len(take) + len(cluster) > need:
+                    # seed-degenerate cluster overshoots the declared
+                    # multiplicity: split it by the dynamical matrix
+                    # (frequency), taking the LOWEST eigenvalues first
+                    if H is None:
+                        raise ValueError(
+                            f"seeds cannot furnish {name} on wyckoff "
+                            f"{declaration.wyckoff!r}: a seed-degenerate "
+                            f"cluster of {len(cluster)} overshoots the "
+                            f"{need} requested carriers of irrep "
+                            f"{ct.names[j]}; rerun with "
+                            "with_reference=True (frequency splitting) "
+                            "or supply seed_atoms that resolve the copies"
+                        )
+                    Vc = v[:, cluster]
+                    wc, vc = np.linalg.eigh(Vc.conj().T @ H @ Vc)
+                    sub = []
+                    si = 0
+                    while si < len(wc) and len(take) + len(sub) < need:
+                        sev = wc.real[si]
+                        scl = [k for k in range(si, len(wc))
+                               if abs(wc.real[k] - sev)
+                               <= 1e-8 * max(1.0, abs(sev))]
+                        sub.extend(scl)
+                        si += len(scl)
+                    take.extend(cluster[k] for k in sub[: need - len(take)])
+                    i += len(cluster)
+                    continue
+                take.extend(cluster)
+                i += len(cluster)
+            if len(take) < need:
+                raise ValueError(
+                    f"seeds cannot furnish {name} on wyckoff "
+                    f"{declaration.wyckoff!r}: only {len(take)} of "
+                    f"{need} cluster vectors available in irrep "
+                    f"{ct.names[j]}; supply more seed_atoms"
+                )
+            carriers.append(v[:, take])
+        U = np.hstack(carriers) if carriers else np.zeros((nbasis, 0))
+        # sector purity: characters of the extracted span decompose
+        # into integer multiplicities, all within the induced sector
+        rho = {
+            int(g): complex(np.trace(U.conj().T @ (M[int(g)] @ U)))
+            for g in lg
+        }
+        mult_span = ct.multiplicities(rho)
+        purity = float(
+            np.abs(mult_span.real - np.round(mult_span.real)).max()
         )
-        cov = float(max(np.abs(P @ (M[g] @ U) - M[g] @ U).max() for g in lg))
+        outside = [
+            ct.names[j]
+            for j, m in enumerate(mult_span)
+            if int(round(m.real)) >= 1 and j not in P_of
+        ]
+        if outside:
+            raise ValueError(
+                f"extracted span leaves the declared sector for {name}: "
+                f"{outside}"
+            )
+        cov = float(
+            max(np.abs(Q @ (M[int(g)] @ U) - M[int(g)] @ U).max() for g in lg)
+        )
         blocks.append(
             {
                 "name": name,
-                "dim": int(dim),
-                "rank": rank,
-                "singular_values": [float(x) for x in s[: rank]],
-                "idempotency_residual": idem,
-                "character_deviation": char_dev,
-                "isotypic_covariance": cov,
+                "multiplicity": int(m_decl),
+                "dim_site": int(dim_site),
+                "sector_irreps": {
+                    ct.names[j]: int(round(mult_ind[j].real)) for j in P_of
+                },
+                "n_carriers": int(U.shape[1]),
+                "projector_idempotency": idem,
+                "sector_purity_residual": purity,
+                "sector_covariance": cov,
             }
         )
         columns.append(U)
@@ -207,14 +327,6 @@ def symmetry_trial_orbitals(
     )
 
     if with_reference and orbitals.shape[1]:
-        from lawaf.interfaces.phonopy.phonopywrapper import PhonopyWrapper
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            wrapper = PhonopyWrapper(phonon, mode="dm", is_nac=False,
-                                     use_cache=False)
-        _evals, evecs = wrapper.solve_all([q])
-        evecs = np.asarray(evecs[0])
         U = report.orbitals
         # degenerate reference blocks (grouped by eigenvalue)
         ev = _evals[0]
