@@ -608,7 +608,11 @@ class CharacterLabels:
         ct = character_table(self.sga, ops)
         P = np.asarray(self.projector_fn(q), dtype=complex)
         _validate_projector(P)
-        chi = [complex(np.trace(self.sga.matrix(g, q) @ P)) for g in ops]
+        # chi must be keyed by op index: multiplicities indexes by the
+        # op VALUE, and little-group op indices are sparse subsets of the
+        # full-group index range (positional arrays only work at Gamma,
+        # where indices coincide with positions)
+        chi = {int(g): complex(np.trace(self.sga.matrix(g, q) @ P)) for g in ops}
         return ct.labels(ct.multiplicities(chi, per_op=True))
 
 
