@@ -9,6 +9,16 @@ This is an *analysis* layer for window/subspace design (ADR-012-style
 legality, mesh-global): it does not construct Wannier functions and does
 not change the projected-Wannier path.
 
+NOTE on compatibility: restricting the Gamma displacement representation
+to another point's little group is not an endpoint compatibility
+relation -- the fibers carry different q-dependent Bloch phases (on
+BaTiO3 the Gamma restriction to X's group predicts u-only content while
+the actual X small-rep content contains g irreps; nonsymmorphic groups
+add small-rep factor systems on top). Proper endpoint compatibility
+restricts both endpoint representations to the common little group of a
+connecting line (CORREL/CDML machinery) and is deliberately deferred
+(research memo open question, stage R3).
+
 All public objects are importable without optional dependencies
 (``lawaf.anharmonic.irrepfield``).
 """
