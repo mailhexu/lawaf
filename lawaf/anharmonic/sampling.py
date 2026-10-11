@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Q-space sampling and force projection for the LWF anharmonic effective model.
 
 Conventions

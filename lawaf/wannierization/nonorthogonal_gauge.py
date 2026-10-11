@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Maximally localized NON-ORTHOGONAL Wannier functions via a constant
 GL gauge transform.
 

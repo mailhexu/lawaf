@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 from dataclasses import dataclass
 
 import numpy as np

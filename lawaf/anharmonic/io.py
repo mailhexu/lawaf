@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """netCDF serialization of the anharmonic effective model (story 022,
 FR-012).
 

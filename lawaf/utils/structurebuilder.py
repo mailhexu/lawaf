@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-2-Clause
 import pickle
 import copy
 import os

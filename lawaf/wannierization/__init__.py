@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 from .dummy import DummyWannierizer
 from .projectedWF import MaxProjectedWannierizer, ProjectedWannierizer
 from .scdmk import ScdmkWannierizer

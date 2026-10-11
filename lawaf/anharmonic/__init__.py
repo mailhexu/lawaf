@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Anharmonic effective-model program for Lattice Wannier Functions.
 
 Modules (see specs/architecture-lwf-anharmonic-effective-model.md):

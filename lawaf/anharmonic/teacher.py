@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Teacher stack: calculator labeling, atomchain adapter, DFT spot checks.
 
 Conventions (see ``lawaf/anharmonic/sampling.py`` / ``dataset.py``):

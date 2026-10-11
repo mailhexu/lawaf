@@ -2,6 +2,135 @@
 
 
 ### v0.4 (unreleased)
+* Caller-owned ABINIT sources now require the complete canonical `WfkHeader`,
+  explicit target mesh coordinates/count and source-index-aware symmetry maps.
+  Map entries declare operation, translation, reciprocal shift, spin label and
+  antiunitary flag. `MeshSource` consumes these entries rather than rediscovering
+  a possibly different map. Geometry, occupations and symmetry metadata remain
+  borrowed read-only views; no flat-header defaults or compatibility aliases.
+  Actual decoder allocation/lifetime measurements replace borrowed-byte counters.
+  The full64-point file/caller smoke is bit-exact; it is not a localization gate.
+* WFK binary body indexing now validates each point record's stored plane-wave,
+  spinor and band counts against its header, and checks every trailing Fortran
+  record marker, including the final coefficient record. Count disagreement
+  raises D2; missing/corrupted trailing markers raise D5. Missing NetCDF
+  eigenvalue variables or incomplete requested slabs raise contextual D6.
+* Parsed UPF/XML radial arrays are read-only, retaining exact stored values.
+  Trial manifests publish deeply immutable units, harmonic conventions and
+  dataset identity/path mappings; harmonic normalization and boolean
+  spin-frame declarations are mandatory rather than guessed/coerced.
+* Added `PawSpecies` numerical XML operators in a declared normalized real
+  Wannier90 s/p/d/f basis: bounded projector Fourier kets, zero-b DeltaS and
+  finite-b Q with negative Fourier phase and reverse-pair adjoint symmetry.
+  Raw `R(r)` uses `r^2 dr` and the native logarithmic-grid Jacobian; actual
+  dataset duality is checked rather than converting partial-wave overlaps
+  into cprj. Atomic phase and cell-volume factors are deliberately left to
+  the complete-state consumer and must each be applied once.
+  Independent Cartesian Gaussian fields now certify complete two-sided PAW
+  A/M, both coherent components, the overlap metric and NC limit. The
+  complete mixed-storage GaAs file set passes real external parsing with
+  supplied/computed parity; its source SCF is not a convergence certificate.
+* PAW manifests can select `paw_augmented_partial_wave`: the referenced XML
+  pseudo radial function inside the augmentation radius, zero outside,
+  transformed by PAW. Raw scattering waves are not localized trial functions.
+  `paw_dual_projector` remains an explicitly different trial definition and
+  fails admission if defining local closure exceeds the approved gate.
+  Supplied electronic cprj remains `dualprojector` in either trial basis.
+* Supplied stored/IBZ PAW coefficients are transported through `MeshSource`
+  using the actual atom-cell image, harmonic rotation, antiunitary operation
+  and coherent SU(2) action, without recomputing Fourier projector overlaps.
+* `AbinitWannierFileSet` generates separate channel plans/seeds and actual
+  per-channel AMN/MMN/EIG. Coherent spinors use one physical-band energy set,
+  sum both same-spin components in A/M and declare `spinors=true` in WIN.
+  External preprocessing uses the canonical `spinor_projections` NNKP block.
+  AFM reconstruction requires explicit up/down source-symmetry maps.
+  Actual GaAs collinear and SOC file sets completed external localization;
+  independent mixed-channel/mixed-spin fields detect channel/component faults.
+* Supplied PAW handoff now requires `witness_compare(record, reference)` to
+  succeed at the unchanged same-source tolerance before constructing the
+  producer. Schema validation is not a numerical certificate. Keep borrowed
+  coefficient buffers and independent references unchanged while consuming
+  them; a new file record must be witnessed again after opening.
+  DeltaS and each distinct finite-b Q now enforce an actual finer-grid radial
+  integration residual at1e-8, with bounded refinement and a named D5 error
+  instead of publishing an unresolved operator. This is fixed-spline
+  integration admission, not dataset/source convergence.
+* MMN is contracted in bounded physical-band row/column tiles before
+  allocation; sparse original-band selections no longer decode their entire
+  intervening band interval. `slab_columns=0` uses bounded defaults.
+  Published plans, source headers and image geometry are deeply immutable.
+  Failed WFK construction closes its acquired handle immediately; missing
+  streamed EIG points fail rather than publishing a truncated sequence.
+  Collinear exchange/antiunitary images route actual source-channel energies,
+  occupations and states; explicit maps carry original channel identity.
+* `AbinitWannierInputs(..., trial_manifest=...)` now evaluates physical NC
+  numerical trials directly from the referenced UPF `PP_CHI` channels. The
+  bounded native-grid Fourier transform preserves `u=rR`, PP_RAB quadrature,
+  normalized Wannier90 s/p/d/f harmonic order, Cartesian local axes, atomic
+  Bloch phases and cell-volume normalization; no hidden radial normalization
+  or same-l channel averaging occurs. A supplied callable remains an explicit
+  alternative, not a fallback.
+  Manifests now declare `position_coordinates` (`reduced` or `cartesian`);
+  `default_nc_manifest` writes reduced site coordinates. Parsed manifests
+  retain validated right-handed local axes, sites and dataset paths. Relative
+  dataset references resolve against the manifest directory.
+  A real GaAs WFK-to-external-localization smoke exercised this path and
+  HamiltonIO output consumption; scientific symmetry certification remains
+  open because the current NSCF reference did not meet its requested tolerance.
+* `MeshSource` reconstructs scalar NC IBZ states on demand through the shared
+  source seam. The eager full-mesh coefficient expansion/cache was removed.
+  Reciprocal folding relabels G vectors; fractional translations phase the
+  source Bloch field before antiunitary conjugation. Raw WFK symmetry rows
+  follow native `cgtk_rotate` (transposed native symrel), not a convention
+  chosen by fitting eigenvalues. Antiunitary search requires an explicit
+  `time_reversal` certificate; it is no longer enabled for every source.
+* Fixed ABINIT Fortran-record WFK spinor decoding: G varies fastest within
+  each coherent component, matching native `cg(2,npw*nspinor)` and NetCDF
+  records. Each physical band still has one eigenvalue.
+* WFK symmetry reconstruction requires all three metadata fields:
+  `reduced_symmetry_matrices`, `reduced_symmetry_translations`, and `symafm`.
+  Missing translations or magnetic symmetry flags now raise a named `D7`
+  diagnostic instead of silently substituting incomplete/nonmagnetic data.
+* ABINIT file and caller-array source seams now consistently expose lattice
+  vectors as rows in bohr. Native Fortran-column/NetCDF axes are converted
+  once at the reader boundary; the row-lattice reciprocal metric is
+  `(2*pi)^2 * inverse(A).T @ inverse(A)`. Skew-cell G-sphere checks and WIN
+  geometry therefore use the same cell.
+* WFK block reads avoid redundant NetCDF complex-array copies and retain
+  only the requested eigenvalue slab. `peak_live_bytes` reports tracked
+  numeric payload buffers; allocation measurements separately include Python
+  overhead rather than mistaking that counter for total live memory.
+* WFK automatic `istwfk=0` records now resolve per k point while preserving
+  the raw modes. Mixed resolved/automatic records retain exactly the same
+  decoded states as their explicit-storage counterparts.
+* Supplied PAW carrier slab access uses original physical-band IDs within
+  its declared band interval, including nonzero starts. NetCDF slabs are
+  read-only; supplied/reference comparison is blockwise, not a full-tensor
+  copy. Actual supplied memory/file records now feed matched PAW DeltaS and
+  finite-b Q consumers with zero Fourier recomputations; XML operators remain
+  mandatory. Schema/kind/frame/conjugation/phase/raw-normalization declarations
+  are explicit. Expanded records require a named map reference matching the
+  consumer declaration. Unsupported versions, fractional state identities,
+  swapped source species and malformed metadata fail with named diagnostics.
+  Analytic parity rejects non-finite overlaps and uses the true reference scale,
+  with only exact zeros admitted against a zero reference. Metadata is readonly.
+  This is supplied-reuse certification, not source physics or localization.
+  A one-channel coefficient carrier now declares its original zero-based
+  `SupplierMeta.source_channel` (NetCDF attribute `source_channel`); no
+  implicit up-channel identity is substituted. Band coverage is validated
+  against that selected source channel. Incorrect file axes or non-float64
+  real/imag pairs fail at open with named diagnostics.
+  Projector order is also explicit: `projector_labels` contains one
+  `(atom, radial_id, l, m)` tuple per column, grouped by the declared atom
+  counts, and `harmonic_convention` names the angular basis. Missing or
+  duplicated labels fail rather than assuming that equal counts imply the
+  same functions. Both fields are persisted in the v1 NetCDF carrier.
+* The ABINIT PAW-XML reader preserves radial functions as `R(r)` and reports
+  `PawXmlDataset.radial_representation="R"`. Partial-wave and projector
+  contractions therefore require `r^2 dr`; native ABINIT multiplies XML
+  arrays by `r` when constructing its internal `rR` arrays. On the supported
+  logarithmic mesh `r=a*(exp(d*i)-1)`, integrate using the Jacobian
+  `dr/di=d*(r+a)`. The reader does not resample or multiply the stored arrays.
 * Fixed a stale-cache bug in the phonopy wrapper: `phon_cache` entries
   are now keyed by a fingerprint of the force constants, masses, and
   evaluation mode in addition to the k-point, so a cache left in the

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 # to modify:
 
 # dym_get_recip_dipole_dipole in phonopy. c. dynmat.c

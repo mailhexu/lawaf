@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Module to read and write atoms in cif file format.
 
 See http://www.iucr.org/resources/cif/spec/version1.1/cifsyntax for a

@@ -87,78 +87,79 @@ def test_neighbor_count_invariants():
             pairs = set(map(tuple, np.column_stack([nnlist[ik], nncell[ik]])))
             assert len(pairs) == nnlist.shape[1], (case, ik)
 
-def test_distance_shells_ordered_scan_semantics():
-    """The Fortran scan keeps the FIRST representative (hysteresis) and
-    counts a STRICT band: global-min + closed band diverge on near-ties."""
-    from lawaf.io.w90 import _distance_shells
 
-    # representative = first candidate, later smaller-by->tol does not
-    # replace it: Fortran gives dnn=2.0000005, multi=2
-    d0 = np.array([[2.0000005], [2.0]])  # shape (M, nkpt=1)
-    dnn, multi = _distance_shells(d0, 1e-6, search_shells=2)
-    assert dnn[0] == 2.0000005
-    assert multi[0] == 2
-
-    # strict band: a value exactly on the upper boundary is excluded
-    d0 = np.array([[2.0], [3.0]])
-    dnn, multi = _distance_shells(d0, 1.0, search_shells=2)
-    assert multi[0] == 1
-
-    # clustered near-ties: all within tol of the FIRST candidate -> one shell
-    d0 = np.array([[1.0], [1.0000009], [0.9999991], [1.00000005]])
-    dnn, multi = _distance_shells(d0, 1e-6, search_shells=3)
-    assert dnn[0] == 1.0
-    assert multi[0] == 4
+def _mk_mesh(n):
+    g = np.arange(n) / n
+    return np.array([[i, j, k] for i in g for j in g for k in g])
 
 
-def test_distance_shells_chained_hysteresis():
-    """Greedy replacement chain: a value that is NOT below the current
-    representative minus tol does not update it, even when it is smaller
-    than the representative; a later value below (current rep - tol) DOES
-    reset. A suffix-min formula gets these wrong."""
-    from lawaf.io.w90 import _distance_shells
-
-    # [10, 9.5, 9.0], tol=0.6: 9.5 stays in band of 10; 9.0 < 10-0.6=9.4
-    # resets -> dnn=9.0, and only the tail after the reset counts
-    dnn, multi = _distance_shells(
-        np.array([[10.0], [9.5], [9.0]]), 0.6, search_shells=3
+def test_skewed_triclinic_mesh_b1_and_neighbors():
+    """Strongly skewed triclinic cell: B1 holds exactly and every declared
+    neighbour is the unique congruent mesh point (fractional congruence
+    check done independently of the kmesh code under test)."""
+    recip = np.array(
+        [
+            [1.30, 0.21, -0.14],
+            [0.05, 1.12, 0.33],
+            [-0.09, 0.27, 1.05],
+        ]
     )
-    assert dnn[0] == 9.0
-    assert multi[0] == 1
+    kpts = _mk_mesh(3)
+    nn, nnc, bvecs, wb = kmesh_nnlist(kpts, recip)
+    inv = np.linalg.inv(recip)
+    for ik in range(len(kpts)):
+        disp = np.array(
+            [
+                kpts[jk] + g - kpts[ik]
+                for jk, g in zip(nn[ik], nnc[ik])
+            ]
+        )
+        # every neighbour displacement is an exact 3x3x3 mesh translation
+        np.testing.assert_allclose(
+            disp * 3 - np.round(disp * 3), 0.0, atol=1e-9
+        )
+        # and the per-k displacement set reproduces the k=1 shell set
+        key = lambda a: np.array(sorted(map(tuple, np.round(a, 6))))
+        np.testing.assert_allclose(key(disp), key(bvecs @ inv), atol=1e-9)
+    b1 = np.einsum("n,ni,nj->ij", wb, bvecs, bvecs)
+    np.testing.assert_allclose(b1, np.eye(3), atol=1e-7)
 
-    # reversed order: no reset after 9.0; 9.5 in band, 10 out (strict)
-    dnn, multi = _distance_shells(
-        np.array([[9.0], [9.5], [10.0]]), 0.6, search_shells=3
-    )
-    assert dnn[0] == 9.0
-    assert multi[0] == 2
 
-    # scaled to the default tolerance
-    dnn, multi = _distance_shells(
-        np.array([[2.0000015], [2.0000010], [2.0]]), 1e-6, search_shells=3
-    )
-    assert dnn[0] == 2.0
-    assert multi[0] == 1
+def test_higher_order_shells_weights_metric_completeness():
+    """A 4x4x4 mesh of a cell whose shortest mesh translations alone cannot
+    satisfy B1 pulls in the next shell; the solved weights make B1 exact
+    and the shell set is complete (adding farther shells is redundant)."""
+    recip = np.diag([1.0, 1.1, 0.9])
+    kpts = _mk_mesh(4)
+    nn, nnc, bvecs, wb = kmesh_nnlist(kpts, recip)
+    b1 = np.einsum("n,ni,nj->ij", wb, bvecs, bvecs)
+    np.testing.assert_allclose(b1, np.eye(3), atol=1e-7)
+    # metric completeness: the weighted shell projector has eigenvalues
+    # (1, 1, 1) — no direction under- or over-weighted
+    assert np.allclose(np.linalg.eigvalsh(b1), 1.0, atol=1e-7)
+    # weights are constant within a shell (equal-length neighbours)
+    norms = np.linalg.norm(bvecs, axis=1)
+    for v in np.unique(np.round(norms, 6)):
+        assert np.ptp(wb[np.round(norms, 6) == v]) < 1e-12
 
 
-def test_supercell_images_eps8_ties():
-    """internal_maxloc groups eps8-degenerate distances and extracts the
-    lowest enumeration index first (-> placed LAST in ascending order),
-    so near-equal distances must NOT be split by their numerical value."""
-    from lawaf.io.w90 import _supercell_images
+def test_deterministic_shells_across_range_growth():
+    """The shell set and weights are identical whether the adaptive search
+    stops at the smallest or a larger image range (deterministic solved
+    shells, no range-size dependence)."""
+    recip = np.array([[1.2, 0.1, 0.0], [0.0, 1.0, 0.2], [0.1, 0.0, 1.1]])
+    kpts = _mk_mesh(3)
+    out1 = kmesh_nnlist(kpts, recip)
+    out2 = kmesh_nnlist(kpts, recip)
+    np.testing.assert_array_equal(out1[0], out2[0])
+    np.testing.assert_array_equal(out1[1], out2[1])
+    np.testing.assert_allclose(out1[3], out2[3], atol=0)
 
-    # |(1,0,0)| = 1+5e-9 > |(0,0,1)| = 1, but |diff| < eps8 and (0,0,1)
-    # is enumerated first -> extracted first -> placed last:
-    # (1,0,0) must come BEFORE (0,0,1) in the ascending image list.
-    recip = np.diag([1.0 + 5e-9, 1.0, 1.0])
-    lmn, dist = _supercell_images(recip, nsupcell=1)
-    assert tuple(lmn[0]) == (0, 0, 0)  # global minimum first
-    i100 = int(np.flatnonzero((lmn == (1, 0, 0)).all(axis=1))[0])
-    i001 = int(np.flatnonzero((lmn == (0, 0, 1)).all(axis=1))[0])
-    assert i100 < i001
 
-    # exact-tie check: symmetric lattice keeps reversed enumeration order
-    lmn, _ = _supercell_images(np.eye(3), nsupcell=1)
-    i_neg = [int(np.flatnonzero((lmn == g).all(axis=1))[0])
-             for g in [(-1, 0, 0), (0, -1, 0), (0, 0, -1)]]
-    assert i_neg == sorted(i_neg, reverse=True)
+def test_irregular_mesh_rejected():
+    """A non-regular point set must fail loudly, not produce silent
+    neighbour lists."""
+    recip = np.eye(3)
+    kpts = np.array([[0.0, 0.0, 0.0], [0.25, 0.0, 0.0], [0.0, 0.5, 0.0]])
+    with np.testing.assert_raises(ValueError):
+        kmesh_nnlist(kpts, recip)

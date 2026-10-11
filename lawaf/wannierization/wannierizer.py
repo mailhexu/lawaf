@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """
 Wannierizer Module: Getting the Unitary matrix Amnk.
 """
@@ -434,8 +435,9 @@ class Wannierizer(BasicWannierizer):
         Writes ``<prefix>.win``, ``.amn``, ``.eig`` and ``.mmn`` ready for a
         standalone ``wannier90.x <prefix>`` run. The k-points are written
         explicitly in lawaf's own order, so wannier90's k indices match
-        lawaf's; the .mmn neighbour list is built with lawaf's faithful
-        port of wannier90's kmesh_get, so every block matches at read time.
+        lawaf's; the .mmn neighbour list is built with lawaf's original
+        kmesh construction (validated against wannier90 output), so every
+        block matches at read time.
 
         :param prefix: output file prefix (path without extension);
         :param lattice: (3, 3) rows a1..a3 in Angstrom;

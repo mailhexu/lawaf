@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """TrainingDataset: frame-stacked training structures, labels, and netCDF I/O.
 
 Storage layout (xarray, netCDF group ``"dataset"``, one file per dataset --

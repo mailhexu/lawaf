@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """
 Use Amn, kpt, and eig to calculate the Hamiltonian matrix
 """

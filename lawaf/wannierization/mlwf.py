@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Maximally localized Wannier functions (Marzari-Vanderbilt) backend.
 
 Stories 006/007: the d_omega optimization and Mmn-form spread diagnostics,

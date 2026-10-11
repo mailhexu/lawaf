@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 import numpy as np
 from ase.io import read
 import os

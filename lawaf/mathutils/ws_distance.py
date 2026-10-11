@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Wannier90-style Wigner-Seitz image assignment for k<->R transforms.
 
 Faithful reimplementation of wannier90's ``ws_distance.F90``

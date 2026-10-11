@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """GL-covariant MMN links for non-orthogonal Wannier frames.
 
 This is the safe Epic-13 pilot, not a full non-orthogonal

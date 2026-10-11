@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Per-q irrep content of the phonon displacement representation (R1).
 
 Research memo 2026-09-22-symmetry-projected-pwf (stage R1): at each

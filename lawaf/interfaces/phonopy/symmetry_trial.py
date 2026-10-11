@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Wigner-projected symmetry trial orbitals for phonon LWFs (R2).
 
 Research memo 2026-09-22-symmetry-projected-pwf (stage R2): build

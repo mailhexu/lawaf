@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 import numpy as np
 import matplotlib.pyplot as plt
 import copy

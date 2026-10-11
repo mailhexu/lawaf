@@ -7,7 +7,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 readme = "README.md"
-license = {text = "BSD-2"}
+license = {text = "BSD-2-Clause"}
 dependencies = [
     "numpy<=2.0",
     "scipy>=1.7.0",
@@ -31,6 +31,17 @@ distribution = true
 [project.optional-dependencies]
 test=[
     "pytest>=6.2.0",
+]
+
+# optional imports, not vendored: lawaf.interfaces uses wannier90io for
+# wannier90 file IO; lawaf.wrapper.myTB and the magnon downfolder import
+# TB2J. Both remain environment-provided; no compiled bindings are
+# distributed with lawaf.
+wannier=[
+    "wannier90io>=0.1.0b1",
+]
+tb2j=[
+    "TB2J",
 ]
 
 symmetry=[

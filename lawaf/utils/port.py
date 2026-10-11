@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 import socket
 
 def get_unused_port(default=8000):

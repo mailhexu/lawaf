@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Symmetry-adapted phonon projector seeds via spgrep-modulation.
 
 Story-010 seed core: band→eigenspace mapping, whole-eigenspace + svmin guard

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Evaluator and ASE calculator for the anharmonic LWF effective model
 (story 022, FR-011/012, ADR-004/010).
 

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 class GPAWWrapper:
     def __init__(self, calc):
         self.calc = calc

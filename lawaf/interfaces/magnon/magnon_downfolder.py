@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 import pickle
 from dataclasses import dataclass
 from pathlib import Path

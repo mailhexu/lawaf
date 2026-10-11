@@ -1,16 +1,13 @@
-from .phonopy.phonon_downfolder import NACPhonopyDownfolder, PhonopyDownfolder
-from .siesta import SiestaDownfolder
-from .wannier90 import W90Downfolder
-
-
+# SPDX-License-Identifier: BSD-2-Clause
 def select_downfolder(name):
-    if name == "phonopy":
-        return PhonopyDownfolder
-    elif name == "nac-phonopy":
-        return NACPhonopyDownfolder
-    elif name == "siesta":
-        return SiestaDownfolder
-    elif name == "wannier90":
-        return W90Downfolder
-    else:
+    import lawaf.interfaces as interfaces
+
+    classes = {
+        "phonopy": "PhonopyDownfolder",
+        "nac-phonopy": "NACPhonopyDownfolder",
+        "siesta": "SiestaDownfolder",
+        "wannier90": "W90Downfolder",
+    }
+    if name not in classes:
         raise ValueError("Unknown downfolder: %s" % name)
+    return getattr(interfaces, classes[name])

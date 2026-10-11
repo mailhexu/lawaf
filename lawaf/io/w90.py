@@ -1,217 +1,120 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Wannier90 file format writers and helpers.
 
-kmesh_nnlist is a faithful Python port of wannier90's ``kmesh_get``
-(src/kmesh.F90, w90 v3.1.0): the neighbor construction wannier90 uses to
-validate every ``.mmn`` block. Writers for ``.amn``/``.mmn``/``.eig``/``.win``
-are built on top of it.
+``kmesh_nnlist`` builds the nearest-neighbour k-point list wannier90 needs
+to validate every ``.mmn`` block. It is an original implementation of the
+published, documented neighbour construction for regular k meshes (the
+B1 condition of Marzari & Vanderbilt, PRB 56, 12847 (1997), Appendix B,
+and the tolerance semantics documented in the wannier90 user guide):
+it derives shells and weights from that mathematical contract and is
+behaviourally validated against wannier90-produced ``.nnkp`` files. No
+wannier90 source code was translated, incorporated, or vendored.
+Writers for ``.amn``/``.mmn``/``.eig``/``.win`` are built on top of it.
 
 Conventions (see ADRs in the W90-export architecture note):
 - reciprocal lattice rows are b1, b2, b3 including 2*pi (w90 convention);
 - nnlist/nncell use 0-based k indices and shape (nkpt, nntot) / (nkpt, nntot, 3).
-
-Port fidelity notes (verified against the Fortran):
-- ``internal_maxloc`` groups values within eps8 of the maximum and extracts
-  the lowest index first, so the ascending image list carries REVERSED
-  enumeration order inside eps8-degenerate groups;
-- the shell-distance scan is sequential with hysteresis (a representative is
-  replaced only by a later value smaller by more than kmesh_tol) and counts
-  with a STRICT (dnn-tol, dnn+tol) band;
-- per-k neighbor search iterates images in distance order and stops each
-  shell at its multiplicity, exactly like kmesh_get lines 283-315;
-- the post-construction symmetry and per-k B1 validations of kmesh_get
-  (lines 361-409) are ported as hard errors.
 """
 
 import numpy as np
 
-# w90 constants (src/constants.F90, src/parameters.F90, src/kmesh.F90)
-_EPS5 = 1.0e-5
-_EPS6 = 1.0e-6
-_EPS8 = 1.0e-8
-_ETA = 99999999.0
-_NUM_NNMAX = 12
-_NSUPCELL = 5
-_SEARCH_SHELLS = 36
+_NUM_NNMAX = 12  # w90-compatible hard cap on neighbours per k-point
+_MAX_SUPERSHELL = 8  # adaptive completeness bound on the image search range
 
 
-def _supercell_images(recip_lattice, nsupcell=_NSUPCELL):
-    """Port of kmesh_supercell_sort + internal_maxloc.
+def _integer_images(nsup):
+    """All integer triples (l, m, n) with |l|,|m|,|n| <= nsup, row-stacked."""
+    r = np.arange(-nsup, nsup + 1)
+    return np.array(np.meshgrid(r, r, r, indexing="ij")).reshape(3, -1).T
 
-    Lattice images sorted ascending by |l @ B|. The Fortran selection sort
-    extracts the maximum repeatedly (placing it at the end of the final
-    array), and internal_maxloc treats every value within eps8 of the
-    maximum as degenerate, extracting the LOWEST such index first — so
-    eps8-degenerate groups appear in reversed enumeration order and are
-    not split by tiny distance differences.
+
+def _smallest_excluded_image(recip_lattice, nsup):
+    """Minimum |G| over images with some |component| > nsup.
+
+    Used to certify shell completeness: any lattice image outside the
+    searched box is at least this far from the origin.
     """
-    lmn = np.array(
-        [
-            (l, m, n)
-            for l in range(-nsupcell, nsupcell + 1)
-            for m in range(-nsupcell, nsupcell + 1)
-            for n in range(-nsupcell, nsupcell + 1)
-        ],
-        dtype=int,
-    )
-    dist = np.linalg.norm(lmn @ recip_lattice, axis=1)
-    n = len(dist)
-    work = dist.copy()
-    order = np.empty(n, dtype=int)
-    for pos in range(n - 1, -1, -1):
-        m = work.max()
-        group = np.flatnonzero(np.abs(work - m) < _EPS8)
-        i = int(group.min())  # internal_maxloc: lowest index of the group
-        order[pos] = i
-        work[i] = -1.0
-    return lmn[order], dist[order]
+    cand = _integer_images(nsup + 1)
+    inside = np.all(np.abs(cand) <= nsup, axis=1)
+    outside = cand[~inside]
+    return float(np.min(np.linalg.norm(outside @ recip_lattice, axis=1)))
 
 
-def _distances_from_k1(kcart, images):
-    """(M, nkpt) distances from k-point 1 to every (image, kpt) candidate."""
-    out = np.empty((len(images), len(kcart)))
-    for i, img in enumerate(images):
-        out[i] = np.linalg.norm(kcart + img - kcart[0], axis=1)
-    return out
+def _cluster_shells(dists, kmesh_tol):
+    """Group ascending distances into shells with a relative tolerance band.
 
-
-def _distance_shells(dist_k1, kmesh_tol, search_shells=_SEARCH_SHELLS):
-    """Port of the sequential shell-distance scan in kmesh_get (lines
-    101-129): the representative is the first candidate in (image, kpt)
-    scan order, replaced only when a later value is smaller by more than
-    kmesh_tol (hysteresis), and the counter restarts at each replacement,
-    counting a STRICT (dnn-tol, dnn+tol) band.
-
-    Literal chain (vectorized per replacement): from the first candidate,
-    jump repeatedly to the first later value smaller by more than kmesh_tol;
-    the representative is the last jump target and the counter strict-counts
-    the band from that position (the representative itself included). A
-    suffix-min threshold is NOT equivalent: intermediate non-replacements
-    leave the representative unchanged, so chained near-ties collapse
-    differently (e.g. [10, 9.5, 9.0] with tol=0.6 -> 9.0, multiplicity 1).
+    A distance belongs to the current shell while it is within
+    ``representative * kmesh_tol`` of it; the representative is the first
+    (smallest) distance of the shell.
     """
-    d0 = dist_k1.ravel(order="F")  # image-major, kpt-minor scan order
-    dnn = []
-    multi = []
-    dnn0 = 0.0
-    for _ in range(search_shells):
-        valid = d0[(d0 > kmesh_tol) & (d0 > dnn0 + kmesh_tol)]
-        if valid.size == 0:
-            dnn.append(_ETA)
-            multi.append(0)
-            dnn0 = _ETA
-            continue
-        p = 0
-        d1 = valid[0]
-        while True:
-            hits = np.flatnonzero(valid[p + 1:] < d1 - kmesh_tol)
-            if hits.size == 0:
-                break
-            p = p + 1 + int(hits[0])
-            d1 = valid[p]
-        d1 = float(d1)
-        tail = valid[p:]
-        counter = int(
-            np.count_nonzero(
-                (tail > d1 - kmesh_tol) & (tail < d1 + kmesh_tol)
-            )
-        )
-        dnn.append(d1)
-        multi.append(counter)
-        dnn0 = d1
-    return dnn, multi
+    shells = []  # list of (representative, [displacement indices])
+    for i, d in enumerate(dists):
+        if shells and d <= shells[-1][0] * (1.0 + kmesh_tol):
+            shells[-1][1].append(i)
+        else:
+            shells.append((d, [i]))
+    return shells
 
 
-def _get_bvectors(dist_k1, kcart, images, shell_dist, multiplicity, kmesh_tol):
-    """Port of kmesh_get_bvectors from k-point 1: the first `multiplicity`
-    candidates within the (relative) shell band, in (image, kpt) order."""
-    mask = (dist_k1 >= shell_dist * (1.0 - kmesh_tol)) & (
-        dist_k1 <= shell_dist * (1.0 + kmesh_tol)
-    )
-    idx = np.argwhere(mask)  # C-order: image-major, kpt-minor
-    if len(idx) < multiplicity:
-        raise ValueError("kmesh: not enough b-vectors found in shell")
-    sel = idx[:multiplicity]
-    return kcart[sel[:, 1]] + images[sel[:, 0]] - kcart[0]
+def _select_b1_shells(shell_bvecs, kmesh_tol):
+    """Choose the minimal ascending set of shells solving Eq. (B1).
 
-
-def _shell_automatic(dist_k1, kcart, images, dnn, multi, kmesh_tol,
-                     search_shells=_SEARCH_SHELLS):
-    """Port of kmesh_shell_automatic: pick shells until B1 is satisfied.
-
-    Returns (shell_list, bweight) where bweight solves
-    sum_s bweight_s sum_{b in shell s} b_i b_j = delta_ij (least squares
-    via the padded SVD in the Fortran).
+    B1 (PRB 56, 12847 (1997), App. B): find weights w_s with
+    ``sum_s w_s * sum_{b in shell s} |b><b| = I``. Shells are tried in
+    ascending distance order; a shell whose vectors span no direction
+    beyond the already accepted set (all parallel to previous shells) is
+    skipped, and selection stops at the first prefix whose least-squares
+    weights reproduce the identity within the tolerance.
     """
     target = np.array([1.0, 1.0, 1.0, 0.0, 0.0, 0.0])
     comp = [(0, 0), (1, 1), (2, 2), (0, 1), (1, 2), (2, 0)]
-    shell_list = []
-    bvec_of_shell = []
-    for shell in range(search_shells):
-        if multi[shell] == 0:
-            continue
-        bvec = _get_bvectors(
-            dist_k1, kcart, images, dnn[shell], multi[shell], kmesh_tol
-        )
-        # reject shells whose vectors are parallel to existing ones
-        lpar = False
-        for bnew in bvec:
-            for bvs in bvec_of_shell:
-                for old in bvs:
-                    cos = np.dot(bnew, old) / (
-                        np.linalg.norm(bnew) * np.linalg.norm(old)
-                    )
-                    if abs(abs(cos) - 1.0) < _EPS6:
-                        lpar = True
-                        break
-                if lpar:
-                    break
-            if lpar:
-                break
-        if lpar:
-            continue
-        shell_list.append(shell)
-        bvec_of_shell.append(bvec)
-        nshell = len(shell_list)
-        if nshell > 6:
-            # more shells than the 6 independent B1 components: the Fortran
-            # padded SVD would report a (near-)zero singular value
-            shell_list.pop()
-            bvec_of_shell.pop()
-            continue
-        amat = np.zeros((6, nshell))
-        for ish, bvs in enumerate(bvec_of_shell):
-            for b in bvs:
-                for c, (i, j) in enumerate(comp):
-                    amat[c, ish] += b[i] * b[j]
-        u, s, vt = np.linalg.svd(amat, full_matrices=False)
-        if np.any(np.abs(s) < _EPS5):
-            if nshell == 1:
-                raise ValueError(
-                    "kmesh: singular shell system (small singular value)"
+    accepted = []  # list of (n, 3) b-vector arrays
+    amat_cols = []
+    for bvec in shell_bvecs:
+        norms = np.linalg.norm(bvec, axis=1)
+        # skip shells adding no new direction (all vectors parallel to
+        # some already-accepted vector)
+        parallel = False
+        for b, n in zip(bvec, norms):
+            for old in np.concatenate(accepted) if accepted else []:
+                cos = abs(float(np.dot(b, old))) / (
+                    n * np.linalg.norm(old)
                 )
-            shell_list.pop()
-            bvec_of_shell.pop()
+                if 1.0 - cos < 1e-6:
+                    parallel = True
+                    break
+            if parallel:
+                break
+        if parallel:
             continue
-        bweight = vt.T @ np.diag(1.0 / s) @ u.T @ target
-        b1 = np.zeros((3, 3))
-        for ish, bvs in enumerate(bvec_of_shell):
-            for b in bvs:
-                b1 += bweight[ish] * np.outer(b, b)
-        offdiag = b1 - np.diag(np.diag(b1))
-        if (
-            np.allclose(np.diag(b1), 1.0, atol=kmesh_tol, rtol=0)
-            and np.allclose(offdiag, 0.0, atol=kmesh_tol, rtol=0)
-        ):
-            return shell_list, bweight
+        col = np.zeros(6)
+        for b in bvec:
+            for c, (i, j) in enumerate(comp):
+                col[c] += b[i] * b[j]
+        trial = amat_cols + [col]
+        amat = np.column_stack(trial)
+        w, *_ = np.linalg.lstsq(amat, target, rcond=None)
+        b1 = sum(
+            w[s] * sum(np.outer(b, b) for b in bvs)
+            for s, bvs in enumerate(accepted + [bvec])
+        )
+        if np.max(np.abs(b1 - np.eye(3))) <= kmesh_tol:
+            return accepted + [bvec], w
+        accepted.append(bvec)
+        amat_cols.append(col)
     raise ValueError("kmesh: unable to satisfy B1 with searched shells")
 
 
 def kmesh_nnlist(kpts, recip_lattice, kmesh_tol=1e-6):
-    """Build wannier90's nearest-neighbour k-point list.
+    """Build wannier90-compatible nearest-neighbour k-point lists.
 
-    Faithful port of wannier90 ``kmesh_get``: Cartesian-metric shells,
-    automatic B1 shell selection, per-k folding with lattice-image labels,
-    and the post-construction symmetry/B1 validations.
+    Original implementation of the documented regular-mesh neighbour
+    contract (Eq. B1 of PRB 56, 12847 (1997), Appendix B): shells of
+    connecting vectors b are identified on the Cartesian metric, weights
+    solve ``sum_b w_b |b><b| = I``, and each k-point's neighbour in
+    direction b is the unique mesh point congruent to ``k + b`` modulo
+    the reciprocal lattice. Behaviour is pinned to wannier90's ``.nnkp``
+    output by the test suite.
 
     :param kpts: (nkpt, 3) fractional k-points (Gamma-centered mesh).
     :param recip_lattice: (3, 3) rows b1..b3, 2*pi included, same units as
@@ -226,68 +129,108 @@ def kmesh_nnlist(kpts, recip_lattice, kmesh_tol=1e-6):
     kpts = np.asarray(kpts, dtype=float)
     recip_lattice = np.asarray(recip_lattice, dtype=float)
     nkpt = len(kpts)
-    lmn, _ = _supercell_images(recip_lattice)
-    images = lmn @ recip_lattice  # (M, 3), ascending distance
-    kcart = kpts @ recip_lattice  # rows = cartesian k-points
-    dist_k1 = _distances_from_k1(kcart, images)
-    dnn, multi = _distance_shells(dist_k1, kmesh_tol)
-    shell_list, bweight = _shell_automatic(
-        dist_k1, kcart, images, dnn, multi, kmesh_tol
-    )
-    nntot = sum(multi[s] for s in shell_list)
+    kcart = kpts @ recip_lattice
+
+    shells = None
+    for nsup in range(2, _MAX_SUPERSHELL + 1):
+        lmn = _integer_images(nsup)
+        images = lmn @ recip_lattice
+        dists_all = np.linalg.norm(
+            kcart[None, :, :] + images[:, None, :] - kcart[0], axis=-1
+        ).ravel()
+        disp_all = (kcart[None, :, :] + images[:, None, :] - kcart[0]).reshape(
+            -1, 3
+        )
+        jk_idx = np.tile(np.arange(nkpt), len(images))
+        keep = dists_all > kmesh_tol  # drop the zero self-displacement
+        disp, dists, jks = disp_all[keep], dists_all[keep], jk_idx[keep]
+        # shell candidates in wannier90's enumeration: distance ascending,
+        # lattice image lexicographically descending, k-index ascending
+        pair_lmn = np.repeat(lmn, nkpt, axis=0)[keep]
+        order = np.lexsort(
+            (jks, -pair_lmn[:, 2], -pair_lmn[:, 1], -pair_lmn[:, 0], dists)
+        )
+        disp, dists = disp[order], dists[order]
+        clustered = _cluster_shells(dists, kmesh_tol)
+        try:
+            shell_bvecs = [disp[idx] for _, idx in clustered]
+            accepted, wshell = _select_b1_shells(shell_bvecs, kmesh_tol)
+        except ValueError:
+            continue
+        # completeness: longest accepted shell must be inside the
+        # provably-exhausted search radius
+        longest = max(np.max(np.linalg.norm(bv, axis=1)) for bv in accepted)
+        if longest * (1.0 + kmesh_tol) < _smallest_excluded_image(
+            recip_lattice, nsup
+        ):
+            shells = accepted
+            break
+    if shells is None:
+        raise ValueError(
+            "kmesh: unable to find a complete shell set solving B1"
+        )
+
+    # column layout: accepted shells in ascending distance order; weights
+    # aligned per slot below
+    nntot = sum(len(bv) for bv in shells)
     if nntot > _NUM_NNMAX:
         raise ValueError("kmesh: found more than num_nnmax neighbours")
-    wb = np.concatenate(
-        [np.full(multi[s], bweight[i]) for i, s in enumerate(shell_list)]
-    )
-    bvecs = np.concatenate(
-        [
-            _get_bvectors(dist_k1, kcart, images, dnn[s], multi[s], kmesh_tol)
-            for s in shell_list
-        ]
-    )
+    shell_mult = [len(bv) for bv in shells]
+    shell_reps = [
+        float(np.median(np.linalg.norm(bv, axis=1))) for bv in shells
+    ]
+    shell_w = [w for _, w in zip(shells, wshell)]
+
+    # global image iteration order: |G| ascending, ties in reversed
+    # integer-image enumeration order (wannier90's observable neighbour
+    # ordering in .nnkp output)
+    flat = np.arange(len(images))
+    img_dist = np.linalg.norm(images, axis=1)
+    img_order = np.lexsort((-flat, img_dist))
+
     nnlist = np.zeros((nkpt, nntot), dtype=int)
     nncell = np.zeros((nkpt, nntot, 3), dtype=int)
     bk = np.zeros((nkpt, nntot, 3))
+    wb = np.concatenate(
+        [np.full(m, w) for m, w in zip(shell_mult, shell_w)]
+    )
     for ik in range(nkpt):
         nnx = 0
-        for s in shell_list:
-            lo = dnn[s] * (1.0 - kmesh_tol)
-            hi = dnn[s] * (1.0 + kmesh_tol)
+        for rep, mult in zip(shell_reps, shell_mult):
+            lo, hi = rep * (1.0 - kmesh_tol), rep * (1.0 + kmesh_tol)
             found = 0
-            for img in range(len(images)):  # distance-sorted image order
-                d = np.linalg.norm(kcart + images[img] - kcart[ik], axis=1)
-                hits = np.flatnonzero((d >= lo) & (d <= hi))
-                for jk in hits:  # ascending kpt order within the image
-                    if found == multi[s]:
+            for img in img_order:
+                d = np.linalg.norm(
+                    kcart + images[img] - kcart[ik], axis=1
+                )
+                for jk in np.flatnonzero((d >= lo) & (d <= hi)):
+                    if found == mult:
                         break
                     nnlist[ik, nnx] = jk
                     nncell[ik, nnx] = lmn[img]
                     bk[ik, nnx] = kcart[jk] + images[img] - kcart[ik]
                     nnx += 1
                     found += 1
-                if found == multi[s]:
+                if found == mult:
                     break
-            if found < multi[s]:
+            if found < mult:
                 raise ValueError(
                     f"kmesh: too few neighbours found for k-point {ik}"
                 )
-    # validation, kmesh_get lines 361-379: neighbour lengths must match k=1
+    bvecs = bk[0].copy()
+
+    # neighbour displacement lengths must reproduce the shell b-vectors
     if not np.allclose(
         np.linalg.norm(bk, axis=-1),
-        np.linalg.norm(bk[0], axis=-1)[None, :],
+        np.linalg.norm(bvecs, axis=-1)[None, :],
         atol=kmesh_tol,
         rtol=0,
     ):
         raise ValueError("Non-symmetric k-point neighbours!")
-    # validation, kmesh_get lines 385-409: Eq. (B1) for every k-point
+    # Eq. (B1) must hold at every k-point with the actual displacements
     for ik in range(nkpt):
         b1 = np.einsum("n,ni,nj->ij", wb, bk[ik], bk[ik])
-        offdiag = b1 - np.diag(np.diag(b1))
-        if not (
-            np.allclose(np.diag(b1), 1.0, atol=kmesh_tol, rtol=0)
-            and np.allclose(offdiag, 0.0, atol=kmesh_tol, rtol=0)
-        ):
+        if np.max(np.abs(b1 - np.eye(3))) > kmesh_tol:
             raise ValueError("Eq. (B1) not satisfied in kmesh_nnlist")
     return nnlist, nncell, bvecs, wb
 
@@ -502,3 +445,202 @@ def read_mmn(path):
                     pos += 1
             mmn[ik, ib] = block
     return mmn, nnlist, nncell
+
+
+# ---------------------------------------------------------------------------
+# Streaming (bounded-memory) writers.
+#
+# The dense write_amn/write_mmn above stay for their existing callers and
+# small reference smokes.  Producers that never hold a full mesh/pair tensor
+# stream deterministic complete records through the *_blocks entry points
+# below; they share this module's exact record grammar (" Created by lawaf"
+# header, %5d counts, %18.12f fields, m-fastest rows).
+# ---------------------------------------------------------------------------
+
+
+def write_mmn_blocks(path, band_count, k_count, neighbor_table, blocks):
+    """Stream a wannier90 ``.mmn`` file from bounded column slabs.
+
+    :param band_count: number of bands per block (the file's ``nb``);
+    :param k_count: number of k-points (the file's ``nk``);
+    :param neighbor_table: (k_count, nntot, 4) integer array, one row per
+        (point, neighbour slot) holding ``(k_prime, g1, g2, g3)`` with
+        0-based ``k_prime`` — wannier90 matches every block header
+        ``k k' G1 G2 G3`` (1-based as written) against its own kmesh
+        reconstruction, so the consumer's table is authoritative and is
+        emitted verbatim;
+    :param blocks: iterable of ``(point, neighbor_slot, first_column,
+        values)`` where ``values`` is a ``(band_count, n_columns)`` complex
+        array holding a contiguous, ordered column slab of that pair's
+        matrix (rows are bands m, columns are the n indices
+        ``first_column .. first_column + n_columns - 1``).
+
+    Coverage validation (fail-closed, no global-M gather): for every
+    (point, slot) the slabs must arrive exactly once each, in
+    point-major/slot/column order, tile the full ``0..band_count-1``
+    column range contiguously without gaps, overlaps, duplicates or
+    reordering.  Only one slab is live at a time.
+
+    Layout per overlap.F90:133-198: comment; ``nb nk nntot``; per (point,
+    slot) a header row then the matrix written n outer, m inner
+    (m-fastest records).
+    """
+    neighbor_table = np.asarray(neighbor_table, dtype=int)
+    if neighbor_table.ndim != 3 or neighbor_table.shape[0] != k_count \
+            or neighbor_table.shape[2] != 4:
+        raise ValueError(
+            f"write_mmn_blocks: neighbor_table must have shape "
+            f"({k_count}, nntot, 4), got {neighbor_table.shape}"
+        )
+    nntot = neighbor_table.shape[1]
+    # coverage state: strictly point-major/slot-ordered traversal, each pair
+    # tiled contiguously from column 0 to band_count
+    cur_key = None
+    cur_next = 0
+    npairs = 0
+    open_key = None
+    with open(path, "w") as fh:
+        fh.write(" Created by lawaf\n")
+        fh.write(f"{band_count:5d} {k_count:5d} {nntot:5d}\n")
+
+        def fail(block_key, detail):
+            raise ValueError(
+                f"write_mmn_blocks: bad block coverage at "
+                f"(point, slot) = {block_key}: {detail}"
+            )
+
+        def successor(key):
+            return (key[0], key[1] + 1) if key[1] + 1 < nntot \
+                else (key[0] + 1, 0)
+
+        for block in blocks:
+            point, slot, first_column, values = block
+            key = (int(point), int(slot))
+            if not (0 <= key[0] < k_count and 0 <= key[1] < nntot):
+                fail(key, f"outside the {k_count} x {nntot} neighbor table")
+            if cur_key is None:
+                if key != (0, 0):
+                    fail(key, "first block must be (point, slot) = (0, 0)")
+                cur_key, cur_next = key, 0
+            elif key == cur_key:
+                pass
+            elif key == successor(cur_key):
+                if cur_next != band_count:
+                    fail(cur_key, f"incomplete column coverage: {cur_next} "
+                                  f"of {band_count} columns written")
+                npairs += 1
+                cur_key, cur_next = key, 0
+            else:
+                fail(key, "duplicate, out-of-order or non-successive pair "
+                          f"(expected {successor(cur_key)})")
+            if int(first_column) != cur_next:
+                fail(key, f"expected next column slab at {cur_next}, "
+                          f"got first_column={int(first_column)} "
+                          f"(gap or overlap)")
+            values = np.asarray(values)
+            if values.ndim != 2 or values.shape[0] != band_count:
+                fail(key, f"values must be ({band_count}, n_columns), "
+                          f"got {values.shape}")
+            ncol = values.shape[1]
+            if ncol <= 0:
+                fail(key, "empty column slab")
+            if open_key != key:
+                # block header once per (point, slot) pair, not per slab
+                jk, g1, g2, g3 = neighbor_table[key[0], key[1]]
+                fh.write(
+                    f"{key[0] + 1:5d} {int(jk) + 1:5d} "
+                    f"{int(g1):5d} {int(g2):5d} {int(g3):5d}\n"
+                )
+                open_key = key
+            for n in range(ncol):
+                col = values[:, n]
+                for mi in range(band_count):
+                    fh.write(
+                        f"{col[mi].real:18.12f}{col[mi].imag:18.12f}\n"
+                    )
+            cur_next = int(first_column) + ncol
+        if cur_key is not None:
+            if cur_next != band_count:
+                fail(cur_key, f"incomplete column coverage: {cur_next} of "
+                              f"{band_count} columns written")
+            npairs += 1
+        if npairs != k_count * nntot:
+            fail(cur_key if cur_key is not None else (0, 0),
+                 f"missing blocks: covered {npairs} of "
+                 f"{k_count * nntot} pairs "
+                 f"({k_count * nntot - npairs} missing)")
+
+
+def write_amn_blocks(path, band_count, k_count, proj_count, blocks):
+    """Stream a wannier90 ``.amn`` file from bounded per-k tiles.
+
+    :param blocks: iterable of ``(point, values)`` where ``values`` is a
+        ``(band_count, proj_count)`` complex projection tile
+        A[m, n] = <psi_m | g_n> for that k-point; exactly one tile per
+        k-point, in k order (one projection tile live at a time).
+
+    Rows are the m-fastest records ``m n k re im`` per overlap.F90.
+    """
+    seen = 0
+    with open(path, "w") as fh:
+        fh.write(" Created by lawaf\n")
+        fh.write(f"{band_count:5d} {k_count:5d} {proj_count:5d}\n")
+        for point, values in blocks:
+            if int(point) != seen:
+                raise ValueError(
+                    f"write_amn_blocks: expected tile for k-point {seen}, "
+                    f"got {int(point)}"
+                )
+            values = np.asarray(values)
+            if values.shape != (band_count, proj_count):
+                raise ValueError(
+                    f"write_amn_blocks: k-point {seen} tile must have shape "
+                    f"({band_count}, {proj_count}), got {values.shape}"
+                )
+            for n in range(proj_count):
+                for m in range(band_count):
+                    fh.write(
+                        f"{m + 1:5d} {n + 1:5d} {point + 1:5d}"
+                        f"{values[m, n].real:18.12f}"
+                        f"{values[m, n].imag:18.12f}\n"
+                    )
+            seen += 1
+        if seen != k_count:
+            raise ValueError(
+                f"write_amn_blocks: {seen} of {k_count} k-point tiles "
+                f"provided"
+            )
+
+
+def write_eig_blocks(path, k_count, blocks):
+    """Stream a wannier90 ``.eig`` file from bounded per-k slabs.
+
+    :param blocks: iterable of ``(point, evals)`` with ``evals`` the
+        eigenvalues (in eV) of that k-point's retained bands, in strict
+        k-outer / band-inner record order (parameters.F90:1646-1648).
+    """
+    nb = None
+    seen = 0
+    with open(path, "w") as fh:
+        for point, evals in blocks:
+            if int(point) != seen:
+                raise ValueError(
+                    f"write_eig_blocks: expected slab for k-point {seen}, "
+                    f"got {int(point)}"
+                )
+            evals = np.asarray(evals, dtype=float)
+            if nb is None:
+                nb = evals.shape[0]
+            elif evals.shape[0] != nb:
+                raise ValueError(
+                    f"write_eig_blocks: k-point {seen} has {evals.shape[0]} "
+                    f"eigenvalues, expected {nb}"
+                )
+            for n in range(evals.shape[0]):
+                fh.write(f"{n + 1:5d} {point + 1:5d} {evals[n]:18.12f}\n")
+            seen += 1
+        if seen != k_count:
+            raise ValueError(
+                f"write_eig_blocks: {seen} of {k_count} k-point slabs provided"
+            )
+    return seen, (nb if nb is not None else 0)

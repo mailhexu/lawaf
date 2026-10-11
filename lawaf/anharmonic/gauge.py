@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Star-covariant constrained gauge for projected LWFs (story-018, FR-004/015, ADR-003).
 
 Given a downfolder/builder holding a projected gauge ``Amn(q)`` (the

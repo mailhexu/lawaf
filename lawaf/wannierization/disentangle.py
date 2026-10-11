@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Disentanglement / continuity-preserving subspace selection.
 
 Architecture (disentanglement ADR-001/002/005, approved 2026-08-30);

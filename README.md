@@ -12,3 +12,11 @@ It has interface to:
 
 The online documentation can be found at:
 https://lawaf.readthedocs.io/en/latest/index.html
+
+ABINIT PAW trial admission preserves raw XML radial functions and native
+dual-projector coefficients. Projector contractions use the dataset
+generator's per-integrand `overint` support; local augmentation uses the
+common PAW sphere and native `simp_gen` quadrature. The defining local
+overlap must match the compact metric with transposed electronic
+coefficients at the unchanged normalized D5 gate of `1e-8`. Dataset
+admission does not certify SCF or Wannier localization convergence.

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """k-dependent GL gauge G(k) for non-orthogonal Wannier functions.
 
 Parametrization (research memo specs/research/2026-09-19-kdependent-gauge.md,

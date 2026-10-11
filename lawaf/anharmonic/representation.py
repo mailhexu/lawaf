@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Space-group action S_g(q) on the mass-weighted Cartesian displacement basis.
 
 Story-014 core: the (3N, 3N) unitary representation matrices of the space

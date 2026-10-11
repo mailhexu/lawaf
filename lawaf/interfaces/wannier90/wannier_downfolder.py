@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 from HamiltonIO import WannierHam
 from lawaf.interfaces.downfolder import Lawaf
 

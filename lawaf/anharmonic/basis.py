@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Symmetry-invariant polynomial basis over LWF cluster indices (story-020).
 
 The anharmonic LWF effective energy is a polynomial in the mode amplitudes

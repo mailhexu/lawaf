@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """
 Read and write of xsf file.
 """

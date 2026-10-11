@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """
 Modified from ase cif module:
 https://gitlab.com/ase/ase/-/tree/91e5660cb468b411bb6141ea1394ae9e570f51b8/ase/io

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Declared-representation compatibility and subspace covariance (story-015).
 
 Two checks over the story-014 space-group action :class:`SpaceGroupAction`

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 """Residual-baseline joint fit of the anharmonic effective model (story 021,
 FR-010/018, ADR-009).
 

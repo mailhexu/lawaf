@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 import sys
 
 from lawaf.utils.port import get_unused_port

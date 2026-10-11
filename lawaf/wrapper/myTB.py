@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: BSD-2-Clause
 import os
 import numpy as np
 import copy

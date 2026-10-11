@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-2-Clause
 import os
 import matplotlib.pyplot as plt
 from pyDFTutils.ase_utils.kpoints import kpath

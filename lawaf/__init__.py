@@ -1,36 +1,43 @@
-from lawaf.interfaces import W90Downfolder, SiestaDownfolder, PhonopyDownfolder, NACPhonopyDownfolder
-from lawaf.interfaces.phonopy.symmetry_seeds import (
-    get_symmetry_anchor_wfn,
-    list_opd_families,
-)
-from lawaf.lwf.lwf import LWF
-from lawaf.wannierization.covariant_mmn import (
-    covariant_mmn_links,
-    mmn_form_spread,
-    phonon_mmn,
-)
-from lawaf.wannierization.kdependent_gauge import (
-    optimize_kdependent_gauge,
-)
-from lawaf.wannierization.nonorthogonal_gauge import (
-    apply_gauge_transform,
-    exact_smetric_spread,
-    optimize_nonorthogonal_gauge,
-)
+# SPDX-License-Identifier: BSD-2-Clause
+"""Lazy public API (PEP 562).
 
-__all__ = [
-    "W90Downfolder",
-    "SiestaDownfolder",
-    "PhonopyDownfolder",
-    "NACPhonopyDownfolder",
-    "LWF",
-    "get_symmetry_anchor_wfn",
-    "list_opd_families",
-    "optimize_nonorthogonal_gauge",
-    "exact_smetric_spread",
-    "optimize_kdependent_gauge",
-    "phonon_mmn",
-    "covariant_mmn_links",
-    "mmn_form_spread",
-    "apply_gauge_transform",
-]
+Importing :mod:`lawaf` — and in particular the
+:mod:`lawaf.interfaces.abinit` reader package — must not pull heavy
+dependencies (wannier90 wrappers, sisl, ctypes) onto the import graph
+(story 060, AC-060-07).  All previous eager public names are preserved and
+imported on first attribute access.
+"""
+
+_LAZY = {
+    "W90Downfolder": "lawaf.interfaces",
+    "SiestaDownfolder": "lawaf.interfaces",
+    "PhonopyDownfolder": "lawaf.interfaces",
+    "NACPhonopyDownfolder": "lawaf.interfaces",
+    "get_symmetry_anchor_wfn": "lawaf.interfaces.phonopy.symmetry_seeds",
+    "list_opd_families": "lawaf.interfaces.phonopy.symmetry_seeds",
+    "LWF": "lawaf.lwf.lwf",
+    "covariant_mmn_links": "lawaf.wannierization.covariant_mmn",
+    "mmn_form_spread": "lawaf.wannierization.covariant_mmn",
+    "phonon_mmn": "lawaf.wannierization.covariant_mmn",
+    "optimize_kdependent_gauge": "lawaf.wannierization.kdependent_gauge",
+    "apply_gauge_transform": "lawaf.wannierization.nonorthogonal_gauge",
+    "exact_smetric_spread": "lawaf.wannierization.nonorthogonal_gauge",
+    "optimize_nonorthogonal_gauge": "lawaf.wannierization.nonorthogonal_gauge",
+}
+
+__all__ = list(_LAZY)
+
+
+def __getattr__(name):
+    if name in _LAZY:
+        import importlib
+
+        module = importlib.import_module(_LAZY[name])
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(__all__)
